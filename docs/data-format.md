@@ -11,17 +11,24 @@ Timeline events are stored as a JSON array of event objects. Events can be neste
 | Field    | Type            | Required | Description |
 |----------|-----------------|----------|-------------|
 | `name`   | `string`        | Yes      | Display name of the event or period |
-| `start`  | `number`        | Yes      | Start year (integer). Negative values represent BCE years. |
-| `end`    | `number`        | Yes      | End year (integer). Can equal `start` for point events. |
+| `start`  | `string`        | Yes      | ISO date string. See Date Format below. |
+| `end`    | `string`        | Yes      | ISO date string. Can equal `start` for point events. |
 | `info`   | `string`        | No       | Additional descriptive text |
 | `nested` | `Event[]`       | No       | Child events contained within this event |
 
-### Year Representation
+### Date Format
 
-- Years are integers
-- Positive values = CE (e.g., `1492`)
-- Negative values = BCE (e.g., `-3000` = 3000 BCE)
-- Zero = 1 BCE (there is no year 0 in historical convention, but we use 0 as a valid value representing 1 BCE for simplicity)
+Dates are ISO date strings with variable precision:
+
+| Format | Example | Meaning |
+|--------|---------|---------|
+| Year only | `"1471"` | The year 1471 |
+| Year-month | `"1471-08"` | August 1471 |
+| Full date | `"1471-08-09"` | 9 August 1471 |
+| BCE year | `"-3000"` | 3000 BCE |
+| BCE full | `"-3000-06-15"` | 15 June 3000 BCE |
+
+**Internal representation**: Dates are converted to decimal years for rendering math. `"1471-07-01"` becomes approximately `1471.5`. This conversion is handled by `src/data/time.ts` and is transparent to the data format.
 
 ### Nesting Rules
 
@@ -35,27 +42,27 @@ Timeline events are stored as a JSON array of event objects. Events can be neste
 ```json
 [
   {
-    "start": 1471,
-    "end": 1534,
+    "start": "1471",
+    "end": "1534",
     "name": "Renaissance Popes",
     "nested": [
       {
-        "start": 1471,
-        "end": 1484,
+        "start": "1471-08-09",
+        "end": "1484-08-12",
         "name": "Sixtus IV",
         "info": "Francesco della Rovere"
       },
       {
-        "start": 1503,
-        "end": 1513,
+        "start": "1503-11-01",
+        "end": "1513-02-21",
         "name": "Julius II",
         "info": "Giuliano della Rovere"
       }
     ]
   },
   {
-    "start": 1469,
-    "end": 1527,
+    "start": "1469-05-03",
+    "end": "1527-06-21",
     "name": "Niccolo Machiavelli"
   }
 ]

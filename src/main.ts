@@ -1,7 +1,9 @@
 import { loadEvents } from './data/loader';
-import { render } from './timeline/renderer';
+import { render, computeFullRange } from './timeline/renderer';
+import { Viewport } from './timeline/viewport';
+import { setupInput } from './timeline/input';
 
-function setupCanvas(canvas: HTMLCanvasElement) {
+function setupCanvas(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
   const dpr = window.devicePixelRatio || 1;
   const rect = canvas.getBoundingClientRect();
   canvas.width = rect.width * dpr;
@@ -19,19 +21,41 @@ async function main() {
     throw new Error('Canvas element not found');
   }
 
-  // Fill viewport
   canvas.style.width = '100vw';
   canvas.style.height = '100vh';
 
   const events = await loadEvents('/events.json');
 
+  // Initialize viewport to show full data range
+  let viewport: Viewport = computeFullRange(events);
+
+  // rAF-batched rendering
+  let rafId = 0;
+
   function draw() {
+    rafId = 0;
     const ctx = setupCanvas(canvas);
-    render(ctx, canvas, events);
+    const rect = canvas.getBoundingClientRect();
+    render(ctx, rect.width, rect.height, events, viewport);
   }
 
+  function requestRedraw() {
+    if (rafId === 0) {
+      rafId = requestAnimationFrame(draw);
+    }
+  }
+
+  // Wire up input
+  setupInput(
+    canvas,
+    () => viewport,
+    (v: Viewport) => { viewport = v; },
+    requestRedraw,
+  );
+
+  // Initial draw and resize handler
   draw();
-  window.addEventListener('resize', draw);
+  window.addEventListener('resize', () => requestRedraw());
 }
 
 main();

@@ -1,7 +1,7 @@
 export interface TimelineEvent {
   name: string;
-  start: number;
-  end: number;
+  start: string;
+  end: string;
   info?: string;
   nested?: TimelineEvent[];
 }

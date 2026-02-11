@@ -45,16 +45,16 @@ Axis:  ────────────────────────�
 
 ## Non-Goals (for this feature)
 
-- No pan or zoom
 - No click interaction
 - No collapsing/expanding of groups
 - No animations
-- No responsive scaling for very different time ranges (this assumes a narrow date range for now)
 
 ## Technical Approach
 
-1. `src/types.ts` defines `TimelineEvent` type matching the data schema
-2. `src/data/loader.ts` fetches and parses `public/events.json`
-3. `src/timeline/renderer.ts` takes a Canvas context and an array of events, and draws the timeline
-4. `src/main.ts` initializes the Canvas, loads data, and triggers rendering
-5. Canvas is redrawn on window resize
+1. `src/types.ts` defines `TimelineEvent` type with ISO date string `start`/`end` fields
+2. `src/data/time.ts` converts ISO date strings to decimal years for rendering math
+3. `src/data/loader.ts` fetches and parses `public/events.json`
+4. `src/timeline/viewport.ts` defines the visible year range (Viewport)
+5. `src/timeline/renderer.ts` takes a Canvas context, events, and viewport, and draws the timeline
+6. `src/main.ts` initializes the Canvas, loads data, sets up viewport and input, triggers rendering
+7. Canvas is redrawn on window resize and viewport changes

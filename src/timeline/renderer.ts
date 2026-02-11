@@ -1,4 +1,6 @@
 import { TimelineEvent } from '../types';
+import { Viewport } from './viewport';
+import { dateToDecimalYear, formatAxisLabel } from '../data/time';
 
 const COLORS = {
   background: '#1a1a2e',
@@ -21,49 +23,47 @@ const LAYOUT = {
   childBarHeight: 22,
   parentRowStart: 110,
   rowGap: 6,
-  nestIndent: 20,
   barRadius: 4,
   fontSize: 13,
   smallFontSize: 11,
 };
 
-interface TimeRange {
-  min: number;
-  max: number;
-}
-
-function findTimeRange(events: TimelineEvent[]): TimeRange {
+/**
+ * Compute the full time range of all events (including nested).
+ * Returns a Viewport spanning the entire dataset with a small margin.
+ */
+export function computeFullRange(events: TimelineEvent[]): Viewport {
   let min = Infinity;
   let max = -Infinity;
 
   function walk(list: TimelineEvent[]) {
     for (const e of list) {
-      if (e.start < min) min = e.start;
-      if (e.end > max) max = e.end;
-      if (e.end === e.start) {
-        // Point event: give it a little visual space
-        if (e.start - 1 < min) min = e.start - 1;
-        if (e.end + 1 > max) max = e.end + 1;
+      const s = dateToDecimalYear(e.start);
+      const end = dateToDecimalYear(e.end);
+      if (s < min) min = s;
+      if (end > max) max = end;
+      if (s === end) {
+        if (s - 1 < min) min = s - 1;
+        if (end + 1 > max) max = end + 1;
       }
       if (e.nested) walk(e.nested);
     }
   }
 
   walk(events);
-  // Add a small margin
   const span = max - min;
   min -= span * 0.02;
   max += span * 0.02;
-  return { min, max };
+  return { start: min, end: max };
 }
 
-function yearToX(year: number, range: TimeRange, canvasWidth: number): number {
+function yearToX(year: number, viewport: Viewport, canvasWidth: number): number {
   const drawWidth = canvasWidth - LAYOUT.paddingX * 2;
-  return LAYOUT.paddingX + ((year - range.min) / (range.max - range.min)) * drawWidth;
+  return LAYOUT.paddingX + ((year - viewport.start) / (viewport.end - viewport.start)) * drawWidth;
 }
 
-function chooseTickInterval(range: TimeRange, canvasWidth: number): number {
-  const span = range.max - range.min;
+function chooseTickInterval(viewport: Viewport, canvasWidth: number): number {
+  const span = viewport.end - viewport.start;
   const drawWidth = canvasWidth - LAYOUT.paddingX * 2;
   const minPixelsPerTick = 80;
   const maxTicks = drawWidth / minPixelsPerTick;
@@ -74,11 +74,6 @@ function chooseTickInterval(range: TimeRange, canvasWidth: number): number {
     if (interval >= rawInterval) return interval;
   }
   return Math.ceil(rawInterval / 1000) * 1000;
-}
-
-function formatYear(year: number): string {
-  if (year < 0) return `${Math.abs(year)} BCE`;
-  return `${year}`;
 }
 
 function drawRoundedRect(
@@ -103,7 +98,7 @@ function drawRoundedRect(
   ctx.closePath();
 }
 
-function drawAxis(ctx: CanvasRenderingContext2D, range: TimeRange, canvasWidth: number) {
+function drawAxis(ctx: CanvasRenderingContext2D, viewport: Viewport, canvasWidth: number) {
   const y = LAYOUT.axisY;
   const x1 = LAYOUT.paddingX;
   const x2 = canvasWidth - LAYOUT.paddingX;
@@ -117,36 +112,44 @@ function drawAxis(ctx: CanvasRenderingContext2D, range: TimeRange, canvasWidth: 
   ctx.stroke();
 
   // Ticks and labels
-  const interval = chooseTickInterval(range, canvasWidth);
-  const firstTick = Math.ceil(range.min / interval) * interval;
+  const interval = chooseTickInterval(viewport, canvasWidth);
+  const firstTick = Math.ceil(viewport.start / interval) * interval;
+  const spanYears = viewport.end - viewport.start;
 
   ctx.fillStyle = COLORS.axisText;
   ctx.font = `${LAYOUT.smallFontSize}px monospace`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
 
-  for (let year = firstTick; year <= range.max; year += interval) {
-    const x = yearToX(year, range, canvasWidth);
+  for (let year = firstTick; year <= viewport.end; year += interval) {
+    const x = yearToX(year, viewport, canvasWidth);
     ctx.beginPath();
     ctx.moveTo(x, y - LAYOUT.tickHeight / 2);
     ctx.lineTo(x, y + LAYOUT.tickHeight / 2);
     ctx.stroke();
-    ctx.fillText(formatYear(year), x, y + LAYOUT.tickHeight / 2 + 4);
+    ctx.fillText(formatAxisLabel(year, spanYears), x, y + LAYOUT.tickHeight / 2 + 4);
   }
+}
+
+/** Check if an event is visible within the viewport */
+function isVisible(startYear: number, endYear: number, viewport: Viewport): boolean {
+  return endYear >= viewport.start && startYear <= viewport.end;
 }
 
 function drawEventBar(
   ctx: CanvasRenderingContext2D,
-  event: TimelineEvent,
+  startYear: number,
+  endYear: number,
+  name: string,
   y: number,
-  range: TimeRange,
+  viewport: Viewport,
   canvasWidth: number,
   isChild: boolean,
 ) {
-  const x1 = yearToX(event.start, range, canvasWidth);
-  const x2 = yearToX(event.end, range, canvasWidth);
+  const x1 = yearToX(startYear, viewport, canvasWidth);
+  const x2 = yearToX(endYear, viewport, canvasWidth);
   const barHeight = isChild ? LAYOUT.childBarHeight : LAYOUT.parentBarHeight;
-  const barWidth = Math.max(x2 - x1, 3); // minimum 3px for point events
+  const barWidth = Math.max(x2 - x1, 3);
 
   // Bar
   const fillColor = isChild ? COLORS.childBar : COLORS.parentBar;
@@ -176,46 +179,50 @@ function drawEventBar(
     ctx.beginPath();
     ctx.rect(x1, y, barWidth, barHeight);
     ctx.clip();
-    ctx.fillText(event.name, textX, textY);
+    ctx.fillText(name, textX, textY);
     ctx.restore();
   } else {
-    // Bar too small: draw label to the right
-    ctx.fillText(event.name, x1 + barWidth + 4, textY);
+    ctx.fillText(name, x1 + barWidth + 4, textY);
   }
 }
 
 export function render(
   ctx: CanvasRenderingContext2D,
-  canvas: HTMLCanvasElement,
+  canvasWidth: number,
+  canvasHeight: number,
   events: TimelineEvent[],
+  viewport: Viewport,
 ) {
-  const width = canvas.width;
-  const height = canvas.height;
-
   // Clear
   ctx.fillStyle = COLORS.background;
-  ctx.fillRect(0, 0, width, height);
+  ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
   if (events.length === 0) return;
 
-  const range = findTimeRange(events);
-
   // Draw axis
-  drawAxis(ctx, range, width);
+  drawAxis(ctx, viewport, canvasWidth);
 
   // Draw events
   let currentY = LAYOUT.parentRowStart;
 
   for (const event of events) {
-    drawEventBar(ctx, event, currentY, range, width, false);
+    const eventStart = dateToDecimalYear(event.start);
+    const eventEnd = dateToDecimalYear(event.end);
+
+    if (isVisible(eventStart, eventEnd, viewport)) {
+      drawEventBar(ctx, eventStart, eventEnd, event.name, currentY, viewport, canvasWidth, false);
+    }
     currentY += LAYOUT.parentBarHeight + LAYOUT.rowGap;
 
     if (event.nested) {
       for (const child of event.nested) {
-        drawEventBar(ctx, child, currentY, range, width, true);
+        const childStart = dateToDecimalYear(child.start);
+        const childEnd = dateToDecimalYear(child.end);
+        if (isVisible(childStart, childEnd, viewport)) {
+          drawEventBar(ctx, childStart, childEnd, child.name, currentY, viewport, canvasWidth, true);
+        }
         currentY += LAYOUT.childBarHeight + LAYOUT.rowGap;
       }
-      // Add extra gap after a group's children
       currentY += LAYOUT.rowGap;
     }
   }
