@@ -35,6 +35,7 @@ interface Viewport {
 |-------|--------|
 | Trackpad horizontal swipe | `wheel.deltaX` → horizontal pan |
 | Mouse wheel (vertical) | `wheel.deltaY` → horizontal pan |
+| Ctrl/Cmd + wheel / trackpad pinch | Zoom (see feature 05) — not pan |
 | Mouse drag | `mousemove` delta → horizontal pan |
 | Touch drag | `touchmove` delta → horizontal pan |
 
@@ -47,7 +48,7 @@ interface Viewport {
 
 ## Non-Goals (for this feature)
 
-- No zoom (will be a separate feature)
+- Zoom is handled by feature 05
 - No vertical scrolling
 - No scroll boundaries / edge clamping (can scroll past data range freely)
 - No inertia / momentum scrolling

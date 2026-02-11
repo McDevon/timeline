@@ -1,4 +1,4 @@
-import { Viewport, panViewport } from './viewport';
+import { Viewport, panViewport, zoomViewport } from './viewport';
 import { LayoutItem } from './layout';
 import { hitTest } from './hitTest';
 import { Tooltip } from '../ui/tooltip';
@@ -27,8 +27,18 @@ export function setupInput(
   function onWheel(e: WheelEvent) {
     e.preventDefault();
     const viewport = getViewport();
-    const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
-    setViewport(panViewport(viewport, delta, canvas.clientWidth));
+
+    if (e.ctrlKey || e.metaKey) {
+      // Zoom — Ctrl+wheel or trackpad pinch
+      const rect = canvas.getBoundingClientRect();
+      const cursorX = e.clientX - rect.left;
+      setViewport(zoomViewport(viewport, cursorX, canvas.clientWidth, e.deltaY));
+    } else {
+      // Pan
+      const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      setViewport(panViewport(viewport, delta, canvas.clientWidth));
+    }
+
     requestRedraw();
   }
 
