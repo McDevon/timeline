@@ -1,53 +1,108 @@
 import { Viewport, panViewport } from './viewport';
+import { LayoutItem } from './layout';
+import { hitTest } from './hitTest';
+import { Tooltip } from '../ui/tooltip';
 
 export interface InputHandlers {
   destroy(): void;
 }
 
+const CLICK_THRESHOLD = 3; // pixels — movement under this is a click, not a drag
+
 /**
- * Attach input handlers to a canvas for panning the viewport.
- * Returns a destroy function to remove all listeners.
+ * Attach input handlers to a canvas for panning, hover, and click.
  */
 export function setupInput(
   canvas: HTMLCanvasElement,
   getViewport: () => Viewport,
   setViewport: (v: Viewport) => void,
+  getLayout: () => LayoutItem[],
+  getHovered: () => LayoutItem | null,
+  setHovered: (item: LayoutItem | null) => void,
   requestRedraw: () => void,
 ): InputHandlers {
+  const tooltip = new Tooltip();
+
   // --- Wheel / trackpad ---
   function onWheel(e: WheelEvent) {
     e.preventDefault();
     const viewport = getViewport();
-    // Use deltaX for horizontal swipe; fall back to deltaY for vertical-only wheels
     const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
     setViewport(panViewport(viewport, delta, canvas.clientWidth));
     requestRedraw();
   }
 
-  // --- Mouse drag ---
+  // --- Mouse drag + click ---
   let dragging = false;
+  let mouseDownX = 0;
+  let mouseDownY = 0;
   let lastMouseX = 0;
+  let didDrag = false;
 
   function onMouseDown(e: MouseEvent) {
-    if (e.button !== 0) return; // left button only
+    if (e.button !== 0) return;
     dragging = true;
+    didDrag = false;
+    mouseDownX = e.clientX;
+    mouseDownY = e.clientY;
     lastMouseX = e.clientX;
     canvas.style.cursor = 'grabbing';
   }
 
   function onMouseMove(e: MouseEvent) {
-    if (!dragging) return;
-    const dx = lastMouseX - e.clientX; // inverted: drag right → scroll left
-    lastMouseX = e.clientX;
+    if (dragging) {
+      const dx = lastMouseX - e.clientX;
+      lastMouseX = e.clientX;
+
+      const dist = Math.hypot(e.clientX - mouseDownX, e.clientY - mouseDownY);
+      if (dist >= CLICK_THRESHOLD) {
+        didDrag = true;
+      }
+
+      const viewport = getViewport();
+      setViewport(panViewport(viewport, dx, canvas.clientWidth));
+      requestRedraw();
+      return;
+    }
+
+    // Hover detection
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const layout = getLayout();
     const viewport = getViewport();
-    setViewport(panViewport(viewport, dx, canvas.clientWidth));
-    requestRedraw();
+    const hit = hitTest(x, y, layout, viewport, canvas.clientWidth);
+
+    const prev = getHovered();
+    if (hit !== prev) {
+      setHovered(hit);
+      canvas.style.cursor = hit ? 'pointer' : 'grab';
+      requestRedraw();
+    }
   }
 
-  function onMouseUp() {
+  function onMouseUp(e: MouseEvent) {
     if (!dragging) return;
     dragging = false;
-    canvas.style.cursor = 'grab';
+
+    if (!didDrag) {
+      // This was a click, not a drag
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const layout = getLayout();
+      const viewport = getViewport();
+      const hit = hitTest(x, y, layout, viewport, canvas.clientWidth);
+
+      if (hit) {
+        tooltip.show(hit.event, e.clientX, e.clientY);
+      } else {
+        tooltip.hide();
+      }
+    }
+
+    const hovered = getHovered();
+    canvas.style.cursor = hovered ? 'pointer' : 'grab';
   }
 
   // --- Touch drag ---
@@ -56,6 +111,7 @@ export function setupInput(
   function onTouchStart(e: TouchEvent) {
     if (e.touches.length === 1) {
       lastTouchX = e.touches[0].clientX;
+      tooltip.hide();
     }
   }
 
@@ -77,7 +133,6 @@ export function setupInput(
   canvas.addEventListener('touchstart', onTouchStart, { passive: true });
   canvas.addEventListener('touchmove', onTouchMove, { passive: false });
 
-  // Set initial cursor
   canvas.style.cursor = 'grab';
 
   return {
@@ -88,6 +143,7 @@ export function setupInput(
       window.removeEventListener('mouseup', onMouseUp);
       canvas.removeEventListener('touchstart', onTouchStart);
       canvas.removeEventListener('touchmove', onTouchMove);
+      tooltip.hide();
     },
   };
 }

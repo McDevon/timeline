@@ -1,5 +1,6 @@
 import { loadEvents } from './data/loader';
-import { render, computeFullRange } from './timeline/renderer';
+import { render, computeFullRange, LAYOUT } from './timeline/renderer';
+import { computeLayout, LayoutItem } from './timeline/layout';
 import { Viewport } from './timeline/viewport';
 import { setupInput } from './timeline/input';
 
@@ -26,8 +27,12 @@ async function main() {
 
   const events = await loadEvents('/events.json');
 
+  // Compute layout once (events are static)
+  const layout: LayoutItem[] = computeLayout(events, LAYOUT.eventsStartY);
+
   // Initialize viewport to show full data range
   let viewport: Viewport = computeFullRange(events);
+  let hoveredItem: LayoutItem | null = null;
 
   // rAF-batched rendering
   let rafId = 0;
@@ -36,7 +41,7 @@ async function main() {
     rafId = 0;
     const ctx = setupCanvas(canvas);
     const rect = canvas.getBoundingClientRect();
-    render(ctx, rect.width, rect.height, events, viewport);
+    render(ctx, rect.width, rect.height, layout, viewport, hoveredItem);
   }
 
   function requestRedraw() {
@@ -50,6 +55,9 @@ async function main() {
     canvas,
     () => viewport,
     (v: Viewport) => { viewport = v; },
+    () => layout,
+    () => hoveredItem,
+    (item: LayoutItem | null) => { hoveredItem = item; },
     requestRedraw,
   );
 

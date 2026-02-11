@@ -1,32 +1,36 @@
 import { TimelineEvent } from '../types';
-import { Viewport } from './viewport';
+import { Viewport, yearToX } from './viewport';
 import { dateToDecimalYear, formatAxisLabel } from '../data/time';
+import { LayoutItem } from './layout';
 
 const COLORS = {
   background: '#1a1a2e',
   axis: '#e0e0e0',
   axisText: '#a0a0a0',
-  parentBar: '#16213e',
-  parentBorder: '#0f3460',
-  parentText: '#e0e0e0',
-  childBar: '#0f3460',
-  childBorder: '#533483',
-  childText: '#e0e0e0',
+  containerFill: 'rgba(15, 52, 96, 0.25)',
+  containerBorder: '#0f3460',
+  containerText: '#e0e0e0',
+  containerHoverFill: 'rgba(15, 52, 96, 0.4)',
+  containerHoverBorder: '#1a6ea0',
+  barFill: '#0f3460',
+  barBorder: '#533483',
+  barText: '#e0e0e0',
+  barHoverFill: '#163d6e',
+  barHoverBorder: '#7b52ab',
 };
 
 const LAYOUT = {
   paddingX: 60,
-  paddingTop: 60,
   axisY: 80,
   tickHeight: 8,
-  parentBarHeight: 30,
-  childBarHeight: 22,
-  parentRowStart: 110,
-  rowGap: 6,
+  eventsStartY: 110,
   barRadius: 4,
+  containerRadius: 6,
   fontSize: 13,
   smallFontSize: 11,
 };
+
+export { LAYOUT };
 
 /**
  * Compute the full time range of all events (including nested).
@@ -55,11 +59,6 @@ export function computeFullRange(events: TimelineEvent[]): Viewport {
   min -= span * 0.02;
   max += span * 0.02;
   return { start: min, end: max };
-}
-
-function yearToX(year: number, viewport: Viewport, canvasWidth: number): number {
-  const drawWidth = canvasWidth - LAYOUT.paddingX * 2;
-  return LAYOUT.paddingX + ((year - viewport.start) / (viewport.end - viewport.start)) * drawWidth;
 }
 
 function chooseTickInterval(viewport: Viewport, canvasWidth: number): number {
@@ -103,7 +102,6 @@ function drawAxis(ctx: CanvasRenderingContext2D, viewport: Viewport, canvasWidth
   const x1 = LAYOUT.paddingX;
   const x2 = canvasWidth - LAYOUT.paddingX;
 
-  // Main axis line
   ctx.strokeStyle = COLORS.axis;
   ctx.lineWidth = 1;
   ctx.beginPath();
@@ -111,7 +109,6 @@ function drawAxis(ctx: CanvasRenderingContext2D, viewport: Viewport, canvasWidth
   ctx.lineTo(x2, y);
   ctx.stroke();
 
-  // Ticks and labels
   const interval = chooseTickInterval(viewport, canvasWidth);
   const firstTick = Math.ceil(viewport.start / interval) * interval;
   const spanYears = viewport.end - viewport.start;
@@ -131,58 +128,104 @@ function drawAxis(ctx: CanvasRenderingContext2D, viewport: Viewport, canvasWidth
   }
 }
 
-/** Check if an event is visible within the viewport */
 function isVisible(startYear: number, endYear: number, viewport: Viewport): boolean {
   return endYear >= viewport.start && startYear <= viewport.end;
 }
 
-function drawEventBar(
+function drawContainer(
   ctx: CanvasRenderingContext2D,
-  startYear: number,
-  endYear: number,
-  name: string,
-  y: number,
+  item: LayoutItem,
   viewport: Viewport,
   canvasWidth: number,
-  isChild: boolean,
+  hoveredItem: LayoutItem | null,
 ) {
-  const x1 = yearToX(startYear, viewport, canvasWidth);
-  const x2 = yearToX(endYear, viewport, canvasWidth);
-  const barHeight = isChild ? LAYOUT.childBarHeight : LAYOUT.parentBarHeight;
-  const barWidth = Math.max(x2 - x1, 3);
+  const x1 = yearToX(item.startYear, viewport, canvasWidth);
+  const x2 = yearToX(item.endYear, viewport, canvasWidth);
+  const boxWidth = Math.max(x2 - x1, 3);
+  const isHovered = hoveredItem === item;
 
-  // Bar
-  const fillColor = isChild ? COLORS.childBar : COLORS.parentBar;
-  const borderColor = isChild ? COLORS.childBorder : COLORS.parentBorder;
-
-  drawRoundedRect(ctx, x1, y, barWidth, barHeight, LAYOUT.barRadius);
-  ctx.fillStyle = fillColor;
+  // Container background
+  drawRoundedRect(ctx, x1, item.y, boxWidth, item.height, LAYOUT.containerRadius);
+  ctx.fillStyle = isHovered ? COLORS.containerHoverFill : COLORS.containerFill;
   ctx.fill();
-  ctx.strokeStyle = borderColor;
-  ctx.lineWidth = 1;
+  ctx.strokeStyle = isHovered ? COLORS.containerHoverBorder : COLORS.containerBorder;
+  ctx.lineWidth = isHovered ? 2 : 1;
   ctx.stroke();
 
-  // Label
-  const textColor = isChild ? COLORS.childText : COLORS.parentText;
-  const fontSize = isChild ? LAYOUT.smallFontSize : LAYOUT.fontSize;
-  ctx.fillStyle = textColor;
-  ctx.font = `${fontSize}px sans-serif`;
+  // Container label at top
+  ctx.fillStyle = COLORS.containerText;
+  ctx.font = `${LAYOUT.fontSize}px sans-serif`;
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'left';
 
-  const textY = y + barHeight / 2;
+  const labelY = item.y + 12;
+  const labelX = x1 + 8;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x1, item.y, boxWidth, item.height);
+  ctx.clip();
+  ctx.fillText(item.event.name, labelX, labelY);
+  ctx.restore();
+
+  // Draw children
+  for (const child of item.children) {
+    drawLayoutItem(ctx, child, viewport, canvasWidth, hoveredItem);
+  }
+}
+
+function drawBar(
+  ctx: CanvasRenderingContext2D,
+  item: LayoutItem,
+  viewport: Viewport,
+  canvasWidth: number,
+  isHovered: boolean,
+) {
+  const x1 = yearToX(item.startYear, viewport, canvasWidth);
+  const x2 = yearToX(item.endYear, viewport, canvasWidth);
+  const barWidth = Math.max(x2 - x1, 3);
+
+  drawRoundedRect(ctx, x1, item.y, barWidth, item.height, LAYOUT.barRadius);
+  ctx.fillStyle = isHovered ? COLORS.barHoverFill : COLORS.barFill;
+  ctx.fill();
+  ctx.strokeStyle = isHovered ? COLORS.barHoverBorder : COLORS.barBorder;
+  ctx.lineWidth = isHovered ? 2 : 1;
+  ctx.stroke();
+
+  // Label
+  ctx.fillStyle = COLORS.barText;
+  ctx.font = `${LAYOUT.smallFontSize}px sans-serif`;
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'left';
+
+  const textY = item.y + item.height / 2;
   const textX = x1 + 6;
   const maxTextWidth = barWidth - 12;
 
   if (maxTextWidth > 20) {
     ctx.save();
     ctx.beginPath();
-    ctx.rect(x1, y, barWidth, barHeight);
+    ctx.rect(x1, item.y, barWidth, item.height);
     ctx.clip();
-    ctx.fillText(name, textX, textY);
+    ctx.fillText(item.event.name, textX, textY);
     ctx.restore();
   } else {
-    ctx.fillText(name, x1 + barWidth + 4, textY);
+    ctx.fillText(item.event.name, x1 + barWidth + 4, textY);
+  }
+}
+
+function drawLayoutItem(
+  ctx: CanvasRenderingContext2D,
+  item: LayoutItem,
+  viewport: Viewport,
+  canvasWidth: number,
+  hoveredItem: LayoutItem | null,
+) {
+  if (!isVisible(item.startYear, item.endYear, viewport)) return;
+
+  if (item.isContainer) {
+    drawContainer(ctx, item, viewport, canvasWidth, hoveredItem);
+  } else {
+    drawBar(ctx, item, viewport, canvasWidth, hoveredItem === item);
   }
 }
 
@@ -190,40 +233,18 @@ export function render(
   ctx: CanvasRenderingContext2D,
   canvasWidth: number,
   canvasHeight: number,
-  events: TimelineEvent[],
+  layout: LayoutItem[],
   viewport: Viewport,
+  hoveredItem: LayoutItem | null,
 ) {
-  // Clear
   ctx.fillStyle = COLORS.background;
   ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-  if (events.length === 0) return;
+  if (layout.length === 0) return;
 
-  // Draw axis
   drawAxis(ctx, viewport, canvasWidth);
 
-  // Draw events
-  let currentY = LAYOUT.parentRowStart;
-
-  for (const event of events) {
-    const eventStart = dateToDecimalYear(event.start);
-    const eventEnd = dateToDecimalYear(event.end);
-
-    if (isVisible(eventStart, eventEnd, viewport)) {
-      drawEventBar(ctx, eventStart, eventEnd, event.name, currentY, viewport, canvasWidth, false);
-    }
-    currentY += LAYOUT.parentBarHeight + LAYOUT.rowGap;
-
-    if (event.nested) {
-      for (const child of event.nested) {
-        const childStart = dateToDecimalYear(child.start);
-        const childEnd = dateToDecimalYear(child.end);
-        if (isVisible(childStart, childEnd, viewport)) {
-          drawEventBar(ctx, childStart, childEnd, child.name, currentY, viewport, canvasWidth, true);
-        }
-        currentY += LAYOUT.childBarHeight + LAYOUT.rowGap;
-      }
-      currentY += LAYOUT.rowGap;
-    }
+  for (const item of layout) {
+    drawLayoutItem(ctx, item, viewport, canvasWidth, hoveredItem);
   }
 }
