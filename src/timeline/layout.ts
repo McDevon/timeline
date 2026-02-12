@@ -20,126 +20,168 @@ export interface LayoutItem {
   children: LayoutItem[];
 }
 
-/**
- * Assign each child to a row index using greedy interval packing.
- * Children should be sorted by start time before calling.
- * Returns an array of row indices (one per child).
- */
-function packRows(children: { startYear: number; endYear: number }[]): number[] {
-  // Each row tracks the end year of its last placed event
-  const rowEnds: number[] = [];
-  const assignments: number[] = [];
-
-  for (const child of children) {
-    let placed = false;
-    for (let r = 0; r < rowEnds.length; r++) {
-      if (child.startYear >= rowEnds[r]) {
-        rowEnds[r] = child.endYear;
-        assignments.push(r);
-        placed = true;
-        break;
-      }
-    }
-    if (!placed) {
-      rowEnds.push(child.endYear);
-      assignments.push(rowEnds.length - 1);
-    }
-  }
-
-  return assignments;
+/** Internal: an event placed at a relative Y within its level. */
+interface PlacedItem {
+  event: TimelineEvent;
+  startYear: number;
+  endYear: number;
+  relativeY: number;
+  height: number;
+  isContainer: boolean;
+  placedChildren: PlacedItem[];
 }
 
 /**
- * Compute the height of a container given the number of packed rows.
+ * Find the minimum Y position where an item of the given height fits
+ * without overlapping any active event. Active list must be sorted by Y.
  */
-function containerHeight(numRows: number): number {
-  if (numRows === 0) return LAYOUT.parentBarHeight;
-  return (
-    LAYOUT.containerHeaderHeight +
-    LAYOUT.containerPadding +
-    numRows * LAYOUT.childBarHeight +
-    (numRows - 1) * LAYOUT.rowGap +
-    LAYOUT.containerPadding
-  );
+function findMinY(active: PlacedItem[], height: number, gap: number): number {
+  let y = 0;
+  for (const event of active) {
+    if (y + height + gap <= event.relativeY) {
+      break; // found a gap
+    }
+    y = Math.max(y, event.relativeY + event.height + gap);
+  }
+  return y;
+}
+
+/**
+ * Insert an item into a Y-sorted active list, maintaining sort order.
+ */
+function insertSorted(active: PlacedItem[], item: PlacedItem): void {
+  let i = active.length;
+  while (i > 0 && active[i - 1].relativeY > item.relativeY) {
+    i--;
+  }
+  active.splice(i, 0, item);
+}
+
+/**
+ * Recursively compute sizes and place events at a given level.
+ *
+ * Uses sweep-and-prune: events are processed in time order, maintaining
+ * an active set of time-overlapping events sorted by Y position.
+ * Each event is placed at the highest Y that doesn't collide with any
+ * active event. Works for arbitrary nesting depth — containers recursively
+ * place their children the same way.
+ */
+function placeLevel(
+  events: TimelineEvent[],
+  barHeight: number,
+  gap: number,
+): { items: PlacedItem[]; totalHeight: number } {
+  // Phase 1: compute heights (recursively for containers)
+  const sized = events.map(event => {
+    const startYear = dateToDecimalYear(event.start);
+    const endYear = dateToDecimalYear(event.end);
+
+    if (!event.nested || event.nested.length === 0) {
+      return {
+        event,
+        startYear,
+        endYear,
+        height: barHeight,
+        isContainer: false,
+        placedChildren: [] as PlacedItem[],
+      };
+    }
+
+    const { items: placedChildren, totalHeight: contentHeight } =
+      placeLevel(event.nested, LAYOUT.childBarHeight, LAYOUT.rowGap);
+
+    const height =
+      LAYOUT.containerHeaderHeight +
+      LAYOUT.containerPadding +
+      contentHeight +
+      LAYOUT.containerPadding;
+
+    return {
+      event,
+      startYear,
+      endYear,
+      height,
+      isContainer: true,
+      placedChildren,
+    };
+  });
+
+  // Sort by start time for sweep
+  const sorted = [...sized].sort((a, b) => a.startYear - b.startYear);
+
+  // Phase 2: sweep-and-prune placement
+  const active: PlacedItem[] = []; // Y-sorted active set
+  const placed: PlacedItem[] = [];
+
+  for (const item of sorted) {
+    // Prune: remove events whose time range no longer overlaps
+    for (let i = active.length - 1; i >= 0; i--) {
+      if (active[i].endYear <= item.startYear) {
+        active.splice(i, 1);
+      }
+    }
+
+    const y = findMinY(active, item.height, gap);
+
+    const placedItem: PlacedItem = {
+      event: item.event,
+      startYear: item.startYear,
+      endYear: item.endYear,
+      relativeY: y,
+      height: item.height,
+      isContainer: item.isContainer,
+      placedChildren: item.placedChildren,
+    };
+
+    insertSorted(active, placedItem);
+    placed.push(placedItem);
+  }
+
+  const totalHeight = placed.length > 0
+    ? Math.max(...placed.map(p => p.relativeY + p.height))
+    : 0;
+
+  return { items: placed, totalHeight };
+}
+
+/**
+ * Convert relative-Y placed items to absolute-Y LayoutItems.
+ */
+function toLayoutItems(placed: PlacedItem[], offsetY: number): LayoutItem[] {
+  return placed.map(item => {
+    const y = offsetY + item.relativeY;
+
+    if (!item.isContainer) {
+      return {
+        event: item.event,
+        startYear: item.startYear,
+        endYear: item.endYear,
+        y,
+        height: item.height,
+        isContainer: false,
+        children: [],
+      };
+    }
+
+    const childrenStartY = y + LAYOUT.containerHeaderHeight + LAYOUT.containerPadding;
+    const children = toLayoutItems(item.placedChildren, childrenStartY);
+
+    return {
+      event: item.event,
+      startYear: item.startYear,
+      endYear: item.endYear,
+      y,
+      height: item.height,
+      isContainer: true,
+      children,
+    };
+  });
 }
 
 /**
  * Recursively compute layout for a list of events starting at a given Y offset.
  */
 export function computeLayout(events: TimelineEvent[], startY: number): LayoutItem[] {
-  const items: LayoutItem[] = [];
-  let currentY = startY;
-
-  for (const event of events) {
-    const startYear = dateToDecimalYear(event.start);
-    const endYear = dateToDecimalYear(event.end);
-
-    if (!event.nested || event.nested.length === 0) {
-      // Leaf event — simple bar
-      items.push({
-        event,
-        startYear,
-        endYear,
-        y: currentY,
-        height: LAYOUT.parentBarHeight,
-        isContainer: false,
-        children: [],
-      });
-      currentY += LAYOUT.parentBarHeight + LAYOUT.itemGap;
-    } else {
-      // Container event — compute children layout
-      const childData = event.nested.map(child => ({
-        event: child,
-        startYear: dateToDecimalYear(child.start),
-        endYear: dateToDecimalYear(child.end),
-      }));
-
-      // Sort by start time for packing
-      const sorted = childData
-        .map((c, i) => ({ ...c, originalIndex: i }))
-        .sort((a, b) => a.startYear - b.startYear);
-
-      const rowAssignments = packRows(sorted);
-      const numRows = rowAssignments.length > 0 ? Math.max(...rowAssignments) + 1 : 0;
-      const height = containerHeight(numRows);
-
-      const containerY = currentY;
-      const childrenStartY = containerY + LAYOUT.containerHeaderHeight + LAYOUT.containerPadding;
-
-      // Build child layout items with Y positions based on row assignment
-      const children: LayoutItem[] = sorted.map((child, i) => {
-        const row = rowAssignments[i];
-        const childY = childrenStartY + row * (LAYOUT.childBarHeight + LAYOUT.rowGap);
-
-        // Recurse for deeply nested events
-        if (child.event.nested && child.event.nested.length > 0) {
-          const nestedItems = computeLayout([child.event], childY);
-          return nestedItems[0];
-        }
-
-        return {
-          event: child.event,
-          startYear: child.startYear,
-          endYear: child.endYear,
-          y: childY,
-          height: LAYOUT.childBarHeight,
-          isContainer: false,
-          children: [],
-        };
-      });
-
-      items.push({
-        event,
-        startYear,
-        endYear,
-        y: containerY,
-        height,
-        isContainer: true,
-        children,
-      });
-      currentY += height + LAYOUT.itemGap;
-    }
-  }
-
-  return items;
+  const { items } = placeLevel(events, LAYOUT.parentBarHeight, LAYOUT.itemGap);
+  return toLayoutItems(items, startY);
 }
