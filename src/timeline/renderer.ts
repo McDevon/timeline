@@ -12,11 +12,15 @@ const COLORS = {
   containerText: '#e0e0e0',
   containerHoverFill: 'rgba(15, 52, 96, 0.4)',
   containerHoverBorder: '#1a6ea0',
+  containerSelectedFill: 'rgba(80, 56, 12, 0.4)',
+  containerSelectedBorder: '#c89a2c',
   barFill: '#0f3460',
   barBorder: '#533483',
   barText: '#e0e0e0',
   barHoverFill: '#163d6e',
   barHoverBorder: '#7b52ab',
+  barSelectedFill: '#4a3800',
+  barSelectedBorder: '#c89a2c',
 };
 
 const LAYOUT = {
@@ -138,18 +142,20 @@ function drawContainer(
   viewport: Viewport,
   canvasWidth: number,
   hoveredItem: LayoutItem | null,
+  selectedItem: LayoutItem | null,
 ) {
   const x1 = yearToX(item.startYear, viewport, canvasWidth);
   const x2 = yearToX(item.endYear, viewport, canvasWidth);
   const boxWidth = Math.max(x2 - x1, 3);
-  const isHovered = hoveredItem === item;
+  const isSelected = selectedItem === item;
+  const isHovered = !isSelected && hoveredItem === item;
 
   // Container background
   drawRoundedRect(ctx, x1, item.y, boxWidth, item.height, LAYOUT.containerRadius);
-  ctx.fillStyle = isHovered ? COLORS.containerHoverFill : COLORS.containerFill;
+  ctx.fillStyle = isSelected ? COLORS.containerSelectedFill : isHovered ? COLORS.containerHoverFill : COLORS.containerFill;
   ctx.fill();
-  ctx.strokeStyle = isHovered ? COLORS.containerHoverBorder : COLORS.containerBorder;
-  ctx.lineWidth = isHovered ? 2 : 1;
+  ctx.strokeStyle = isSelected ? COLORS.containerSelectedBorder : isHovered ? COLORS.containerHoverBorder : COLORS.containerBorder;
+  ctx.lineWidth = isSelected || isHovered ? 2 : 1;
   ctx.stroke();
 
   // Container label at top
@@ -169,7 +175,7 @@ function drawContainer(
 
   // Draw children
   for (const child of item.children) {
-    drawLayoutItem(ctx, child, viewport, canvasWidth, hoveredItem);
+    drawLayoutItem(ctx, child, viewport, canvasWidth, hoveredItem, selectedItem);
   }
 }
 
@@ -179,37 +185,32 @@ function drawBar(
   viewport: Viewport,
   canvasWidth: number,
   isHovered: boolean,
+  isSelected: boolean,
 ) {
   const x1 = yearToX(item.startYear, viewport, canvasWidth);
   const x2 = yearToX(item.endYear, viewport, canvasWidth);
   const barWidth = Math.max(x2 - x1, 3);
 
   drawRoundedRect(ctx, x1, item.y, barWidth, item.height, LAYOUT.barRadius);
-  ctx.fillStyle = isHovered ? COLORS.barHoverFill : COLORS.barFill;
+  ctx.fillStyle = isSelected ? COLORS.barSelectedFill : isHovered ? COLORS.barHoverFill : COLORS.barFill;
   ctx.fill();
-  ctx.strokeStyle = isHovered ? COLORS.barHoverBorder : COLORS.barBorder;
-  ctx.lineWidth = isHovered ? 2 : 1;
+  ctx.strokeStyle = isSelected ? COLORS.barSelectedBorder : isHovered ? COLORS.barHoverBorder : COLORS.barBorder;
+  ctx.lineWidth = isSelected || isHovered ? 2 : 1;
   ctx.stroke();
 
-  // Label
-  ctx.fillStyle = COLORS.barText;
-  ctx.font = `${LAYOUT.smallFontSize}px sans-serif`;
-  ctx.textBaseline = 'middle';
-  ctx.textAlign = 'left';
+  // Label — only render when bar is wide enough to show text
+  if (barWidth > 32) {
+    ctx.fillStyle = COLORS.barText;
+    ctx.font = `${LAYOUT.smallFontSize}px sans-serif`;
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
 
-  const textY = item.y + item.height / 2;
-  const textX = x1 + 6;
-  const maxTextWidth = barWidth - 12;
-
-  if (maxTextWidth > 20) {
     ctx.save();
     ctx.beginPath();
     ctx.rect(x1, item.y, barWidth, item.height);
     ctx.clip();
-    ctx.fillText(item.event.name, textX, textY);
+    ctx.fillText(item.event.name, x1 + 6, item.y + item.height / 2);
     ctx.restore();
-  } else {
-    ctx.fillText(item.event.name, x1 + barWidth + 4, textY);
   }
 }
 
@@ -219,13 +220,16 @@ function drawLayoutItem(
   viewport: Viewport,
   canvasWidth: number,
   hoveredItem: LayoutItem | null,
+  selectedItem: LayoutItem | null,
 ) {
   if (!isVisible(item.startYear, item.endYear, viewport)) return;
 
   if (item.isContainer) {
-    drawContainer(ctx, item, viewport, canvasWidth, hoveredItem);
+    drawContainer(ctx, item, viewport, canvasWidth, hoveredItem, selectedItem);
   } else {
-    drawBar(ctx, item, viewport, canvasWidth, hoveredItem === item);
+    const isSelected = selectedItem === item;
+    const isHovered = !isSelected && hoveredItem === item;
+    drawBar(ctx, item, viewport, canvasWidth, isHovered, isSelected);
   }
 }
 
@@ -236,6 +240,7 @@ export function render(
   layout: LayoutItem[],
   viewport: Viewport,
   hoveredItem: LayoutItem | null,
+  selectedItem: LayoutItem | null,
 ) {
   ctx.fillStyle = COLORS.background;
   ctx.fillRect(0, 0, canvasWidth, canvasHeight);
@@ -245,6 +250,6 @@ export function render(
   drawAxis(ctx, viewport, canvasWidth);
 
   for (const item of layout) {
-    drawLayoutItem(ctx, item, viewport, canvasWidth, hoveredItem);
+    drawLayoutItem(ctx, item, viewport, canvasWidth, hoveredItem, selectedItem);
   }
 }

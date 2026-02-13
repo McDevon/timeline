@@ -19,11 +19,33 @@ export function setupInput(
   getLayout: () => LayoutItem[],
   getHovered: () => LayoutItem | null,
   setHovered: (item: LayoutItem | null) => void,
+  getSelected: () => LayoutItem | null,
+  setSelected: (item: LayoutItem | null) => void,
   requestRedraw: () => void,
 ): InputHandlers {
   const tooltip = new Tooltip();
 
+  function clearSelection() {
+    tooltip.hide();
+    if (getSelected()) {
+      setSelected(null);
+      requestRedraw();
+    }
+  }
+
   // --- Wheel / trackpad ---
+  function updateHover() {
+    if (cursorCanvasX < 0) return;
+    const layout = getLayout();
+    const viewport = getViewport();
+    const hit = hitTest(cursorCanvasX, cursorCanvasY, layout, viewport, canvas.clientWidth);
+    const prev = getHovered();
+    if (hit !== prev) {
+      setHovered(hit);
+      canvas.style.cursor = hit ? 'pointer' : 'grab';
+    }
+  }
+
   function onWheel(e: WheelEvent) {
     e.preventDefault();
     const viewport = getViewport();
@@ -39,6 +61,7 @@ export function setupInput(
       setViewport(panViewport(viewport, delta, canvas.clientWidth));
     }
 
+    updateHover();
     requestRedraw();
   }
 
@@ -48,6 +71,10 @@ export function setupInput(
   let mouseDownY = 0;
   let lastMouseX = 0;
   let didDrag = false;
+
+  // Last known cursor position on the canvas (for hover updates during scroll)
+  let cursorCanvasX = -1;
+  let cursorCanvasY = -1;
 
   function onMouseDown(e: MouseEvent) {
     if (e.button !== 0) return;
@@ -75,18 +102,13 @@ export function setupInput(
       return;
     }
 
-    // Hover detection
+    // Track cursor position and update hover
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const layout = getLayout();
-    const viewport = getViewport();
-    const hit = hitTest(x, y, layout, viewport, canvas.clientWidth);
-
+    cursorCanvasX = e.clientX - rect.left;
+    cursorCanvasY = e.clientY - rect.top;
     const prev = getHovered();
-    if (hit !== prev) {
-      setHovered(hit);
-      canvas.style.cursor = hit ? 'pointer' : 'grab';
+    updateHover();
+    if (getHovered() !== prev) {
       requestRedraw();
     }
   }
@@ -106,9 +128,11 @@ export function setupInput(
 
       if (hit) {
         tooltip.show(hit.event, e.clientX, e.clientY);
+        setSelected(hit);
       } else {
-        tooltip.hide();
+        clearSelection();
       }
+      requestRedraw();
     }
 
     const hovered = getHovered();
@@ -121,7 +145,7 @@ export function setupInput(
   function onTouchStart(e: TouchEvent) {
     if (e.touches.length === 1) {
       lastTouchX = e.touches[0].clientX;
-      tooltip.hide();
+      clearSelection();
     }
   }
 

@@ -1,4 +1,5 @@
 import { TimelineEvent } from '../types';
+import { formatDate, formatDuration } from '../data/time';
 
 const TOOLTIP_MARGIN = 12;
 
@@ -14,6 +15,10 @@ export class Tooltip {
   show(event: TimelineEvent, x: number, y: number) {
     // Build content
     let html = `<strong>${this.escape(event.name)}</strong>`;
+    const start = formatDate(event.start);
+    const end = formatDate(event.end);
+    const duration = formatDuration(event.start, event.end);
+    html += `<br><span class="tooltip-dates">${start} – ${end} (${duration})</span>`;
     if (event.info) {
       html += `<br><span class="tooltip-info">${this.escape(event.info)}</span>`;
     }

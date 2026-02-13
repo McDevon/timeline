@@ -33,6 +33,7 @@ async function main() {
   // Initialize viewport to show full data range
   let viewport: Viewport = computeFullRange(events);
   let hoveredItem: LayoutItem | null = null;
+  let selectedItem: LayoutItem | null = null;
 
   // rAF-batched rendering
   let rafId = 0;
@@ -41,7 +42,7 @@ async function main() {
     rafId = 0;
     const ctx = setupCanvas(canvas);
     const rect = canvas.getBoundingClientRect();
-    render(ctx, rect.width, rect.height, layout, viewport, hoveredItem);
+    render(ctx, rect.width, rect.height, layout, viewport, hoveredItem, selectedItem);
   }
 
   function requestRedraw() {
@@ -58,6 +59,8 @@ async function main() {
     () => layout,
     () => hoveredItem,
     (item: LayoutItem | null) => { hoveredItem = item; },
+    () => selectedItem,
+    (item: LayoutItem | null) => { selectedItem = item; },
     requestRedraw,
   );
 
