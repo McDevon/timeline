@@ -108,6 +108,61 @@ export function formatDuration(startIso: string, endIso: string): string {
 }
 
 /**
+ * Convert a decimal year to an approximate ISO date string (year-month).
+ */
+export function decimalYearToIso(year: number): string {
+  const floored = Math.floor(year);
+  const decimalPart = year - floored;
+  const month = Math.floor(decimalPart * 12) + 1;
+  const absYear = Math.abs(floored);
+  if (year < 0) {
+    return `-${absYear}-${String(month).padStart(2, '0')}`;
+  }
+  return `${absYear}-${String(month).padStart(2, '0')}`;
+}
+
+/**
+ * Format a decimal year difference as a human-readable magnitude string.
+ * Precision adapts to the visible viewport span, not the distance itself.
+ */
+export function formatDecimalYearDelta(deltaYears: number, spanYears: number): string {
+  const abs = Math.abs(deltaYears);
+  const wholeYears = Math.floor(abs);
+  const remainingMonths = Math.round((abs - wholeYears) * 12);
+
+  if (spanYears > 50) {
+    // Zoomed out: whole years only
+    const rounded = Math.round(abs);
+    return `${rounded} year${rounded !== 1 ? 's' : ''}`;
+  }
+
+  if (spanYears > 2) {
+    // Medium zoom: years + months
+    if (abs >= 1) {
+      if (remainingMonths === 0) return `${wholeYears} yr`;
+      return `${wholeYears} yr ${remainingMonths}mo`;
+    }
+    const months = Math.round(abs * 12);
+    return `${months} month${months !== 1 ? 's' : ''}`;
+  }
+
+  // Zoomed in: full precision (years+months, months, or days)
+  if (abs >= 1) {
+    if (remainingMonths === 0) return `${wholeYears} yr`;
+    return `${wholeYears} yr ${remainingMonths}mo`;
+  }
+
+  const months = abs * 12;
+  if (months >= 1) {
+    const wholeMonths = Math.round(months);
+    return `${wholeMonths} month${wholeMonths !== 1 ? 's' : ''}`;
+  }
+
+  const days = Math.max(1, Math.round(abs * 365));
+  return `${days} day${days !== 1 ? 's' : ''}`;
+}
+
+/**
  * Format a decimal year as a display string for axis labels.
  * Adapts precision based on the visible time span.
  */

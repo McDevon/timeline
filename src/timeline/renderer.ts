@@ -1,6 +1,6 @@
-import { TimelineEvent } from '../types';
-import { Viewport, yearToX } from './viewport';
-import { dateToDecimalYear, formatAxisLabel } from '../data/time';
+import { TimelineEvent, TimelineSelection } from '../types';
+import { Viewport, yearToX, xToYear } from './viewport';
+import { dateToDecimalYear, decimalYearToIso, formatAxisLabel, formatDate, formatDecimalYearDelta } from '../data/time';
 import { LayoutItem } from './layout';
 
 const COLORS = {
@@ -21,6 +21,13 @@ const COLORS = {
   barHoverBorder: '#7b52ab',
   barSelectedFill: '#4a3800',
   barSelectedBorder: '#c89a2c',
+  todayLine: 'rgba(255, 82, 82, 0.5)',
+  todayText: 'rgba(255, 82, 82, 0.8)',
+  cursorLine: 'rgba(255, 255, 255, 0.2)',
+  cursorText: 'rgba(255, 255, 255, 0.6)',
+  selectionLine: 'rgba(255, 255, 255, 0.5)',
+  selectionText: 'rgba(255, 255, 255, 0.9)',
+  selectionFill: 'rgba(255, 255, 255, 0.05)',
 };
 
 const LAYOUT = {
@@ -129,6 +136,186 @@ function drawAxis(ctx: CanvasRenderingContext2D, viewport: Viewport, canvasWidth
     ctx.lineTo(x, y + LAYOUT.tickHeight / 2);
     ctx.stroke();
     ctx.fillText(formatAxisLabel(year, spanYears), x, y + LAYOUT.tickHeight / 2 + 4);
+  }
+}
+
+function todayDecimalYear(): number {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), 0, 1);
+  const dayOfYear = (now.getTime() - start.getTime()) / 86400000;
+  return now.getFullYear() + dayOfYear / 365;
+}
+
+function todayIsoDate(): string {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  return `${y}-${m}`;
+}
+
+function drawTodayLine(
+  ctx: CanvasRenderingContext2D,
+  viewport: Viewport,
+  canvasWidth: number,
+  canvasHeight: number,
+) {
+  const today = todayDecimalYear();
+  if (today < viewport.start || today > viewport.end) return;
+
+  const x = yearToX(today, viewport, canvasWidth);
+
+  // Vertical line
+  ctx.strokeStyle = COLORS.todayLine;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(x, LAYOUT.axisY - LAYOUT.tickHeight);
+  ctx.lineTo(x, canvasHeight);
+  ctx.stroke();
+
+  // Date label above axis
+  ctx.fillStyle = COLORS.todayText;
+  ctx.font = `${LAYOUT.smallFontSize}px monospace`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+  ctx.fillText(formatDate(todayIsoDate()), x, LAYOUT.axisY - LAYOUT.tickHeight - 4);
+}
+
+function drawCursorLine(
+  ctx: CanvasRenderingContext2D,
+  cursorX: number,
+  selection: TimelineSelection | null,
+  viewport: Viewport,
+  canvasWidth: number,
+  canvasHeight: number,
+) {
+  if (cursorX < 0) return;
+
+  const year = xToYear(cursorX, viewport, canvasWidth);
+  const isoDate = decimalYearToIso(year);
+
+  // Vertical line
+  ctx.strokeStyle = COLORS.cursorLine;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(cursorX, LAYOUT.axisY - LAYOUT.tickHeight);
+  ctx.lineTo(cursorX, canvasHeight);
+  ctx.stroke();
+
+  // Determine which labels to show
+  const isRange = selection !== null && selection.start !== selection.end;
+  const isSinglePoint = selection !== null && selection.start === selection.end;
+
+  ctx.font = `${LAYOUT.smallFontSize}px monospace`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+  const lineHeight = 14;
+
+  if (isRange) {
+    // Range selected: date only
+    ctx.fillStyle = COLORS.cursorText;
+    ctx.fillText(formatDate(isoDate), cursorX, LAYOUT.axisY - LAYOUT.tickHeight - 4);
+  } else {
+    // No selection or single point: date + distance to now + optional distance to selection
+    const extraLines = 1 + (isSinglePoint ? 1 : 0);
+    const dateY = LAYOUT.axisY - LAYOUT.tickHeight - 4 - extraLines * lineHeight;
+
+    ctx.fillStyle = COLORS.cursorText;
+    ctx.fillText(formatDate(isoDate), cursorX, dateY);
+
+    const today = todayDecimalYear();
+    const deltaNow = today - year;
+    const span = viewport.end - viewport.start;
+    const nowMag = formatDecimalYearDelta(deltaNow, span);
+    const nowLabel = deltaNow > 0 ? `${nowMag} ago` : `in ${nowMag}`;
+    ctx.fillText(nowLabel, cursorX, dateY + lineHeight);
+
+    if (isSinglePoint) {
+      const deltaSel = year - selection!.start;
+      const selMag = formatDecimalYearDelta(deltaSel, span);
+      const selLabel = deltaSel >= 0 ? `+${selMag}` : `-${selMag}`;
+      ctx.fillStyle = COLORS.selectionText;
+      ctx.fillText(selLabel, cursorX, dateY + lineHeight * 2);
+    }
+  }
+}
+
+function drawSelectionBackground(
+  ctx: CanvasRenderingContext2D,
+  selection: TimelineSelection | null,
+  viewport: Viewport,
+  canvasWidth: number,
+  canvasHeight: number,
+) {
+  if (selection === null || selection.start === selection.end) return;
+  if (selection.end < viewport.start || selection.start > viewport.end) return;
+
+  const x1 = yearToX(Math.max(selection.start, viewport.start), viewport, canvasWidth);
+  const x2 = yearToX(Math.min(selection.end, viewport.end), viewport, canvasWidth);
+  const top = LAYOUT.axisY - LAYOUT.tickHeight;
+
+  ctx.fillStyle = COLORS.selectionFill;
+  ctx.fillRect(x1, top, x2 - x1, canvasHeight - top);
+}
+
+function drawSelectionLine(
+  ctx: CanvasRenderingContext2D,
+  year: number,
+  viewport: Viewport,
+  canvasWidth: number,
+  canvasHeight: number,
+) {
+  if (year < viewport.start || year > viewport.end) return;
+  const x = yearToX(year, viewport, canvasWidth);
+
+  ctx.strokeStyle = COLORS.selectionLine;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(x, LAYOUT.axisY - LAYOUT.tickHeight);
+  ctx.lineTo(x, canvasHeight);
+  ctx.stroke();
+}
+
+function drawSelectionForeground(
+  ctx: CanvasRenderingContext2D,
+  selection: TimelineSelection | null,
+  viewport: Viewport,
+  canvasWidth: number,
+  canvasHeight: number,
+) {
+  if (selection === null) return;
+
+  if (selection.start === selection.end) {
+    // Single point: one line + date label
+    drawSelectionLine(ctx, selection.start, viewport, canvasWidth, canvasHeight);
+
+    if (selection.start >= viewport.start && selection.start <= viewport.end) {
+      const x = yearToX(selection.start, viewport, canvasWidth);
+      ctx.fillStyle = COLORS.selectionText;
+      ctx.font = `${LAYOUT.smallFontSize}px monospace`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText(formatDate(decimalYearToIso(selection.start)), x, LAYOUT.axisY - LAYOUT.tickHeight - 4);
+    }
+  } else {
+    // Range: two lines + centered label
+    drawSelectionLine(ctx, selection.start, viewport, canvasWidth, canvasHeight);
+    drawSelectionLine(ctx, selection.end, viewport, canvasWidth, canvasHeight);
+
+    // Label centered between the two lines
+    const x1 = yearToX(selection.start, viewport, canvasWidth);
+    const x2 = yearToX(selection.end, viewport, canvasWidth);
+    const centerX = (x1 + x2) / 2;
+    const span = viewport.end - viewport.start;
+    const duration = formatDecimalYearDelta(selection.end - selection.start, span);
+    const startLabel = formatDate(decimalYearToIso(selection.start));
+    const endLabel = formatDate(decimalYearToIso(selection.end));
+    const label = `${startLabel} — ${endLabel} (${duration})`;
+
+    ctx.fillStyle = COLORS.selectionText;
+    ctx.font = `${LAYOUT.smallFontSize}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(label, centerX, LAYOUT.axisY - LAYOUT.tickHeight - 4);
   }
 }
 
@@ -241,6 +428,8 @@ export function render(
   viewport: Viewport,
   hoveredItem: LayoutItem | null,
   selectedItem: LayoutItem | null,
+  cursorX: number,
+  selection: TimelineSelection | null,
 ) {
   ctx.fillStyle = COLORS.background;
   ctx.fillRect(0, 0, canvasWidth, canvasHeight);
@@ -248,8 +437,13 @@ export function render(
   if (layout.length === 0) return;
 
   drawAxis(ctx, viewport, canvasWidth);
+  drawSelectionBackground(ctx, selection, viewport, canvasWidth, canvasHeight);
 
   for (const item of layout) {
     drawLayoutItem(ctx, item, viewport, canvasWidth, hoveredItem, selectedItem);
   }
+
+  drawTodayLine(ctx, viewport, canvasWidth, canvasHeight);
+  drawSelectionForeground(ctx, selection, viewport, canvasWidth, canvasHeight);
+  drawCursorLine(ctx, cursorX, selection, viewport, canvasWidth, canvasHeight);
 }

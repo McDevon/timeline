@@ -1,7 +1,9 @@
-import { Viewport, panViewport, zoomViewport } from './viewport';
+import { Viewport, panViewport, zoomViewport, xToYear } from './viewport';
 import { LayoutItem } from './layout';
+import { TimelineSelection } from '../types';
 import { hitTest } from './hitTest';
 import { Tooltip } from '../ui/tooltip';
+import { LAYOUT } from './renderer';
 
 export interface InputHandlers {
   destroy(): void;
@@ -19,18 +21,18 @@ export function setupInput(
   getLayout: () => LayoutItem[],
   getHovered: () => LayoutItem | null,
   setHovered: (item: LayoutItem | null) => void,
-  getSelected: () => LayoutItem | null,
   setSelected: (item: LayoutItem | null) => void,
+  setCursorX: (x: number) => void,
+  getSelection: () => TimelineSelection | null,
+  setSelection: (sel: TimelineSelection | null) => void,
   requestRedraw: () => void,
 ): InputHandlers {
   const tooltip = new Tooltip();
 
   function clearSelection() {
     tooltip.hide();
-    if (getSelected()) {
-      setSelected(null);
-      requestRedraw();
-    }
+    setSelected(null);
+    setSelection(null);
   }
 
   // --- Wheel / trackpad ---
@@ -61,33 +63,81 @@ export function setupInput(
       setViewport(panViewport(viewport, delta, canvas.clientWidth));
     }
 
+    updateCursorLine(cursorCanvasX, cursorCanvasY);
     updateHover();
     requestRedraw();
   }
 
   // --- Mouse drag + click ---
-  let dragging = false;
+  let dragMode: 'none' | 'panning' | 'axis-selecting' = 'none';
   let mouseDownX = 0;
   let mouseDownY = 0;
   let lastMouseX = 0;
   let didDrag = false;
+  let axisAnchorYear = 0;
 
   // Last known cursor position on the canvas (for hover updates during scroll)
   let cursorCanvasX = -1;
   let cursorCanvasY = -1;
+  let lastSetCursorX = -1;
+
+  /** Update the cursor line X; returns true if it changed. */
+  function updateCursorLine(canvasX: number, canvasY: number): boolean {
+    const newX = canvasY < LAYOUT.eventsStartY ? canvasX : -1;
+    if (newX === lastSetCursorX) return false;
+    lastSetCursorX = newX;
+    setCursorX(newX);
+    return true;
+  }
 
   function onMouseDown(e: MouseEvent) {
     if (e.button !== 0) return;
-    dragging = true;
-    didDrag = false;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
     mouseDownX = e.clientX;
     mouseDownY = e.clientY;
     lastMouseX = e.clientX;
-    canvas.style.cursor = 'grabbing';
+    didDrag = false;
+
+    if (y < LAYOUT.eventsStartY) {
+      // Axis region — start selection mode
+      dragMode = 'axis-selecting';
+      const viewport = getViewport();
+      axisAnchorYear = xToYear(x, viewport, canvas.clientWidth);
+      canvas.style.cursor = 'col-resize';
+    } else {
+      // Events region — start panning
+      dragMode = 'panning';
+      updateCursorLine(-1, LAYOUT.eventsStartY);
+      canvas.style.cursor = 'grabbing';
+    }
   }
 
   function onMouseMove(e: MouseEvent) {
-    if (dragging) {
+    if (dragMode === 'axis-selecting') {
+      const dist = Math.hypot(e.clientX - mouseDownX, e.clientY - mouseDownY);
+      if (dist >= CLICK_THRESHOLD) {
+        didDrag = true;
+      }
+      if (didDrag) {
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const viewport = getViewport();
+        const currentYear = xToYear(x, viewport, canvas.clientWidth);
+        setSelection({
+          start: Math.min(axisAnchorYear, currentYear),
+          end: Math.max(axisAnchorYear, currentYear),
+          anchor: axisAnchorYear,
+        });
+        requestRedraw();
+      }
+      return;
+    }
+
+    if (dragMode === 'panning') {
       const dx = lastMouseX - e.clientX;
       lastMouseX = e.clientX;
 
@@ -102,23 +152,47 @@ export function setupInput(
       return;
     }
 
-    // Track cursor position and update hover
+    // Not dragging — track cursor position and update hover
     const rect = canvas.getBoundingClientRect();
     cursorCanvasX = e.clientX - rect.left;
     cursorCanvasY = e.clientY - rect.top;
-    const prev = getHovered();
+    const cursorChanged = updateCursorLine(cursorCanvasX, cursorCanvasY);
+    const prevHover = getHovered();
     updateHover();
-    if (getHovered() !== prev) {
+    if (cursorChanged || getHovered() !== prevHover) {
       requestRedraw();
     }
   }
 
   function onMouseUp(e: MouseEvent) {
-    if (!dragging) return;
-    dragging = false;
+    const mode = dragMode;
+    dragMode = 'none';
 
-    if (!didDrag) {
-      // This was a click, not a drag
+    if (mode === 'axis-selecting') {
+      if (!didDrag) {
+        // Click on axis (not drag)
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const viewport = getViewport();
+        const year = xToYear(x, viewport, canvas.clientWidth);
+        const existing = getSelection();
+
+        if (e.shiftKey && existing !== null) {
+          // Shift-click: extend from existing anchor
+          setSelection({
+            start: Math.min(existing.anchor, year),
+            end: Math.max(existing.anchor, year),
+            anchor: existing.anchor,
+          });
+        } else {
+          // Normal click: single point
+          setSelection({ start: year, end: year, anchor: year });
+        }
+      }
+      // If didDrag, range was already committed during mousemove
+      requestRedraw();
+    } else if (mode === 'panning' && !didDrag) {
+      // Click in events area (not drag)
       const rect = canvas.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
@@ -135,8 +209,15 @@ export function setupInput(
       requestRedraw();
     }
 
+    // Restore cursor line and hover
+    const rect = canvas.getBoundingClientRect();
+    cursorCanvasX = e.clientX - rect.left;
+    cursorCanvasY = e.clientY - rect.top;
+    updateCursorLine(cursorCanvasX, cursorCanvasY);
+    updateHover();
     const hovered = getHovered();
     canvas.style.cursor = hovered ? 'pointer' : 'grab';
+    requestRedraw();
   }
 
   // --- Touch drag ---
@@ -159,11 +240,23 @@ export function setupInput(
     requestRedraw();
   }
 
+  function onMouseLeave() {
+    if (dragMode === 'none') {
+      cursorCanvasX = -1;
+      cursorCanvasY = -1;
+      updateCursorLine(-1, LAYOUT.eventsStartY);
+      setHovered(null);
+      canvas.style.cursor = 'grab';
+      requestRedraw();
+    }
+  }
+
   // Attach listeners
   canvas.addEventListener('wheel', onWheel, { passive: false });
   canvas.addEventListener('mousedown', onMouseDown);
   window.addEventListener('mousemove', onMouseMove);
   window.addEventListener('mouseup', onMouseUp);
+  canvas.addEventListener('mouseleave', onMouseLeave);
   canvas.addEventListener('touchstart', onTouchStart, { passive: true });
   canvas.addEventListener('touchmove', onTouchMove, { passive: false });
 
@@ -175,6 +268,7 @@ export function setupInput(
       canvas.removeEventListener('mousedown', onMouseDown);
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('mouseup', onMouseUp);
+      canvas.removeEventListener('mouseleave', onMouseLeave);
       canvas.removeEventListener('touchstart', onTouchStart);
       canvas.removeEventListener('touchmove', onTouchMove);
       tooltip.hide();

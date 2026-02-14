@@ -2,6 +2,7 @@ import { loadEvents } from './data/loader';
 import { render, computeFullRange, LAYOUT } from './timeline/renderer';
 import { computeLayout, LayoutItem } from './timeline/layout';
 import { Viewport } from './timeline/viewport';
+import { TimelineSelection } from './types';
 import { setupInput } from './timeline/input';
 
 function setupCanvas(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
@@ -34,6 +35,8 @@ async function main() {
   let viewport: Viewport = computeFullRange(events);
   let hoveredItem: LayoutItem | null = null;
   let selectedItem: LayoutItem | null = null;
+  let cursorX = -1;
+  let selection: TimelineSelection | null = null;
 
   // rAF-batched rendering
   let rafId = 0;
@@ -42,7 +45,7 @@ async function main() {
     rafId = 0;
     const ctx = setupCanvas(canvas);
     const rect = canvas.getBoundingClientRect();
-    render(ctx, rect.width, rect.height, layout, viewport, hoveredItem, selectedItem);
+    render(ctx, rect.width, rect.height, layout, viewport, hoveredItem, selectedItem, cursorX, selection);
   }
 
   function requestRedraw() {
@@ -59,8 +62,10 @@ async function main() {
     () => layout,
     () => hoveredItem,
     (item: LayoutItem | null) => { hoveredItem = item; },
-    () => selectedItem,
     (item: LayoutItem | null) => { selectedItem = item; },
+    (x: number) => { cursorX = x; },
+    () => selection,
+    (sel: TimelineSelection | null) => { selection = sel; },
     requestRedraw,
   );
 
