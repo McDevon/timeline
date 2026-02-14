@@ -1,6 +1,6 @@
 import { TimelineEvent, TimelineSelection } from '../types';
 import { Viewport, yearToX, xToYear } from './viewport';
-import { dateToDecimalYear, decimalYearToIso, formatAxisLabel, formatDate, formatDecimalYearDelta, hasFullDate, formatPreciseDuration } from '../data/time';
+import { dateToDecimalYear, decimalYearToIso, formatAxisLabel, formatDate, formatDecimalYearDelta, hasFullDate, formatPreciseDuration, todayDecimalYear, todayIsoDate } from '../data/time';
 import { LayoutItem } from './layout';
 import { SnapDetail, SnapState } from './snap';
 
@@ -144,19 +144,6 @@ function drawAxis(ctx: CanvasRenderingContext2D, viewport: Viewport, canvasWidth
   }
 }
 
-function todayDecimalYear(): number {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), 0, 1);
-  const dayOfYear = (now.getTime() - start.getTime()) / 86400000;
-  return now.getFullYear() + dayOfYear / 365;
-}
-
-function todayIsoDate(): string {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, '0');
-  return `${y}-${m}`;
-}
 
 function drawTodayLine(
   ctx: CanvasRenderingContext2D,

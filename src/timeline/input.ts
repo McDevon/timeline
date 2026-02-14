@@ -5,6 +5,7 @@ import { hitTest } from './hitTest';
 import { Tooltip } from '../ui/tooltip';
 import { LAYOUT } from './renderer';
 import { collectSnapTargets, findSnapYear, getSnapDetail, SnapDetail, SnapState } from './snap';
+import { todayDecimalYear, todayIsoDate, formatDate } from '../data/time';
 
 export interface InputHandlers {
   destroy(): void;
@@ -42,12 +43,19 @@ export function setupInput(
   let cachedLayout: LayoutItem[] | null = null;
   let snapTargetsCache: number[] = [];
   let snapTargetSet: Set<number> = new Set();
+  let cachedNowYear = 0;
+  let cachedNowIso = '';
 
   function getSnapTargets(): number[] {
     const layout = getLayout();
     if (layout !== cachedLayout) {
       cachedLayout = layout;
-      snapTargetsCache = collectSnapTargets(layout);
+      cachedNowYear = todayDecimalYear();
+      cachedNowIso = todayIsoDate();
+      const targets = collectSnapTargets(layout);
+      targets.push(cachedNowYear);
+      targets.sort((a, b) => a - b);
+      snapTargetsCache = targets;
       snapTargetSet = new Set(snapTargetsCache);
     }
     return snapTargetsCache;
@@ -63,6 +71,10 @@ export function setupInput(
   // --- Snap highlighting ---
   let cursorSnapYear: number | null = null;
 
+  function nowSnapDetail(): SnapDetail {
+    return { label: 'Now', date: formatDate(cachedNowIso), isoDate: cachedNowIso };
+  }
+
   function updateSnapHighlights() {
     const years = new Set<number>();
     const layout = getLayout();
@@ -72,18 +84,21 @@ export function setupInput(
 
     if (cursorSnapYear !== null) {
       years.add(cursorSnapYear);
-      cursorDetail = getSnapDetail(cursorSnapYear, layout);
+      cursorDetail = getSnapDetail(cursorSnapYear, layout) ??
+        (cursorSnapYear === cachedNowYear ? nowSnapDetail() : null);
     }
     const sel = getSelection();
     if (sel !== null) {
       getSnapTargets(); // ensure snapTargetSet is up to date
       if (snapTargetSet.has(sel.start)) {
         years.add(sel.start);
-        selStartDetail = getSnapDetail(sel.start, layout);
+        selStartDetail = getSnapDetail(sel.start, layout) ??
+          (sel.start === cachedNowYear ? nowSnapDetail() : null);
       }
       if (sel.start !== sel.end && snapTargetSet.has(sel.end)) {
         years.add(sel.end);
-        selEndDetail = getSnapDetail(sel.end, layout);
+        selEndDetail = getSnapDetail(sel.end, layout) ??
+          (sel.end === cachedNowYear ? nowSnapDetail() : null);
       }
     }
     setSnapState({ highlightYears: years, cursorDetail, selStartDetail, selEndDetail });
@@ -256,6 +271,15 @@ export function setupInput(
             start: Math.min(existing.anchor, year),
             end: Math.max(existing.anchor, year),
             anchor: existing.anchor,
+          });
+        } else if (e.shiftKey) {
+          // Shift-click with no selection: range from now to clicked year
+          getSnapTargets(); // ensure cachedNowYear is set
+          const now = cachedNowYear;
+          setSelection({
+            start: Math.min(now, year),
+            end: Math.max(now, year),
+            anchor: now,
           });
         } else {
           // Normal click: single point
