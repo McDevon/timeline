@@ -28,6 +28,15 @@ function hitTestItem(
   viewport: Viewport,
   canvasWidth: number,
 ): LayoutItem | null {
+  if (item.isPoint) {
+    // Circle hit test for point events
+    const cx = yearToX(item.startYear, viewport, canvasWidth);
+    const cy = item.y + item.height / 2;
+    const radius = item.height / 4;
+    const dist = Math.hypot(px - cx, py - cy);
+    return dist <= radius ? item : null;
+  }
+
   const x1 = yearToX(item.startYear, viewport, canvasWidth);
   const x2 = yearToX(item.endYear, viewport, canvasWidth);
   const itemWidth = Math.max(x2 - x1, 3);

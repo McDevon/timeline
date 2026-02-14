@@ -12,7 +12,7 @@ Timeline events are stored as a JSON array of event objects. Events can be neste
 |----------|-----------------|----------|-------------|
 | `name`   | `string`        | Yes      | Display name of the event or period |
 | `start`  | `string`        | Yes      | ISO date string. See Date Format below. |
-| `end`    | `string`        | Yes      | ISO date string. Can equal `start` for point events. |
+| `end`    | `string`        | No       | ISO date string. Omit for point-in-time events. |
 | `info`   | `string`        | No       | Additional descriptive text |
 | `nested` | `Event[]`       | No       | Child events contained within this event |
 
@@ -30,12 +30,17 @@ Dates are ISO date strings with variable precision:
 
 **Internal representation**: Dates are converted to decimal years for rendering math. `"1471-07-01"` becomes approximately `1471.5`. This conversion is handled by `src/data/time.ts` and is transparent to the data format.
 
+### Point Events
+
+Omitting the `end` field creates a point-in-time event. Point events are rendered as small circles instead of bars. They participate in the same layout as ranged events but cannot have children (`nested` is ignored on point events).
+
 ### Nesting Rules
 
 - Events can be nested to arbitrary depth
 - Nested events do not need to fit within their parent's time range (the data may represent logical grouping, not strict temporal containment)
 - Nested events can overlap with each other
 - An event with `nested` children acts as a collapsible group in the UI
+- Point events (no `end`) cannot contain nested children
 
 ## Example
 
@@ -64,6 +69,11 @@ Dates are ISO date strings with variable precision:
     "start": "1469-05-03",
     "end": "1527-06-21",
     "name": "Niccolo Machiavelli"
+  },
+  {
+    "start": "1517-10-31",
+    "name": "95 Theses",
+    "info": "Martin Luther posts his 95 Theses"
   }
 ]
 ```

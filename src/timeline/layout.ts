@@ -17,6 +17,7 @@ export interface LayoutItem {
   y: number;
   height: number;
   isContainer: boolean;
+  isPoint: boolean;
   children: LayoutItem[];
 }
 
@@ -28,6 +29,7 @@ interface PlacedItem {
   relativeY: number;
   height: number;
   isContainer: boolean;
+  isPoint: boolean;
   placedChildren: PlacedItem[];
 }
 
@@ -74,15 +76,18 @@ function placeLevel(
   // Phase 1: compute heights (recursively for containers)
   const sized = events.map(event => {
     const startYear = dateToDecimalYear(event.start);
-    const endYear = dateToDecimalYear(event.end);
+    const isPoint = event.end === undefined;
+    const endYear = event.end !== undefined ? dateToDecimalYear(event.end) : startYear;
 
-    if (!event.nested || event.nested.length === 0) {
+    // Point events and leaf events without children
+    if (isPoint || !event.nested || event.nested.length === 0) {
       return {
         event,
         startYear,
         endYear,
         height: barHeight,
         isContainer: false,
+        isPoint,
         placedChildren: [] as PlacedItem[],
       };
     }
@@ -102,6 +107,7 @@ function placeLevel(
       endYear,
       height,
       isContainer: true,
+      isPoint: false,
       placedChildren,
     };
   });
@@ -130,6 +136,7 @@ function placeLevel(
       relativeY: y,
       height: item.height,
       isContainer: item.isContainer,
+      isPoint: item.isPoint,
       placedChildren: item.placedChildren,
     };
 
@@ -159,6 +166,7 @@ function toLayoutItems(placed: PlacedItem[], offsetY: number): LayoutItem[] {
         y,
         height: item.height,
         isContainer: false,
+        isPoint: item.isPoint,
         children: [],
       };
     }
@@ -173,6 +181,7 @@ function toLayoutItems(placed: PlacedItem[], offsetY: number): LayoutItem[] {
       y,
       height: item.height,
       isContainer: true,
+      isPoint: false,
       children,
     };
   });

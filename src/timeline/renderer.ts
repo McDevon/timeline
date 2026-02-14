@@ -54,7 +54,7 @@ export function computeFullRange(events: TimelineEvent[]): Viewport {
   function walk(list: TimelineEvent[]) {
     for (const e of list) {
       const s = dateToDecimalYear(e.start);
-      const end = dateToDecimalYear(e.end);
+      const end = dateToDecimalYear(e.end ?? e.start);
       if (s < min) min = s;
       if (end > max) max = end;
       if (s === end) {
@@ -401,6 +401,27 @@ function drawBar(
   }
 }
 
+function drawPointEvent(
+  ctx: CanvasRenderingContext2D,
+  item: LayoutItem,
+  viewport: Viewport,
+  canvasWidth: number,
+  isHovered: boolean,
+  isSelected: boolean,
+) {
+  const x = yearToX(item.startYear, viewport, canvasWidth);
+  const cy = item.y + item.height / 2;
+  const radius = item.height / 4 - 1;
+
+  ctx.beginPath();
+  ctx.arc(x, cy, radius, 0, Math.PI * 2);
+  ctx.fillStyle = isSelected ? COLORS.barSelectedFill : isHovered ? COLORS.barHoverFill : COLORS.barFill;
+  ctx.fill();
+  ctx.strokeStyle = isSelected ? COLORS.barSelectedBorder : isHovered ? COLORS.barHoverBorder : COLORS.barBorder;
+  ctx.lineWidth = isSelected || isHovered ? 2 : 1;
+  ctx.stroke();
+}
+
 function drawLayoutItem(
   ctx: CanvasRenderingContext2D,
   item: LayoutItem,
@@ -416,7 +437,11 @@ function drawLayoutItem(
   } else {
     const isSelected = selectedItem === item;
     const isHovered = !isSelected && hoveredItem === item;
-    drawBar(ctx, item, viewport, canvasWidth, isHovered, isSelected);
+    if (item.isPoint) {
+      drawPointEvent(ctx, item, viewport, canvasWidth, isHovered, isSelected);
+    } else {
+      drawBar(ctx, item, viewport, canvasWidth, isHovered, isSelected);
+    }
   }
 }
 
