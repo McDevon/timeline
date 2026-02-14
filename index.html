@@ -34,9 +34,13 @@
       transition: opacity 0.15s ease-in-out;
       z-index: 100;
       max-width: 300px;
+      cursor: default;
     }
     .timeline-tooltip.visible {
       opacity: 1;
+    }
+    .timeline-tooltip.locked {
+      pointer-events: auto;
     }
     .timeline-tooltip .tooltip-dates {
       color: #b0b0b0;

@@ -5,11 +5,21 @@ const TOOLTIP_MARGIN = 12;
 
 export class Tooltip {
   private el: HTMLDivElement;
+  private _onClick: (() => void) | null = null;
+  private _locked = false;
 
   constructor() {
     this.el = document.createElement('div');
     this.el.className = 'timeline-tooltip';
     document.body.appendChild(this.el);
+
+    this.el.addEventListener('click', () => {
+      if (this._onClick) this._onClick();
+    });
+  }
+
+  set onClick(handler: (() => void) | null) {
+    this._onClick = handler;
   }
 
   show(event: TimelineEvent, x: number, y: number) {
@@ -62,12 +72,19 @@ export class Tooltip {
     this.el.style.top = `${top}px`;
   }
 
-  hide() {
-    this.el.classList.remove('visible');
+  lock() {
+    this._locked = true;
+    this.el.classList.add('locked');
   }
 
-  get isVisible(): boolean {
-    return this.el.classList.contains('visible');
+  hide() {
+    this.el.classList.remove('visible');
+    this.el.classList.remove('locked');
+    this._locked = false;
+  }
+
+  get isLocked(): boolean {
+    return this._locked;
   }
 
   private escape(text: string): string {

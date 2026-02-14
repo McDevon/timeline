@@ -32,6 +32,12 @@ export function setupInput(
 ): InputHandlers {
   const tooltip = new Tooltip();
 
+  tooltip.onClick = () => {
+    tooltip.hide();
+    setSelected(null);
+    scheduleRedraw();
+  };
+
   function clearSelection() {
     tooltip.hide();
     setSelected(null);
@@ -166,6 +172,14 @@ export function setupInput(
     if (hit !== prev) {
       setHovered(hit);
       canvas.style.cursor = hit ? 'pointer' : 'grab';
+      if (!tooltip.isLocked) {
+        if (hit) {
+          const rect = canvas.getBoundingClientRect();
+          tooltip.show(hit.event, rect.left + cursorCanvasX, rect.top + cursorCanvasY);
+        } else {
+          tooltip.hide();
+        }
+      }
     }
   }
 
@@ -288,6 +302,7 @@ export function setupInput(
     }
 
     // Not dragging — track cursor position and update hover
+    if (e.target !== canvas) return;
     const rect = canvas.getBoundingClientRect();
     cursorCanvasX = e.clientX - rect.left;
     cursorCanvasY = e.clientY - rect.top;
@@ -346,6 +361,7 @@ export function setupInput(
 
       if (hit) {
         tooltip.show(hit.event, e.clientX, e.clientY);
+        tooltip.lock();
         setSelected(hit);
       } else {
         clearSelection();
@@ -390,6 +406,9 @@ export function setupInput(
       cursorCanvasY = -1;
       updateCursorLine(-1, LAYOUT.eventsStartY);
       setHovered(null);
+      if (!tooltip.isLocked) {
+        tooltip.hide();
+      }
       canvas.style.cursor = 'grab';
       scheduleRedraw();
     }
