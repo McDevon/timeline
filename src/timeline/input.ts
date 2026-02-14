@@ -3,7 +3,7 @@ import { LayoutItem } from './layout';
 import { TimelineSelection } from '../types';
 import { hitTest } from './hitTest';
 import { Tooltip } from '../ui/tooltip';
-import { LAYOUT } from './renderer';
+import { LAYOUT, chooseTickInterval } from './renderer';
 import { collectSnapTargets, findSnapYear, getSnapDetail, SnapDetail, SnapState } from './snap';
 import { todayDecimalYear, todayIsoDate, formatDate } from '../data/time';
 
@@ -41,23 +41,55 @@ export function setupInput(
   // --- Snapping ---
   let modifierHeld = false;
   let cachedLayout: LayoutItem[] | null = null;
+  let eventSnapTargets: number[] = [];
   let snapTargetsCache: number[] = [];
-  let snapTargetSet: Set<number> = new Set();
+
   let cachedNowYear = 0;
   let cachedNowIso = '';
+  let cachedViewportStart = 0;
+  let cachedViewportEnd = 0;
+
+  function isYearInsideEvent(year: number, items: LayoutItem[]): boolean {
+    for (const item of items) {
+      if (item.startYear <= year && year <= item.endYear) return true;
+    }
+    return false;
+  }
+
+  function collectAxisSnapTargets(viewport: Viewport, canvasWidth: number, layout: LayoutItem[]): number[] {
+    const interval = chooseTickInterval(viewport, canvasWidth);
+    const firstTick = Math.ceil(viewport.start / interval) * interval;
+    const ticks: number[] = [];
+    for (let year = firstTick; year <= viewport.end; year += interval) {
+      if (!isYearInsideEvent(year, layout)) {
+        ticks.push(year);
+      }
+    }
+    return ticks;
+  }
 
   function getSnapTargets(): number[] {
     const layout = getLayout();
+    const viewport = getViewport();
+
     if (layout !== cachedLayout) {
       cachedLayout = layout;
       cachedNowYear = todayDecimalYear();
       cachedNowIso = todayIsoDate();
-      const targets = collectSnapTargets(layout);
-      targets.push(cachedNowYear);
-      targets.sort((a, b) => a - b);
-      snapTargetsCache = targets;
-      snapTargetSet = new Set(snapTargetsCache);
+      eventSnapTargets = collectSnapTargets(layout);
+      eventSnapTargets.push(cachedNowYear);
+      cachedViewportStart = NaN; // force merge rebuild
     }
+
+    if (viewport.start !== cachedViewportStart || viewport.end !== cachedViewportEnd) {
+      cachedViewportStart = viewport.start;
+      cachedViewportEnd = viewport.end;
+      const axisTicks = collectAxisSnapTargets(viewport, canvas.clientWidth, layout);
+      const all = [...new Set([...eventSnapTargets, ...axisTicks])];
+      all.sort((a, b) => a - b);
+      snapTargetsCache = all;
+    }
+
     return snapTargetsCache;
   }
 
@@ -75,6 +107,23 @@ export function setupInput(
     return { label: 'Now', date: formatDate(cachedNowIso), isoDate: cachedNowIso };
   }
 
+  function axisTickSnapDetail(year: number): SnapDetail {
+    const absYear = Math.abs(year);
+    const suffix = year < 0 ? ' BCE' : '';
+    const isoDate = year < 0 ? `-${absYear}-01-01` : `${year}-01-01`;
+    return {
+      label: `Beginning of ${absYear}${suffix}`,
+      date: formatDate(isoDate),
+      isoDate,
+    };
+  }
+
+  function snapDetailFor(year: number, layout: LayoutItem[]): SnapDetail | null {
+    return getSnapDetail(year, layout) ??
+      (year === cachedNowYear ? nowSnapDetail() : null) ??
+      (Number.isInteger(year) && !isYearInsideEvent(year, layout) ? axisTickSnapDetail(year) : null);
+  }
+
   function updateSnapHighlights() {
     const years = new Set<number>();
     const layout = getLayout();
@@ -84,21 +133,19 @@ export function setupInput(
 
     if (cursorSnapYear !== null) {
       years.add(cursorSnapYear);
-      cursorDetail = getSnapDetail(cursorSnapYear, layout) ??
-        (cursorSnapYear === cachedNowYear ? nowSnapDetail() : null);
+      cursorDetail = snapDetailFor(cursorSnapYear, layout);
     }
     const sel = getSelection();
     if (sel !== null) {
-      getSnapTargets(); // ensure snapTargetSet is up to date
-      if (snapTargetSet.has(sel.start)) {
+      selStartDetail = snapDetailFor(sel.start, layout);
+      if (selStartDetail !== null) {
         years.add(sel.start);
-        selStartDetail = getSnapDetail(sel.start, layout) ??
-          (sel.start === cachedNowYear ? nowSnapDetail() : null);
       }
-      if (sel.start !== sel.end && snapTargetSet.has(sel.end)) {
-        years.add(sel.end);
-        selEndDetail = getSnapDetail(sel.end, layout) ??
-          (sel.end === cachedNowYear ? nowSnapDetail() : null);
+      if (sel.start !== sel.end) {
+        selEndDetail = snapDetailFor(sel.end, layout);
+        if (selEndDetail !== null) {
+          years.add(sel.end);
+        }
       }
     }
     setSnapState({ highlightYears: years, cursorDetail, selStartDetail, selEndDetail });

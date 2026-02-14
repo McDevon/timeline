@@ -77,7 +77,7 @@ export function computeFullRange(events: TimelineEvent[]): Viewport {
   return { start: min, end: max };
 }
 
-function chooseTickInterval(viewport: Viewport, canvasWidth: number): number {
+export function chooseTickInterval(viewport: Viewport, canvasWidth: number): number {
   const span = viewport.end - viewport.start;
   const drawWidth = canvasWidth - LAYOUT.paddingX * 2;
   const minPixelsPerTick = 80;
