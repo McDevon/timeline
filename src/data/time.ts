@@ -108,6 +108,61 @@ export function formatDuration(startIso: string, endIso: string): string {
 }
 
 /**
+ * Returns true if the ISO date string has full year-month-day precision.
+ */
+export function hasFullDate(isoDate: string): boolean {
+  const rest = isoDate.startsWith('-') ? isoDate.slice(1) : isoDate;
+  return rest.split('-').length >= 3;
+}
+
+const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+function parseIsoDate(iso: string): { year: number; month: number; day: number } {
+  let rest = iso;
+  let negative = false;
+  if (rest.startsWith('-')) {
+    negative = true;
+    rest = rest.slice(1);
+  }
+  const parts = rest.split('-');
+  let year = parseInt(parts[0], 10);
+  if (negative) year = -year;
+  const month = parts.length >= 2 ? parseInt(parts[1], 10) : 1;
+  const day = parts.length >= 3 ? parseInt(parts[2], 10) : 1;
+  return { year, month, day };
+}
+
+/**
+ * Compute a precise calendar duration between two full ISO dates.
+ * Uses year/month/day arithmetic with borrowing.
+ */
+export function formatPreciseDuration(startIso: string, endIso: string): string {
+  const s = parseIsoDate(startIso);
+  const e = parseIsoDate(endIso);
+
+  let years = e.year - s.year;
+  let months = e.month - s.month;
+  let days = e.day - s.day;
+
+  if (days < 0) {
+    months--;
+    // Borrow days from the previous month (relative to end date)
+    const prevMonth = e.month - 1 <= 0 ? 12 : e.month - 1;
+    days += DAYS_IN_MONTH[prevMonth - 1];
+  }
+  if (months < 0) {
+    years--;
+    months += 12;
+  }
+
+  const parts: string[] = [];
+  if (years > 0) parts.push(`${years} yr`);
+  if (months > 0) parts.push(`${months} mo`);
+  if (days > 0) parts.push(`${days} d`);
+  return parts.length > 0 ? parts.join(' ') : '0 d';
+}
+
+/**
  * Convert a decimal year to an approximate ISO date string (year-month).
  */
 export function decimalYearToIso(year: number): string {

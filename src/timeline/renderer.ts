@@ -1,7 +1,8 @@
 import { TimelineEvent, TimelineSelection } from '../types';
 import { Viewport, yearToX, xToYear } from './viewport';
-import { dateToDecimalYear, decimalYearToIso, formatAxisLabel, formatDate, formatDecimalYearDelta } from '../data/time';
+import { dateToDecimalYear, decimalYearToIso, formatAxisLabel, formatDate, formatDecimalYearDelta, hasFullDate, formatPreciseDuration } from '../data/time';
 import { LayoutItem } from './layout';
+import { SnapDetail, SnapState } from './snap';
 
 const COLORS = {
   background: '#1a1a2e',
@@ -188,6 +189,7 @@ function drawCursorLine(
   ctx: CanvasRenderingContext2D,
   cursorX: number,
   selection: TimelineSelection | null,
+  cursorDetail: SnapDetail | null,
   viewport: Viewport,
   canvasWidth: number,
   canvasHeight: number,
@@ -195,7 +197,6 @@ function drawCursorLine(
   if (cursorX < 0) return;
 
   const year = xToYear(cursorX, viewport, canvasWidth);
-  const isoDate = decimalYearToIso(year);
 
   // Vertical line
   ctx.strokeStyle = COLORS.cursorLine;
@@ -205,41 +206,44 @@ function drawCursorLine(
   ctx.lineTo(cursorX, canvasHeight);
   ctx.stroke();
 
-  // Determine which labels to show
+  // Build label lines (top to bottom)
   const isRange = selection !== null && selection.start !== selection.end;
   const isSinglePoint = selection !== null && selection.start === selection.end;
+  const lines: { text: string; color: string }[] = [];
 
-  ctx.font = `${LAYOUT.smallFontSize}px monospace`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'bottom';
-  const lineHeight = 14;
+  if (cursorDetail) {
+    lines.push({ text: cursorDetail.label, color: COLORS.cursorText });
+  }
 
-  if (isRange) {
-    // Range selected: date only
-    ctx.fillStyle = COLORS.cursorText;
-    ctx.fillText(formatDate(isoDate), cursorX, LAYOUT.axisY - LAYOUT.tickHeight - 4);
-  } else {
-    // No selection or single point: date + distance to now + optional distance to selection
-    const extraLines = 1 + (isSinglePoint ? 1 : 0);
-    const dateY = LAYOUT.axisY - LAYOUT.tickHeight - 4 - extraLines * lineHeight;
+  const dateStr = cursorDetail ? cursorDetail.date : formatDate(decimalYearToIso(year));
+  lines.push({ text: dateStr, color: COLORS.cursorText });
 
-    ctx.fillStyle = COLORS.cursorText;
-    ctx.fillText(formatDate(isoDate), cursorX, dateY);
-
+  if (!isRange) {
     const today = todayDecimalYear();
     const deltaNow = today - year;
     const span = viewport.end - viewport.start;
     const nowMag = formatDecimalYearDelta(deltaNow, span);
     const nowLabel = deltaNow > 0 ? `${nowMag} ago` : `in ${nowMag}`;
-    ctx.fillText(nowLabel, cursorX, dateY + lineHeight);
+    lines.push({ text: nowLabel, color: COLORS.cursorText });
 
     if (isSinglePoint) {
       const deltaSel = year - selection!.start;
       const selMag = formatDecimalYearDelta(deltaSel, span);
       const selLabel = deltaSel >= 0 ? `+${selMag}` : `-${selMag}`;
-      ctx.fillStyle = COLORS.selectionText;
-      ctx.fillText(selLabel, cursorX, dateY + lineHeight * 2);
+      lines.push({ text: selLabel, color: COLORS.selectionText });
     }
+  }
+
+  // Render lines bottom-up from axis
+  ctx.font = `${LAYOUT.smallFontSize}px monospace`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+  const lineHeight = 14;
+  const baseY = LAYOUT.axisY - LAYOUT.tickHeight - 4;
+
+  for (let i = 0; i < lines.length; i++) {
+    ctx.fillStyle = lines[i].color;
+    ctx.fillText(lines[i].text, cursorX, baseY - (lines.length - 1 - i) * lineHeight);
   }
 }
 
@@ -282,44 +286,71 @@ function drawSelectionLine(
 function drawSelectionForeground(
   ctx: CanvasRenderingContext2D,
   selection: TimelineSelection | null,
+  selStartDetail: SnapDetail | null,
+  selEndDetail: SnapDetail | null,
   viewport: Viewport,
   canvasWidth: number,
   canvasHeight: number,
 ) {
   if (selection === null) return;
 
+  ctx.fillStyle = COLORS.selectionText;
+  ctx.font = `${LAYOUT.smallFontSize}px monospace`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+  const lineHeight = 14;
+  const baseY = LAYOUT.axisY - LAYOUT.tickHeight - 4;
+
   if (selection.start === selection.end) {
-    // Single point: one line + date label
+    // Single point: one line + labels
     drawSelectionLine(ctx, selection.start, viewport, canvasWidth, canvasHeight);
 
     if (selection.start >= viewport.start && selection.start <= viewport.end) {
       const x = yearToX(selection.start, viewport, canvasWidth);
-      ctx.fillStyle = COLORS.selectionText;
-      ctx.font = `${LAYOUT.smallFontSize}px monospace`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'bottom';
-      ctx.fillText(formatDate(decimalYearToIso(selection.start)), x, LAYOUT.axisY - LAYOUT.tickHeight - 4);
+      const dateStr = selStartDetail ? selStartDetail.date : formatDate(decimalYearToIso(selection.start));
+
+      if (selStartDetail) {
+        ctx.fillText(selStartDetail.label, x, baseY - lineHeight);
+        ctx.fillText(dateStr, x, baseY);
+      } else {
+        ctx.fillText(dateStr, x, baseY);
+      }
     }
   } else {
     // Range: two lines + centered label
     drawSelectionLine(ctx, selection.start, viewport, canvasWidth, canvasHeight);
     drawSelectionLine(ctx, selection.end, viewport, canvasWidth, canvasHeight);
 
-    // Label centered between the two lines
     const x1 = yearToX(selection.start, viewport, canvasWidth);
     const x2 = yearToX(selection.end, viewport, canvasWidth);
     const centerX = (x1 + x2) / 2;
-    const span = viewport.end - viewport.start;
-    const duration = formatDecimalYearDelta(selection.end - selection.start, span);
-    const startLabel = formatDate(decimalYearToIso(selection.start));
-    const endLabel = formatDate(decimalYearToIso(selection.end));
-    const label = `${startLabel} — ${endLabel} (${duration})`;
 
-    ctx.fillStyle = COLORS.selectionText;
-    ctx.font = `${LAYOUT.smallFontSize}px monospace`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'bottom';
-    ctx.fillText(label, centerX, LAYOUT.axisY - LAYOUT.tickHeight - 4);
+    // Build label lines bottom-up
+    const lines: string[] = [];
+
+    // Event labels line (only when both ends are snapped)
+    if (selStartDetail && selEndDetail) {
+      lines.push(`${selStartDetail.label} — ${selEndDetail.label}`);
+    }
+
+    // Date + duration line
+    const startDate = selStartDetail ? selStartDetail.date : formatDate(decimalYearToIso(selection.start));
+    const endDate = selEndDetail ? selEndDetail.date : formatDate(decimalYearToIso(selection.end));
+
+    // Use precise duration when both endpoints have full ISO dates
+    let duration: string;
+    if (selStartDetail && selEndDetail && hasFullDate(selStartDetail.isoDate) && hasFullDate(selEndDetail.isoDate)) {
+      duration = formatPreciseDuration(selStartDetail.isoDate, selEndDetail.isoDate);
+    } else {
+      const span = viewport.end - viewport.start;
+      duration = formatDecimalYearDelta(selection.end - selection.start, span);
+    }
+
+    lines.push(`${startDate} — ${endDate} (${duration})`);
+
+    for (let i = 0; i < lines.length; i++) {
+      ctx.fillText(lines[i], centerX, baseY - (lines.length - 1 - i) * lineHeight);
+    }
   }
 }
 
@@ -467,7 +498,7 @@ export function render(
   selectedItem: LayoutItem | null,
   cursorX: number,
   selection: TimelineSelection | null,
-  snapHighlightYears: Set<number>,
+  snapState: SnapState,
 ) {
   ctx.fillStyle = COLORS.background;
   ctx.fillRect(0, 0, canvasWidth, canvasHeight);
@@ -478,10 +509,10 @@ export function render(
   drawSelectionBackground(ctx, selection, viewport, canvasWidth, canvasHeight);
 
   for (const item of layout) {
-    drawLayoutItem(ctx, item, viewport, canvasWidth, hoveredItem, selectedItem, snapHighlightYears);
+    drawLayoutItem(ctx, item, viewport, canvasWidth, hoveredItem, selectedItem, snapState.highlightYears);
   }
 
   drawTodayLine(ctx, viewport, canvasWidth, canvasHeight);
-  drawSelectionForeground(ctx, selection, viewport, canvasWidth, canvasHeight);
-  drawCursorLine(ctx, cursorX, selection, viewport, canvasWidth, canvasHeight);
+  drawSelectionForeground(ctx, selection, snapState.selStartDetail, snapState.selEndDetail, viewport, canvasWidth, canvasHeight);
+  drawCursorLine(ctx, cursorX, selection, snapState.cursorDetail, viewport, canvasWidth, canvasHeight);
 }

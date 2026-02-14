@@ -4,6 +4,7 @@ import { computeLayout, LayoutItem } from './timeline/layout';
 import { Viewport } from './timeline/viewport';
 import { TimelineSelection } from './types';
 import { setupInput } from './timeline/input';
+import { SnapState } from './timeline/snap';
 
 function setupCanvas(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
   const dpr = window.devicePixelRatio || 1;
@@ -37,7 +38,7 @@ async function main() {
   let selectedItem: LayoutItem | null = null;
   let cursorX = -1;
   let selection: TimelineSelection | null = null;
-  let snapHighlightYears: Set<number> = new Set();
+  let snapState: SnapState = { highlightYears: new Set(), cursorDetail: null, selStartDetail: null, selEndDetail: null };
 
   // rAF-batched rendering
   let rafId = 0;
@@ -46,7 +47,7 @@ async function main() {
     rafId = 0;
     const ctx = setupCanvas(canvas);
     const rect = canvas.getBoundingClientRect();
-    render(ctx, rect.width, rect.height, layout, viewport, hoveredItem, selectedItem, cursorX, selection, snapHighlightYears);
+    render(ctx, rect.width, rect.height, layout, viewport, hoveredItem, selectedItem, cursorX, selection, snapState);
   }
 
   function requestRedraw() {
@@ -67,7 +68,7 @@ async function main() {
     (x: number) => { cursorX = x; },
     () => selection,
     (sel: TimelineSelection | null) => { selection = sel; },
-    (years: Set<number>) => { snapHighlightYears = years; },
+    (state: SnapState) => { snapState = state; },
     requestRedraw,
   );
 

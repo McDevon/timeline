@@ -4,7 +4,7 @@ import { TimelineSelection } from '../types';
 import { hitTest } from './hitTest';
 import { Tooltip } from '../ui/tooltip';
 import { LAYOUT } from './renderer';
-import { collectSnapTargets, findSnapYear } from './snap';
+import { collectSnapTargets, findSnapYear, getSnapDetail, SnapDetail, SnapState } from './snap';
 
 export interface InputHandlers {
   destroy(): void;
@@ -26,7 +26,7 @@ export function setupInput(
   setCursorX: (x: number) => void,
   getSelection: () => TimelineSelection | null,
   setSelection: (sel: TimelineSelection | null) => void,
-  setSnapHighlightYears: (years: Set<number>) => void,
+  setSnapState: (state: SnapState) => void,
   requestRedraw: () => void,
 ): InputHandlers {
   const tooltip = new Tooltip();
@@ -65,16 +65,28 @@ export function setupInput(
 
   function updateSnapHighlights() {
     const years = new Set<number>();
+    const layout = getLayout();
+    let cursorDetail: SnapDetail | null = null;
+    let selStartDetail: SnapDetail | null = null;
+    let selEndDetail: SnapDetail | null = null;
+
     if (cursorSnapYear !== null) {
       years.add(cursorSnapYear);
+      cursorDetail = getSnapDetail(cursorSnapYear, layout);
     }
     const sel = getSelection();
     if (sel !== null) {
       getSnapTargets(); // ensure snapTargetSet is up to date
-      if (snapTargetSet.has(sel.start)) years.add(sel.start);
-      if (sel.start !== sel.end && snapTargetSet.has(sel.end)) years.add(sel.end);
+      if (snapTargetSet.has(sel.start)) {
+        years.add(sel.start);
+        selStartDetail = getSnapDetail(sel.start, layout);
+      }
+      if (sel.start !== sel.end && snapTargetSet.has(sel.end)) {
+        years.add(sel.end);
+        selEndDetail = getSnapDetail(sel.end, layout);
+      }
     }
-    setSnapHighlightYears(years);
+    setSnapState({ highlightYears: years, cursorDetail, selStartDetail, selEndDetail });
   }
 
   function scheduleRedraw() {

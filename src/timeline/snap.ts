@@ -1,7 +1,83 @@
 import { LayoutItem } from './layout';
 import { Viewport, yearToX, xToYear } from './viewport';
+import { formatDate } from '../data/time';
 
 const SNAP_THRESHOLD_PX = 10;
+
+export interface SnapDetail {
+  label: string;
+  date: string;
+  isoDate: string;
+}
+
+export interface SnapState {
+  highlightYears: Set<number>;
+  cursorDetail: SnapDetail | null;
+  selStartDetail: SnapDetail | null;
+  selEndDetail: SnapDetail | null;
+}
+
+/**
+ * Find the best event at a snap year and build a descriptive label + full date.
+ * Priority: point events > beginnings > ends. Prefers non-containers.
+ */
+export function getSnapDetail(year: number, layout: LayoutItem[]): SnapDetail | null {
+  // priority: 0 = point, 1 = beginning, 2 = end
+  const matches: { label: string; date: string; isoDate: string; isContainer: boolean; priority: number }[] = [];
+
+  function walk(items: LayoutItem[]) {
+    for (const item of items) {
+      if (item.isPoint && item.startYear === year) {
+        matches.push({
+          label: item.event.name,
+          date: formatDate(item.event.start),
+          isoDate: item.event.start,
+          isContainer: false,
+          priority: 0,
+        });
+      } else {
+        if (item.startYear === year) {
+          matches.push({
+            label: `Beginning of ${item.event.name}`,
+            date: formatDate(item.event.start),
+            isoDate: item.event.start,
+            isContainer: item.isContainer,
+            priority: 1,
+          });
+        }
+        if (item.endYear === year && item.event.end) {
+          matches.push({
+            label: `End of ${item.event.name}`,
+            date: formatDate(item.event.end),
+            isoDate: item.event.end,
+            isContainer: item.isContainer,
+            priority: 2,
+          });
+        }
+      }
+      if (item.children.length > 0) {
+        walk(item.children);
+      }
+    }
+  }
+
+  walk(layout);
+  if (matches.length === 0) return null;
+
+  // Prefer non-container matches when deeper matches exist
+  const nonContainer = matches.filter(m => !m.isContainer);
+  const candidates = nonContainer.length > 0 ? nonContainer : matches;
+
+  // Sort by priority (point > beginning > end)
+  candidates.sort((a, b) => a.priority - b.priority);
+  const best = candidates[0];
+
+  return {
+    label: best.label,
+    date: best.date,
+    isoDate: best.isoDate,
+  };
+}
 
 /**
  * Collect all snap target years from the layout tree.
