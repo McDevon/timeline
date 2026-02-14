@@ -55,26 +55,19 @@ export function setupInput(
   let cachedViewportStart = 0;
   let cachedViewportEnd = 0;
 
-  function isYearInsideEvent(year: number, items: LayoutItem[]): boolean {
-    for (const item of items) {
-      if (item.startYear <= year && year <= item.endYear) return true;
-    }
-    return false;
-  }
+  const TICK_SNAP_THRESHOLD_PX = 6;
 
-  function collectAxisSnapTargets(viewport: Viewport, canvasWidth: number, layout: LayoutItem[]): number[] {
+  function collectAxisSnapTargets(viewport: Viewport, canvasWidth: number): number[] {
     const interval = chooseTickInterval(viewport, canvasWidth);
     const firstTick = Math.ceil(viewport.start / interval) * interval;
     const ticks: number[] = [];
     for (let year = firstTick; year <= viewport.end; year += interval) {
-      if (!isYearInsideEvent(year, layout)) {
-        ticks.push(year);
-      }
+      ticks.push(year);
     }
     return ticks;
   }
 
-  function getSnapTargets(): number[] {
+  function ensureSnapCaches(): void {
     const layout = getLayout();
     const viewport = getViewport();
 
@@ -84,26 +77,34 @@ export function setupInput(
       cachedNowIso = todayIsoDate();
       eventSnapTargets = collectSnapTargets(layout);
       eventSnapTargets.push(cachedNowYear);
+      eventSnapTargets.sort((a, b) => a - b);
       cachedViewportStart = NaN; // force merge rebuild
     }
 
     if (viewport.start !== cachedViewportStart || viewport.end !== cachedViewportEnd) {
       cachedViewportStart = viewport.start;
       cachedViewportEnd = viewport.end;
-      const axisTicks = collectAxisSnapTargets(viewport, canvas.clientWidth, layout);
+      const axisTicks = collectAxisSnapTargets(viewport, canvas.clientWidth);
       const all = [...new Set([...eventSnapTargets, ...axisTicks])];
       all.sort((a, b) => a - b);
       snapTargetsCache = all;
     }
+  }
 
-    return snapTargetsCache;
+  /** Two-tier snap: event edges at 10px, then all targets (incl. ticks) at 6px. */
+  function findBestSnap(pixelX: number): number | null {
+    ensureSnapCaches();
+    const viewport = getViewport();
+    const w = canvas.clientWidth;
+    return findSnapYear(pixelX, eventSnapTargets, viewport, w) ??
+      findSnapYear(pixelX, snapTargetsCache, viewport, w, TICK_SNAP_THRESHOLD_PX);
   }
 
   function snapYear(pixelX: number): number {
     const viewport = getViewport();
     const rawYear = xToYear(pixelX, viewport, canvas.clientWidth);
     if (modifierHeld) return rawYear;
-    return findSnapYear(pixelX, getSnapTargets(), viewport, canvas.clientWidth) ?? rawYear;
+    return findBestSnap(pixelX) ?? rawYear;
   }
 
   // --- Snap highlighting ---
@@ -127,7 +128,7 @@ export function setupInput(
   function snapDetailFor(year: number, layout: LayoutItem[]): SnapDetail | null {
     return getSnapDetail(year, layout) ??
       (year === cachedNowYear ? nowSnapDetail() : null) ??
-      (Number.isInteger(year) && !isYearInsideEvent(year, layout) ? axisTickSnapDetail(year) : null);
+      (Number.isInteger(year) ? axisTickSnapDetail(year) : null);
   }
 
   function updateSnapHighlights() {
@@ -222,9 +223,9 @@ export function setupInput(
     let newX = canvasY < LAYOUT.eventsStartY ? canvasX : -1;
     let newSnapYear: number | null = null;
     if (newX >= 0 && !modifierHeld) {
-      const viewport = getViewport();
-      const snapped = findSnapYear(newX, getSnapTargets(), viewport, canvas.clientWidth);
+      const snapped = findBestSnap(newX);
       if (snapped !== null) {
+        const viewport = getViewport();
         newX = yearToX(snapped, viewport, canvas.clientWidth);
         newSnapYear = snapped;
       }
@@ -336,7 +337,7 @@ export function setupInput(
           });
         } else if (e.shiftKey) {
           // Shift-click with no selection: range from now to clicked year
-          getSnapTargets(); // ensure cachedNowYear is set
+          ensureSnapCaches(); // ensure cachedNowYear is set
           const now = cachedNowYear;
           setSelection({
             start: Math.min(now, year),
@@ -363,6 +364,37 @@ export function setupInput(
         tooltip.show(hit.event, e.clientX, e.clientY);
         tooltip.lock();
         setSelected(hit);
+
+        // Determine selection year: always for points, shift-only for ranges
+        let selYear: number | null = null;
+        if (hit.isPoint) {
+          selYear = hit.startYear;
+        } else if (e.shiftKey) {
+          const startX = yearToX(hit.startYear, viewport, canvas.clientWidth);
+          const endX = yearToX(hit.endYear, viewport, canvas.clientWidth);
+          selYear = Math.abs(x - startX) <= Math.abs(x - endX) ? hit.startYear : hit.endYear;
+        }
+
+        if (selYear !== null) {
+          const existing = getSelection();
+          if (e.shiftKey && existing !== null) {
+            setSelection({
+              start: Math.min(existing.anchor, selYear),
+              end: Math.max(existing.anchor, selYear),
+              anchor: existing.anchor,
+            });
+          } else if (e.shiftKey) {
+            ensureSnapCaches();
+            const now = cachedNowYear;
+            setSelection({
+              start: Math.min(now, selYear),
+              end: Math.max(now, selYear),
+              anchor: now,
+            });
+          } else {
+            setSelection({ start: selYear, end: selYear, anchor: selYear });
+          }
+        }
       } else {
         clearSelection();
       }

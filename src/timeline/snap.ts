@@ -109,6 +109,7 @@ export function findSnapYear(
   snapTargets: number[],
   viewport: Viewport,
   canvasWidth: number,
+  threshold: number = SNAP_THRESHOLD_PX,
 ): number | null {
   if (snapTargets.length === 0) return null;
 
@@ -128,7 +129,7 @@ export function findSnapYear(
 
   // Check the two nearest candidates (lo-1 and lo)
   let bestYear: number | null = null;
-  let bestDist = SNAP_THRESHOLD_PX + 1;
+  let bestDist = threshold + 1;
 
   for (const idx of [lo - 1, lo]) {
     if (idx < 0 || idx >= snapTargets.length) continue;
@@ -140,5 +141,5 @@ export function findSnapYear(
     }
   }
 
-  return bestDist <= SNAP_THRESHOLD_PX ? bestYear : null;
+  return bestDist <= threshold ? bestYear : null;
 }
