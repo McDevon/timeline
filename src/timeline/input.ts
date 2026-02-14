@@ -32,12 +32,6 @@ export function setupInput(
 ): InputHandlers {
   const tooltip = new Tooltip();
 
-  tooltip.onClick = () => {
-    tooltip.hide();
-    setSelected(null);
-    scheduleRedraw();
-  };
-
   function clearSelection() {
     tooltip.hide();
     setSelected(null);
@@ -173,13 +167,11 @@ export function setupInput(
     if (hit !== prev) {
       setHovered(hit);
       canvas.style.cursor = hit ? 'pointer' : 'grab';
-      if (!tooltip.isLocked) {
-        if (hit) {
-          const rect = canvas.getBoundingClientRect();
-          tooltip.show(hit.event, rect.left + cursorCanvasX, rect.top + cursorCanvasY);
-        } else {
-          tooltip.hide();
-        }
+      if (hit) {
+        const rect = canvas.getBoundingClientRect();
+        tooltip.show(hit.event, rect.left + cursorCanvasX, rect.top + cursorCanvasY);
+      } else {
+        tooltip.hide();
       }
     }
   }
@@ -361,15 +353,13 @@ export function setupInput(
       const hit = hitTest(x, y, layout, viewport, canvas.clientWidth);
 
       if (hit) {
-        tooltip.show(hit.event, e.clientX, e.clientY);
-        tooltip.lock();
         setSelected(hit);
 
-        // Determine selection year: always for points, shift-only for ranges
+        // Determine selection year: point → at the point; range → closer edge
         let selYear: number | null = null;
         if (hit.isPoint) {
           selYear = hit.startYear;
-        } else if (e.shiftKey) {
+        } else {
           const startX = yearToX(hit.startYear, viewport, canvas.clientWidth);
           const endX = yearToX(hit.endYear, viewport, canvas.clientWidth);
           selYear = Math.abs(x - startX) <= Math.abs(x - endX) ? hit.startYear : hit.endYear;
@@ -438,9 +428,7 @@ export function setupInput(
       cursorCanvasY = -1;
       updateCursorLine(-1, LAYOUT.eventsStartY);
       setHovered(null);
-      if (!tooltip.isLocked) {
-        tooltip.hide();
-      }
+      tooltip.hide();
       canvas.style.cursor = 'grab';
       scheduleRedraw();
     }

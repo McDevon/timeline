@@ -1,0 +1,90 @@
+[
+  {
+    "start": "1471-08-09",
+    "end": "1534-09-25",
+    "name": "Renaissance Popes",
+    "nested": [
+      {
+        "start": "1492-08-11",
+        "end": "1503-08-18",
+        "name": "Alexander VI",
+        "info": "Rodrigo Borgia"
+      },
+      {
+        "start": "1503-11-01",
+        "end": "1513-02-21",
+        "name": "Julius II",
+        "info": "Giuliano della Rovere"
+      },
+      {
+        "start": "1513-03-11",
+        "end": "1521-12-01",
+        "name": "Leo X",
+        "info": "Giovanni de Medici"
+      }
+    ]
+  },
+  {
+    "start": "1492-10-12",
+    "name": "Columbus reaches the Americas",
+    "info": "First voyage of Christopher Columbus"
+  },
+  {
+    "start": "1517-10-31",
+    "name": "95 Theses",
+    "info": "Martin Luther posts his 95 Theses"
+  },
+  {
+    "start": "1914-07-28",
+    "end": "1918-11-11",
+    "name": "World War I",
+    "info": "Global conflict centered in Europe between the Allied and Central Powers",
+    "nested": [
+      {
+        "start": "1914-06-28",
+        "name": "Assassination of Archduke Franz Ferdinand",
+        "info": "Assassination in Sarajevo triggers the chain of events leading to war"
+      },
+      {
+        "start": "1916-02-21",
+        "end": "1916-12-18",
+        "name": "Battle of Verdun",
+        "info": "Longest single battle of the war. French defensive victory."
+      },
+      {
+        "start": "1918-11-11",
+        "name": "Armistice",
+        "info": "Fighting ends at 11 AM on the 11th day of the 11th month"
+      }
+    ]
+  },
+  {
+    "start": "1939-09-01",
+    "end": "1945-09-02",
+    "name": "World War II",
+    "info": "Global conflict between the Allies and the Axis powers",
+    "nested": [
+      {
+        "start": "1941-12-07",
+        "name": "Attack on Pearl Harbor",
+        "info": "Japan attacks the US Pacific Fleet, bringing America into the war"
+      },
+      {
+        "start": "1942-08-23",
+        "end": "1943-02-02",
+        "name": "Battle of Stalingrad",
+        "info": "Bloodiest battle in history. Soviet victory marks the turning point on the Eastern Front."
+      },
+      {
+        "start": "1944-06-06",
+        "name": "D-Day",
+        "info": "Allied invasion of Normandy. Largest seaborne invasion in history."
+      },
+      {
+        "start": "1945-05-08",
+        "name": "V-E Day",
+        "info": "Victory in Europe. Germany surrenders unconditionally."
+      }
+    ]
+  }
+]

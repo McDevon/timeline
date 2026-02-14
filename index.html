@@ -34,13 +34,9 @@
       transition: opacity 0.15s ease-in-out;
       z-index: 100;
       max-width: 300px;
-      cursor: default;
     }
     .timeline-tooltip.visible {
       opacity: 1;
-    }
-    .timeline-tooltip.locked {
-      pointer-events: auto;
     }
     .timeline-tooltip .tooltip-dates {
       color: #b0b0b0;
@@ -50,10 +46,44 @@
       color: #a0a0a0;
       font-size: 12px;
     }
+    .zoom-controls {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      z-index: 50;
+    }
+    .zoom-btn {
+      width: 36px;
+      height: 36px;
+      border: 1px solid #533483;
+      border-radius: 6px;
+      background: #16213e;
+      color: #e0e0e0;
+      font-size: 20px;
+      line-height: 1;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .zoom-btn:hover {
+      background: #1a3a5c;
+      border-color: #7b52ab;
+    }
+    .zoom-btn:active {
+      background: #0f2840;
+    }
   </style>
 </head>
 <body>
   <canvas id="timeline-canvas"></canvas>
+  <div class="zoom-controls">
+    <button id="zoom-in" class="zoom-btn">+</button>
+    <button id="zoom-out" class="zoom-btn">&minus;</button>
+  </div>
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

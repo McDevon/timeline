@@ -1,18 +1,18 @@
 import { loadEvents } from './data/loader';
 import { render, computeFullRange, LAYOUT } from './timeline/renderer';
 import { computeLayout, LayoutItem } from './timeline/layout';
-import { Viewport } from './timeline/viewport';
+import { Viewport, zoomViewport } from './timeline/viewport';
 import { TimelineSelection } from './types';
 import { setupInput } from './timeline/input';
 import { SnapState } from './timeline/snap';
 
 function setupCanvas(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
   const dpr = window.devicePixelRatio || 1;
+  canvas.style.width = '100vw';
+  canvas.style.height = '100vh';
   const rect = canvas.getBoundingClientRect();
   canvas.width = rect.width * dpr;
   canvas.height = rect.height * dpr;
-  canvas.style.width = `${rect.width}px`;
-  canvas.style.height = `${rect.height}px`;
   const ctx = canvas.getContext('2d')!;
   ctx.scale(dpr, dpr);
   return ctx;
@@ -24,10 +24,7 @@ async function main() {
     throw new Error('Canvas element not found');
   }
 
-  canvas.style.width = '100vw';
-  canvas.style.height = '100vh';
-
-  const events = await loadEvents('/events.json');
+  const events = await loadEvents('/events.json', '/events.example.json');
 
   // Compute layout once (events are static)
   const layout: LayoutItem[] = computeLayout(events, LAYOUT.eventsStartY);
@@ -43,8 +40,35 @@ async function main() {
   // rAF-batched rendering
   let rafId = 0;
 
+  // Zoom animation state
+  let animFrom: Viewport | null = null;
+  let animTo: Viewport | null = null;
+  let animStartTime = 0;
+  const ZOOM_ANIM_MS = 150;
+
+  function easeInOut(t: number): number {
+    return t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
+  }
+
   function draw() {
     rafId = 0;
+
+    if (animFrom && animTo) {
+      const elapsed = performance.now() - animStartTime;
+      const t = Math.min(elapsed / ZOOM_ANIM_MS, 1);
+      const e = easeInOut(t);
+      viewport = {
+        start: animFrom.start + (animTo.start - animFrom.start) * e,
+        end: animFrom.end + (animTo.end - animFrom.end) * e,
+      };
+      if (t < 1) {
+        rafId = requestAnimationFrame(draw);
+      } else {
+        animFrom = null;
+        animTo = null;
+      }
+    }
+
     const ctx = setupCanvas(canvas);
     const rect = canvas.getBoundingClientRect();
     render(ctx, rect.width, rect.height, layout, viewport, hoveredItem, selectedItem, cursorX, selection, snapState);
@@ -54,6 +78,13 @@ async function main() {
     if (rafId === 0) {
       rafId = requestAnimationFrame(draw);
     }
+  }
+
+  function animateZoom(target: Viewport) {
+    animFrom = { ...viewport };
+    animTo = target;
+    animStartTime = performance.now();
+    requestRedraw();
   }
 
   // Wire up input
@@ -71,6 +102,19 @@ async function main() {
     (state: SnapState) => { snapState = state; },
     requestRedraw,
   );
+
+  // Zoom buttons
+  const ZOOM_DELTA = 120; // equivalent to one scroll wheel tick
+  document.getElementById('zoom-in')!.addEventListener('click', () => {
+    const center = canvas.clientWidth / 2;
+    const base = animTo ?? viewport;
+    animateZoom(zoomViewport(base, center, canvas.clientWidth, -ZOOM_DELTA));
+  });
+  document.getElementById('zoom-out')!.addEventListener('click', () => {
+    const center = canvas.clientWidth / 2;
+    const base = animTo ?? viewport;
+    animateZoom(zoomViewport(base, center, canvas.clientWidth, ZOOM_DELTA));
+  });
 
   // Initial draw and resize handler
   draw();

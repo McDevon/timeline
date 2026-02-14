@@ -1,38 +1,48 @@
-import { TimelineEvent, TimelineSelection } from '../types';
-import { Viewport, yearToX, xToYear } from './viewport';
-import { dateToDecimalYear, decimalYearToIso, formatAxisLabel, formatDate, formatDecimalYearDelta, hasFullDate, formatPreciseDuration, todayDecimalYear, todayIsoDate } from '../data/time';
-import { LayoutItem } from './layout';
-import { SnapDetail, SnapState } from './snap';
+import { TimelineEvent, TimelineSelection } from "../types";
+import { Viewport, yearToX, xToYear } from "./viewport";
+import {
+  dateToDecimalYear,
+  decimalYearToIso,
+  formatAxisLabel,
+  formatDate,
+  formatDecimalYearDelta,
+  hasFullDate,
+  formatPreciseDuration,
+  todayDecimalYear,
+  todayIsoDate,
+} from "../data/time";
+import { LayoutItem } from "./layout";
+import { SnapDetail, SnapState } from "./snap";
 
 const COLORS = {
-  background: '#1a1a2e',
-  axis: '#e0e0e0',
-  axisText: '#a0a0a0',
-  containerFill: 'rgba(15, 52, 96, 0.25)',
-  containerBorder: '#0f3460',
-  containerText: '#e0e0e0',
-  containerHoverFill: 'rgba(15, 52, 96, 0.4)',
-  containerHoverBorder: '#1a6ea0',
-  containerSnapFill: 'rgba(15, 52, 96, 0.30)',
-  containerSnapBorder: '#124878',
-  containerSelectedFill: 'rgba(80, 56, 12, 0.4)',
-  containerSelectedBorder: '#c89a2c',
-  barFill: '#0f3460',
-  barBorder: '#533483',
-  barText: '#e0e0e0',
-  barHoverFill: '#163d6e',
-  barHoverBorder: '#7b52ab',
-  barSnapFill: '#12395e',
-  barSnapBorder: '#634598',
-  barSelectedFill: '#4a3800',
-  barSelectedBorder: '#c89a2c',
-  todayLine: 'rgba(255, 82, 82, 0.5)',
-  todayText: 'rgba(255, 82, 82, 0.8)',
-  cursorLine: 'rgba(255, 255, 255, 0.2)',
-  cursorText: 'rgba(255, 255, 255, 0.6)',
-  selectionLine: 'rgba(255, 255, 255, 0.5)',
-  selectionText: 'rgba(255, 255, 255, 0.9)',
-  selectionFill: 'rgba(255, 255, 255, 0.05)',
+  background: "#1a1a2e",
+  axis: "#e0e0e0",
+  axisText: "#a0a0a0",
+  containerFill: "rgba(15, 52, 96, 0.25)",
+  containerBorder: "#0f3460",
+  containerText: "#e0e0e0",
+  containerHoverFill: "rgba(15, 52, 96, 0.4)",
+  containerHoverBorder: "#1a6ea0",
+  containerSnapFill: "rgba(15, 52, 96, 0.30)",
+  containerSnapBorder: "#124878",
+  containerSelectedFill: "rgba(80, 56, 12, 0.4)",
+  containerSelectedBorder: "#c89a2c",
+  barFill: "#0f3460",
+  barBorder: "#533483",
+  barText: "#e0e0e0",
+  barHoverFill: "#163d6e",
+  barHoverBorder: "#7b52ab",
+  barSnapFill: "#12395e",
+  barSnapBorder: "#634598",
+  barSelectedFill: "#4a3800",
+  barSelectedBorder: "#c89a2c",
+  todayLine: "rgba(255, 82, 82, 0.5)",
+  todayText: "rgba(255, 82, 82, 0.8)",
+  cursorLine: "rgba(255, 255, 255, 0.2)",
+  cursorText: "rgba(255, 255, 255, 0.6)",
+  selectionLine: "rgba(255, 255, 255, 0.5)",
+  selectionText: "rgba(255, 255, 255, 0.9)",
+  selectionFill: "rgba(255, 255, 255, 0.05)",
 };
 
 const LAYOUT = {
@@ -77,7 +87,10 @@ export function computeFullRange(events: TimelineEvent[]): Viewport {
   return { start: min, end: max };
 }
 
-export function chooseTickInterval(viewport: Viewport, canvasWidth: number): number {
+export function chooseTickInterval(
+  viewport: Viewport,
+  canvasWidth: number,
+): number {
   const span = viewport.end - viewport.start;
   const drawWidth = canvasWidth - LAYOUT.paddingX * 2;
   const minPixelsPerTick = 80;
@@ -113,7 +126,11 @@ function drawRoundedRect(
   ctx.closePath();
 }
 
-function drawAxis(ctx: CanvasRenderingContext2D, viewport: Viewport, canvasWidth: number) {
+function drawAxis(
+  ctx: CanvasRenderingContext2D,
+  viewport: Viewport,
+  canvasWidth: number,
+) {
   const y = LAYOUT.axisY;
   const x1 = LAYOUT.paddingX;
   const x2 = canvasWidth - LAYOUT.paddingX;
@@ -131,8 +148,8 @@ function drawAxis(ctx: CanvasRenderingContext2D, viewport: Viewport, canvasWidth
 
   ctx.fillStyle = COLORS.axisText;
   ctx.font = `${LAYOUT.smallFontSize}px monospace`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'top';
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
 
   for (let year = firstTick; year <= viewport.end; year += interval) {
     const x = yearToX(year, viewport, canvasWidth);
@@ -140,10 +157,13 @@ function drawAxis(ctx: CanvasRenderingContext2D, viewport: Viewport, canvasWidth
     ctx.moveTo(x, y - LAYOUT.tickHeight / 2);
     ctx.lineTo(x, y + LAYOUT.tickHeight / 2);
     ctx.stroke();
-    ctx.fillText(formatAxisLabel(year, spanYears), x, y + LAYOUT.tickHeight / 2 + 4);
+    ctx.fillText(
+      formatAxisLabel(year, spanYears),
+      x,
+      y + LAYOUT.tickHeight / 2 + 4,
+    );
   }
 }
-
 
 function drawTodayLine(
   ctx: CanvasRenderingContext2D,
@@ -167,9 +187,13 @@ function drawTodayLine(
   // Date label above axis
   ctx.fillStyle = COLORS.todayText;
   ctx.font = `${LAYOUT.smallFontSize}px monospace`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'bottom';
-  ctx.fillText(formatDate(todayIsoDate()), x, LAYOUT.axisY - LAYOUT.tickHeight - 4);
+  ctx.textAlign = "center";
+  ctx.textBaseline = "bottom";
+  ctx.fillText(
+    formatDate(todayIsoDate()),
+    x,
+    LAYOUT.axisY - LAYOUT.tickHeight - 4,
+  );
 }
 
 function drawCursorLine(
@@ -202,7 +226,9 @@ function drawCursorLine(
     lines.push({ text: cursorDetail.label, color: COLORS.cursorText });
   }
 
-  const dateStr = cursorDetail ? cursorDetail.date : formatDate(decimalYearToIso(year));
+  const dateStr = cursorDetail
+    ? cursorDetail.date
+    : formatDate(decimalYearToIso(year));
   lines.push({ text: dateStr, color: COLORS.cursorText });
 
   if (!isRange) {
@@ -223,14 +249,18 @@ function drawCursorLine(
 
   // Render lines bottom-up from axis
   ctx.font = `${LAYOUT.smallFontSize}px monospace`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'bottom';
+  ctx.textAlign = "center";
+  ctx.textBaseline = "bottom";
   const lineHeight = 14;
   const baseY = LAYOUT.axisY - LAYOUT.tickHeight - 4;
 
   for (let i = 0; i < lines.length; i++) {
     ctx.fillStyle = lines[i].color;
-    ctx.fillText(lines[i].text, cursorX, baseY - (lines.length - 1 - i) * lineHeight);
+    ctx.fillText(
+      lines[i].text,
+      cursorX,
+      baseY - (lines.length - 1 - i) * lineHeight,
+    );
   }
 }
 
@@ -244,8 +274,16 @@ function drawSelectionBackground(
   if (selection === null || selection.start === selection.end) return;
   if (selection.end < viewport.start || selection.start > viewport.end) return;
 
-  const x1 = yearToX(Math.max(selection.start, viewport.start), viewport, canvasWidth);
-  const x2 = yearToX(Math.min(selection.end, viewport.end), viewport, canvasWidth);
+  const x1 = yearToX(
+    Math.max(selection.start, viewport.start),
+    viewport,
+    canvasWidth,
+  );
+  const x2 = yearToX(
+    Math.min(selection.end, viewport.end),
+    viewport,
+    canvasWidth,
+  );
   const top = LAYOUT.axisY - LAYOUT.tickHeight;
 
   ctx.fillStyle = COLORS.selectionFill;
@@ -283,18 +321,26 @@ function drawSelectionForeground(
 
   ctx.fillStyle = COLORS.selectionText;
   ctx.font = `${LAYOUT.smallFontSize}px monospace`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'bottom';
+  ctx.textAlign = "center";
+  ctx.textBaseline = "bottom";
   const lineHeight = 14;
   const baseY = LAYOUT.axisY - LAYOUT.tickHeight - 4;
 
   if (selection.start === selection.end) {
     // Single point: one line + labels
-    drawSelectionLine(ctx, selection.start, viewport, canvasWidth, canvasHeight);
+    drawSelectionLine(
+      ctx,
+      selection.start,
+      viewport,
+      canvasWidth,
+      canvasHeight,
+    );
 
     if (selection.start >= viewport.start && selection.start <= viewport.end) {
       const x = yearToX(selection.start, viewport, canvasWidth);
-      const dateStr = selStartDetail ? selStartDetail.date : formatDate(decimalYearToIso(selection.start));
+      const dateStr = selStartDetail
+        ? selStartDetail.date
+        : formatDate(decimalYearToIso(selection.start));
 
       if (selStartDetail) {
         ctx.fillText(selStartDetail.label, x, baseY - lineHeight);
@@ -305,7 +351,13 @@ function drawSelectionForeground(
     }
   } else {
     // Range: two lines + centered label
-    drawSelectionLine(ctx, selection.start, viewport, canvasWidth, canvasHeight);
+    drawSelectionLine(
+      ctx,
+      selection.start,
+      viewport,
+      canvasWidth,
+      canvasHeight,
+    );
     drawSelectionLine(ctx, selection.end, viewport, canvasWidth, canvasHeight);
 
     const x1 = yearToX(selection.start, viewport, canvasWidth);
@@ -321,13 +373,25 @@ function drawSelectionForeground(
     }
 
     // Date + duration line
-    const startDate = selStartDetail ? selStartDetail.date : formatDate(decimalYearToIso(selection.start));
-    const endDate = selEndDetail ? selEndDetail.date : formatDate(decimalYearToIso(selection.end));
+    const startDate = selStartDetail
+      ? selStartDetail.date
+      : formatDate(decimalYearToIso(selection.start));
+    const endDate = selEndDetail
+      ? selEndDetail.date
+      : formatDate(decimalYearToIso(selection.end));
 
     // Use precise duration when both endpoints have full ISO dates
     let duration: string;
-    if (selStartDetail && selEndDetail && hasFullDate(selStartDetail.isoDate) && hasFullDate(selEndDetail.isoDate)) {
-      duration = formatPreciseDuration(selStartDetail.isoDate, selEndDetail.isoDate);
+    if (
+      selStartDetail &&
+      selEndDetail &&
+      hasFullDate(selStartDetail.isoDate) &&
+      hasFullDate(selEndDetail.isoDate)
+    ) {
+      duration = formatPreciseDuration(
+        selStartDetail.isoDate,
+        selEndDetail.isoDate,
+      );
     } else {
       const span = viewport.end - viewport.start;
       duration = formatDecimalYearDelta(selection.end - selection.start, span);
@@ -336,12 +400,20 @@ function drawSelectionForeground(
     lines.push(`${startDate} — ${endDate} (${duration})`);
 
     for (let i = 0; i < lines.length; i++) {
-      ctx.fillText(lines[i], centerX, baseY - (lines.length - 1 - i) * lineHeight);
+      ctx.fillText(
+        lines[i],
+        centerX,
+        baseY - (lines.length - 1 - i) * lineHeight,
+      );
     }
   }
 }
 
-function isVisible(startYear: number, endYear: number, viewport: Viewport): boolean {
+function isVisible(
+  startYear: number,
+  endYear: number,
+  viewport: Viewport,
+): boolean {
   return endYear >= viewport.start && startYear <= viewport.end;
 }
 
@@ -359,22 +431,44 @@ function drawContainer(
   const boxWidth = Math.max(x2 - x1, 3);
   const isSelected = selectedItem === item;
   const isHovered = !isSelected && hoveredItem === item;
-  const isSnap = !isSelected && !isHovered &&
-    (snapHighlightYears.has(item.startYear) || snapHighlightYears.has(item.endYear));
+  const isSnap =
+    !isSelected &&
+    !isHovered &&
+    (snapHighlightYears.has(item.startYear) ||
+      snapHighlightYears.has(item.endYear));
 
   // Container background
-  drawRoundedRect(ctx, x1, item.y, boxWidth, item.height, LAYOUT.containerRadius);
-  ctx.fillStyle = isSelected ? COLORS.containerSelectedFill : isHovered ? COLORS.containerHoverFill : isSnap ? COLORS.containerSnapFill : COLORS.containerFill;
+  drawRoundedRect(
+    ctx,
+    x1,
+    item.y,
+    boxWidth,
+    item.height,
+    LAYOUT.containerRadius,
+  );
+  ctx.fillStyle = isSelected
+    ? COLORS.containerSelectedFill
+    : isHovered
+      ? COLORS.containerHoverFill
+      : isSnap
+        ? COLORS.containerSnapFill
+        : COLORS.containerFill;
   ctx.fill();
-  ctx.strokeStyle = isSelected ? COLORS.containerSelectedBorder : isHovered ? COLORS.containerHoverBorder : isSnap ? COLORS.containerSnapBorder : COLORS.containerBorder;
+  ctx.strokeStyle = isSelected
+    ? COLORS.containerSelectedBorder
+    : isHovered
+      ? COLORS.containerHoverBorder
+      : isSnap
+        ? COLORS.containerSnapBorder
+        : COLORS.containerBorder;
   ctx.lineWidth = isSelected || isHovered ? 2 : 1;
   ctx.stroke();
 
   // Container label at top
   ctx.fillStyle = COLORS.containerText;
   ctx.font = `${LAYOUT.fontSize}px sans-serif`;
-  ctx.textBaseline = 'middle';
-  ctx.textAlign = 'left';
+  ctx.textBaseline = "middle";
+  ctx.textAlign = "left";
 
   const labelY = item.y + 12;
   const labelX = x1 + 8;
@@ -387,7 +481,15 @@ function drawContainer(
 
   // Draw children
   for (const child of item.children) {
-    drawLayoutItem(ctx, child, viewport, canvasWidth, hoveredItem, selectedItem, snapHighlightYears);
+    drawLayoutItem(
+      ctx,
+      child,
+      viewport,
+      canvasWidth,
+      hoveredItem,
+      selectedItem,
+      snapHighlightYears,
+    );
   }
 }
 
@@ -405,18 +507,30 @@ function drawBar(
   const barWidth = Math.max(x2 - x1, 3);
 
   drawRoundedRect(ctx, x1, item.y, barWidth, item.height, LAYOUT.barRadius);
-  ctx.fillStyle = isSelected ? COLORS.barSelectedFill : isHovered ? COLORS.barHoverFill : isSnap ? COLORS.barSnapFill : COLORS.barFill;
+  ctx.fillStyle = isSelected
+    ? COLORS.barSelectedFill
+    : isHovered
+      ? COLORS.barHoverFill
+      : isSnap
+        ? COLORS.barSnapFill
+        : COLORS.barFill;
   ctx.fill();
-  ctx.strokeStyle = isSelected ? COLORS.barSelectedBorder : isHovered ? COLORS.barHoverBorder : isSnap ? COLORS.barSnapBorder : COLORS.barBorder;
+  ctx.strokeStyle = isSelected
+    ? COLORS.barSelectedBorder
+    : isHovered
+      ? COLORS.barHoverBorder
+      : isSnap
+        ? COLORS.barSnapBorder
+        : COLORS.barBorder;
   ctx.lineWidth = isSelected || isHovered ? 2 : 1;
   ctx.stroke();
 
   // Label — only render when bar is wide enough to show text
-  if (barWidth > 32) {
+  if (barWidth > 10) {
     ctx.fillStyle = COLORS.barText;
     ctx.font = `${LAYOUT.smallFontSize}px sans-serif`;
-    ctx.textBaseline = 'middle';
-    ctx.textAlign = 'left';
+    ctx.textBaseline = "middle";
+    ctx.textAlign = "left";
 
     ctx.save();
     ctx.beginPath();
@@ -442,9 +556,21 @@ function drawPointEvent(
 
   ctx.beginPath();
   ctx.arc(x, cy, radius, 0, Math.PI * 2);
-  ctx.fillStyle = isSelected ? COLORS.barSelectedFill : isHovered ? COLORS.barHoverFill : isSnap ? COLORS.barSnapFill : COLORS.barFill;
+  ctx.fillStyle = isSelected
+    ? COLORS.barSelectedFill
+    : isHovered
+      ? COLORS.barHoverFill
+      : isSnap
+        ? COLORS.barSnapFill
+        : COLORS.barFill;
   ctx.fill();
-  ctx.strokeStyle = isSelected ? COLORS.barSelectedBorder : isHovered ? COLORS.barHoverBorder : isSnap ? COLORS.barSnapBorder : COLORS.barBorder;
+  ctx.strokeStyle = isSelected
+    ? COLORS.barSelectedBorder
+    : isHovered
+      ? COLORS.barHoverBorder
+      : isSnap
+        ? COLORS.barSnapBorder
+        : COLORS.barBorder;
   ctx.lineWidth = isSelected || isHovered ? 2 : 1;
   ctx.stroke();
 }
@@ -461,14 +587,33 @@ function drawLayoutItem(
   if (!isVisible(item.startYear, item.endYear, viewport)) return;
 
   if (item.isContainer) {
-    drawContainer(ctx, item, viewport, canvasWidth, hoveredItem, selectedItem, snapHighlightYears);
+    drawContainer(
+      ctx,
+      item,
+      viewport,
+      canvasWidth,
+      hoveredItem,
+      selectedItem,
+      snapHighlightYears,
+    );
   } else {
     const isSelected = selectedItem === item;
     const isHovered = !isSelected && hoveredItem === item;
-    const isSnap = !isSelected && !isHovered &&
-      (snapHighlightYears.has(item.startYear) || snapHighlightYears.has(item.endYear));
+    const isSnap =
+      !isSelected &&
+      !isHovered &&
+      (snapHighlightYears.has(item.startYear) ||
+        snapHighlightYears.has(item.endYear));
     if (item.isPoint) {
-      drawPointEvent(ctx, item, viewport, canvasWidth, isHovered, isSelected, isSnap);
+      drawPointEvent(
+        ctx,
+        item,
+        viewport,
+        canvasWidth,
+        isHovered,
+        isSelected,
+        isSnap,
+      );
     } else {
       drawBar(ctx, item, viewport, canvasWidth, isHovered, isSelected, isSnap);
     }
@@ -496,10 +641,34 @@ export function render(
   drawSelectionBackground(ctx, selection, viewport, canvasWidth, canvasHeight);
 
   for (const item of layout) {
-    drawLayoutItem(ctx, item, viewport, canvasWidth, hoveredItem, selectedItem, snapState.highlightYears);
+    drawLayoutItem(
+      ctx,
+      item,
+      viewport,
+      canvasWidth,
+      hoveredItem,
+      selectedItem,
+      snapState.highlightYears,
+    );
   }
 
   drawTodayLine(ctx, viewport, canvasWidth, canvasHeight);
-  drawSelectionForeground(ctx, selection, snapState.selStartDetail, snapState.selEndDetail, viewport, canvasWidth, canvasHeight);
-  drawCursorLine(ctx, cursorX, selection, snapState.cursorDetail, viewport, canvasWidth, canvasHeight);
+  drawSelectionForeground(
+    ctx,
+    selection,
+    snapState.selStartDetail,
+    snapState.selEndDetail,
+    viewport,
+    canvasWidth,
+    canvasHeight,
+  );
+  drawCursorLine(
+    ctx,
+    cursorX,
+    selection,
+    snapState.cursorDetail,
+    viewport,
+    canvasWidth,
+    canvasHeight,
+  );
 }
