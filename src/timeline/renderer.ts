@@ -12,6 +12,8 @@ const COLORS = {
   containerText: '#e0e0e0',
   containerHoverFill: 'rgba(15, 52, 96, 0.4)',
   containerHoverBorder: '#1a6ea0',
+  containerSnapFill: 'rgba(15, 52, 96, 0.30)',
+  containerSnapBorder: '#124878',
   containerSelectedFill: 'rgba(80, 56, 12, 0.4)',
   containerSelectedBorder: '#c89a2c',
   barFill: '#0f3460',
@@ -19,6 +21,8 @@ const COLORS = {
   barText: '#e0e0e0',
   barHoverFill: '#163d6e',
   barHoverBorder: '#7b52ab',
+  barSnapFill: '#12395e',
+  barSnapBorder: '#634598',
   barSelectedFill: '#4a3800',
   barSelectedBorder: '#c89a2c',
   todayLine: 'rgba(255, 82, 82, 0.5)',
@@ -330,18 +334,21 @@ function drawContainer(
   canvasWidth: number,
   hoveredItem: LayoutItem | null,
   selectedItem: LayoutItem | null,
+  snapHighlightYears: Set<number>,
 ) {
   const x1 = yearToX(item.startYear, viewport, canvasWidth);
   const x2 = yearToX(item.endYear, viewport, canvasWidth);
   const boxWidth = Math.max(x2 - x1, 3);
   const isSelected = selectedItem === item;
   const isHovered = !isSelected && hoveredItem === item;
+  const isSnap = !isSelected && !isHovered &&
+    (snapHighlightYears.has(item.startYear) || snapHighlightYears.has(item.endYear));
 
   // Container background
   drawRoundedRect(ctx, x1, item.y, boxWidth, item.height, LAYOUT.containerRadius);
-  ctx.fillStyle = isSelected ? COLORS.containerSelectedFill : isHovered ? COLORS.containerHoverFill : COLORS.containerFill;
+  ctx.fillStyle = isSelected ? COLORS.containerSelectedFill : isHovered ? COLORS.containerHoverFill : isSnap ? COLORS.containerSnapFill : COLORS.containerFill;
   ctx.fill();
-  ctx.strokeStyle = isSelected ? COLORS.containerSelectedBorder : isHovered ? COLORS.containerHoverBorder : COLORS.containerBorder;
+  ctx.strokeStyle = isSelected ? COLORS.containerSelectedBorder : isHovered ? COLORS.containerHoverBorder : isSnap ? COLORS.containerSnapBorder : COLORS.containerBorder;
   ctx.lineWidth = isSelected || isHovered ? 2 : 1;
   ctx.stroke();
 
@@ -362,7 +369,7 @@ function drawContainer(
 
   // Draw children
   for (const child of item.children) {
-    drawLayoutItem(ctx, child, viewport, canvasWidth, hoveredItem, selectedItem);
+    drawLayoutItem(ctx, child, viewport, canvasWidth, hoveredItem, selectedItem, snapHighlightYears);
   }
 }
 
@@ -373,15 +380,16 @@ function drawBar(
   canvasWidth: number,
   isHovered: boolean,
   isSelected: boolean,
+  isSnap: boolean,
 ) {
   const x1 = yearToX(item.startYear, viewport, canvasWidth);
   const x2 = yearToX(item.endYear, viewport, canvasWidth);
   const barWidth = Math.max(x2 - x1, 3);
 
   drawRoundedRect(ctx, x1, item.y, barWidth, item.height, LAYOUT.barRadius);
-  ctx.fillStyle = isSelected ? COLORS.barSelectedFill : isHovered ? COLORS.barHoverFill : COLORS.barFill;
+  ctx.fillStyle = isSelected ? COLORS.barSelectedFill : isHovered ? COLORS.barHoverFill : isSnap ? COLORS.barSnapFill : COLORS.barFill;
   ctx.fill();
-  ctx.strokeStyle = isSelected ? COLORS.barSelectedBorder : isHovered ? COLORS.barHoverBorder : COLORS.barBorder;
+  ctx.strokeStyle = isSelected ? COLORS.barSelectedBorder : isHovered ? COLORS.barHoverBorder : isSnap ? COLORS.barSnapBorder : COLORS.barBorder;
   ctx.lineWidth = isSelected || isHovered ? 2 : 1;
   ctx.stroke();
 
@@ -408,6 +416,7 @@ function drawPointEvent(
   canvasWidth: number,
   isHovered: boolean,
   isSelected: boolean,
+  isSnap: boolean,
 ) {
   const x = yearToX(item.startYear, viewport, canvasWidth);
   const cy = item.y + item.height / 2;
@@ -415,9 +424,9 @@ function drawPointEvent(
 
   ctx.beginPath();
   ctx.arc(x, cy, radius, 0, Math.PI * 2);
-  ctx.fillStyle = isSelected ? COLORS.barSelectedFill : isHovered ? COLORS.barHoverFill : COLORS.barFill;
+  ctx.fillStyle = isSelected ? COLORS.barSelectedFill : isHovered ? COLORS.barHoverFill : isSnap ? COLORS.barSnapFill : COLORS.barFill;
   ctx.fill();
-  ctx.strokeStyle = isSelected ? COLORS.barSelectedBorder : isHovered ? COLORS.barHoverBorder : COLORS.barBorder;
+  ctx.strokeStyle = isSelected ? COLORS.barSelectedBorder : isHovered ? COLORS.barHoverBorder : isSnap ? COLORS.barSnapBorder : COLORS.barBorder;
   ctx.lineWidth = isSelected || isHovered ? 2 : 1;
   ctx.stroke();
 }
@@ -429,18 +438,21 @@ function drawLayoutItem(
   canvasWidth: number,
   hoveredItem: LayoutItem | null,
   selectedItem: LayoutItem | null,
+  snapHighlightYears: Set<number>,
 ) {
   if (!isVisible(item.startYear, item.endYear, viewport)) return;
 
   if (item.isContainer) {
-    drawContainer(ctx, item, viewport, canvasWidth, hoveredItem, selectedItem);
+    drawContainer(ctx, item, viewport, canvasWidth, hoveredItem, selectedItem, snapHighlightYears);
   } else {
     const isSelected = selectedItem === item;
     const isHovered = !isSelected && hoveredItem === item;
+    const isSnap = !isSelected && !isHovered &&
+      (snapHighlightYears.has(item.startYear) || snapHighlightYears.has(item.endYear));
     if (item.isPoint) {
-      drawPointEvent(ctx, item, viewport, canvasWidth, isHovered, isSelected);
+      drawPointEvent(ctx, item, viewport, canvasWidth, isHovered, isSelected, isSnap);
     } else {
-      drawBar(ctx, item, viewport, canvasWidth, isHovered, isSelected);
+      drawBar(ctx, item, viewport, canvasWidth, isHovered, isSelected, isSnap);
     }
   }
 }
@@ -455,6 +467,7 @@ export function render(
   selectedItem: LayoutItem | null,
   cursorX: number,
   selection: TimelineSelection | null,
+  snapHighlightYears: Set<number>,
 ) {
   ctx.fillStyle = COLORS.background;
   ctx.fillRect(0, 0, canvasWidth, canvasHeight);
@@ -465,7 +478,7 @@ export function render(
   drawSelectionBackground(ctx, selection, viewport, canvasWidth, canvasHeight);
 
   for (const item of layout) {
-    drawLayoutItem(ctx, item, viewport, canvasWidth, hoveredItem, selectedItem);
+    drawLayoutItem(ctx, item, viewport, canvasWidth, hoveredItem, selectedItem, snapHighlightYears);
   }
 
   drawTodayLine(ctx, viewport, canvasWidth, canvasHeight);

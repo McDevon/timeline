@@ -37,6 +37,7 @@ async function main() {
   let selectedItem: LayoutItem | null = null;
   let cursorX = -1;
   let selection: TimelineSelection | null = null;
+  let snapHighlightYears: Set<number> = new Set();
 
   // rAF-batched rendering
   let rafId = 0;
@@ -45,7 +46,7 @@ async function main() {
     rafId = 0;
     const ctx = setupCanvas(canvas);
     const rect = canvas.getBoundingClientRect();
-    render(ctx, rect.width, rect.height, layout, viewport, hoveredItem, selectedItem, cursorX, selection);
+    render(ctx, rect.width, rect.height, layout, viewport, hoveredItem, selectedItem, cursorX, selection, snapHighlightYears);
   }
 
   function requestRedraw() {
@@ -66,6 +67,7 @@ async function main() {
     (x: number) => { cursorX = x; },
     () => selection,
     (sel: TimelineSelection | null) => { selection = sel; },
+    (years: Set<number>) => { snapHighlightYears = years; },
     requestRedraw,
   );
 

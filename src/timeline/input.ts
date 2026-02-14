@@ -1,9 +1,10 @@
-import { Viewport, panViewport, zoomViewport, xToYear } from './viewport';
+import { Viewport, panViewport, zoomViewport, xToYear, yearToX } from './viewport';
 import { LayoutItem } from './layout';
 import { TimelineSelection } from '../types';
 import { hitTest } from './hitTest';
 import { Tooltip } from '../ui/tooltip';
 import { LAYOUT } from './renderer';
+import { collectSnapTargets, findSnapYear } from './snap';
 
 export interface InputHandlers {
   destroy(): void;
@@ -25,6 +26,7 @@ export function setupInput(
   setCursorX: (x: number) => void,
   getSelection: () => TimelineSelection | null,
   setSelection: (sel: TimelineSelection | null) => void,
+  setSnapHighlightYears: (years: Set<number>) => void,
   requestRedraw: () => void,
 ): InputHandlers {
   const tooltip = new Tooltip();
@@ -33,6 +35,51 @@ export function setupInput(
     tooltip.hide();
     setSelected(null);
     setSelection(null);
+  }
+
+  // --- Snapping ---
+  let modifierHeld = false;
+  let cachedLayout: LayoutItem[] | null = null;
+  let snapTargetsCache: number[] = [];
+  let snapTargetSet: Set<number> = new Set();
+
+  function getSnapTargets(): number[] {
+    const layout = getLayout();
+    if (layout !== cachedLayout) {
+      cachedLayout = layout;
+      snapTargetsCache = collectSnapTargets(layout);
+      snapTargetSet = new Set(snapTargetsCache);
+    }
+    return snapTargetsCache;
+  }
+
+  function snapYear(pixelX: number): number {
+    const viewport = getViewport();
+    const rawYear = xToYear(pixelX, viewport, canvas.clientWidth);
+    if (modifierHeld) return rawYear;
+    return findSnapYear(pixelX, getSnapTargets(), viewport, canvas.clientWidth) ?? rawYear;
+  }
+
+  // --- Snap highlighting ---
+  let cursorSnapYear: number | null = null;
+
+  function updateSnapHighlights() {
+    const years = new Set<number>();
+    if (cursorSnapYear !== null) {
+      years.add(cursorSnapYear);
+    }
+    const sel = getSelection();
+    if (sel !== null) {
+      getSnapTargets(); // ensure snapTargetSet is up to date
+      if (snapTargetSet.has(sel.start)) years.add(sel.start);
+      if (sel.start !== sel.end && snapTargetSet.has(sel.end)) years.add(sel.end);
+    }
+    setSnapHighlightYears(years);
+  }
+
+  function scheduleRedraw() {
+    updateSnapHighlights();
+    requestRedraw();
   }
 
   // --- Wheel / trackpad ---
@@ -50,6 +97,7 @@ export function setupInput(
 
   function onWheel(e: WheelEvent) {
     e.preventDefault();
+    modifierHeld = e.ctrlKey || e.metaKey;
     const viewport = getViewport();
 
     if (e.ctrlKey || e.metaKey) {
@@ -65,7 +113,7 @@ export function setupInput(
 
     updateCursorLine(cursorCanvasX, cursorCanvasY);
     updateHover();
-    requestRedraw();
+    scheduleRedraw();
   }
 
   // --- Mouse drag + click ---
@@ -81,9 +129,19 @@ export function setupInput(
   let cursorCanvasY = -1;
   let lastSetCursorX = -1;
 
-  /** Update the cursor line X; returns true if it changed. */
+  /** Update the cursor line X with snapping; returns true if it changed. */
   function updateCursorLine(canvasX: number, canvasY: number): boolean {
-    const newX = canvasY < LAYOUT.eventsStartY ? canvasX : -1;
+    let newX = canvasY < LAYOUT.eventsStartY ? canvasX : -1;
+    let newSnapYear: number | null = null;
+    if (newX >= 0 && !modifierHeld) {
+      const viewport = getViewport();
+      const snapped = findSnapYear(newX, getSnapTargets(), viewport, canvas.clientWidth);
+      if (snapped !== null) {
+        newX = yearToX(snapped, viewport, canvas.clientWidth);
+        newSnapYear = snapped;
+      }
+    }
+    cursorSnapYear = newSnapYear;
     if (newX === lastSetCursorX) return false;
     lastSetCursorX = newX;
     setCursorX(newX);
@@ -92,6 +150,7 @@ export function setupInput(
 
   function onMouseDown(e: MouseEvent) {
     if (e.button !== 0) return;
+    modifierHeld = e.ctrlKey || e.metaKey;
 
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -102,11 +161,12 @@ export function setupInput(
     lastMouseX = e.clientX;
     didDrag = false;
 
+    cursorSnapYear = null;
+
     if (y < LAYOUT.eventsStartY) {
       // Axis region — start selection mode
       dragMode = 'axis-selecting';
-      const viewport = getViewport();
-      axisAnchorYear = xToYear(x, viewport, canvas.clientWidth);
+      axisAnchorYear = snapYear(x);
       canvas.style.cursor = 'col-resize';
     } else {
       // Events region — start panning
@@ -117,6 +177,8 @@ export function setupInput(
   }
 
   function onMouseMove(e: MouseEvent) {
+    modifierHeld = e.ctrlKey || e.metaKey;
+
     if (dragMode === 'axis-selecting') {
       const dist = Math.hypot(e.clientX - mouseDownX, e.clientY - mouseDownY);
       if (dist >= CLICK_THRESHOLD) {
@@ -125,14 +187,13 @@ export function setupInput(
       if (didDrag) {
         const rect = canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
-        const viewport = getViewport();
-        const currentYear = xToYear(x, viewport, canvas.clientWidth);
+        const currentYear = snapYear(x);
         setSelection({
           start: Math.min(axisAnchorYear, currentYear),
           end: Math.max(axisAnchorYear, currentYear),
           anchor: axisAnchorYear,
         });
-        requestRedraw();
+        scheduleRedraw();
       }
       return;
     }
@@ -148,7 +209,7 @@ export function setupInput(
 
       const viewport = getViewport();
       setViewport(panViewport(viewport, dx, canvas.clientWidth));
-      requestRedraw();
+      scheduleRedraw();
       return;
     }
 
@@ -160,11 +221,12 @@ export function setupInput(
     const prevHover = getHovered();
     updateHover();
     if (cursorChanged || getHovered() !== prevHover) {
-      requestRedraw();
+      scheduleRedraw();
     }
   }
 
   function onMouseUp(e: MouseEvent) {
+    modifierHeld = e.ctrlKey || e.metaKey;
     const mode = dragMode;
     dragMode = 'none';
 
@@ -173,8 +235,7 @@ export function setupInput(
         // Click on axis (not drag)
         const rect = canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
-        const viewport = getViewport();
-        const year = xToYear(x, viewport, canvas.clientWidth);
+        const year = snapYear(x);
         const existing = getSelection();
 
         if (e.shiftKey && existing !== null) {
@@ -190,7 +251,7 @@ export function setupInput(
         }
       }
       // If didDrag, range was already committed during mousemove
-      requestRedraw();
+      scheduleRedraw();
     } else if (mode === 'panning' && !didDrag) {
       // Click in events area (not drag)
       const rect = canvas.getBoundingClientRect();
@@ -206,7 +267,7 @@ export function setupInput(
       } else {
         clearSelection();
       }
-      requestRedraw();
+      scheduleRedraw();
     }
 
     // Restore cursor line and hover
@@ -217,7 +278,7 @@ export function setupInput(
     updateHover();
     const hovered = getHovered();
     canvas.style.cursor = hovered ? 'pointer' : 'grab';
-    requestRedraw();
+    scheduleRedraw();
   }
 
   // --- Touch drag ---
@@ -237,7 +298,7 @@ export function setupInput(
     lastTouchX = e.touches[0].clientX;
     const viewport = getViewport();
     setViewport(panViewport(viewport, dx, canvas.clientWidth));
-    requestRedraw();
+    scheduleRedraw();
   }
 
   function onMouseLeave() {
@@ -247,7 +308,7 @@ export function setupInput(
       updateCursorLine(-1, LAYOUT.eventsStartY);
       setHovered(null);
       canvas.style.cursor = 'grab';
-      requestRedraw();
+      scheduleRedraw();
     }
   }
 
