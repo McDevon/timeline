@@ -24,13 +24,13 @@ Responsible for loading and parsing event data. Currently fetches from a static 
 The Canvas rendering engine. Handles drawing the timeline axis, events, nested groups, and all visual representation. This module should be self-contained and receive prepared data — it should not know where the data comes from.
 
 ### `src/ui/`
-HTML/CSS components for controls, information panels, and other non-Canvas UI. Communicates with the timeline engine through a defined interface.
+HTML/CSS components for controls, information panels, and other non-Canvas UI. Communicates with the timeline engine through a defined interface. Includes the tooltip (`tooltip.ts`) and event list panel (`eventList.ts`) for toggling event visibility.
 
 ### `src/types.ts`
 Shared TypeScript type definitions used across all modules.
 
 ### `src/main.ts`
-Application entry point. Wires together data loading, the timeline engine, and UI controls.
+Application entry point. Wires together data loading, the timeline engine, and UI controls. Owns the viewport, layout, animation state, and event visibility. Layout is recomputed dynamically when events are toggled visible/hidden, with animated transitions (Y interpolation and alpha fading) handled in the rAF draw loop.
 
 ## Key Principles
 

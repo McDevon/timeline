@@ -81,6 +81,115 @@
     .zoom-btn:active {
       background: #0f2840;
     }
+    .event-list-panel {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      width: 260px;
+      background: #16213e;
+      border: 1px solid #533483;
+      border-radius: 6px;
+      color: #e0e0e0;
+      font-family: sans-serif;
+      font-size: 13px;
+      z-index: 50;
+      overflow: hidden;
+    }
+    .event-list-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 10px;
+      cursor: pointer;
+      user-select: none;
+      border-bottom: 1px solid #533483;
+    }
+    .event-list-header:hover {
+      background: #1a3a5c;
+    }
+    .event-list-title {
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    .event-list-chevron {
+      font-size: 14px;
+      transition: transform 0.2s ease;
+    }
+    .event-list-panel.collapsed .event-list-chevron {
+      transform: rotate(180deg);
+    }
+    .event-list-panel.collapsed .event-list-header {
+      border-bottom: none;
+    }
+    .event-list-body {
+      max-height: 50vh;
+      overflow-y: auto;
+      transition: max-height 0.2s ease;
+    }
+    .event-list-panel.collapsed .event-list-body {
+      max-height: 0;
+      overflow: hidden;
+    }
+    .event-list-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 6px 10px;
+      cursor: pointer;
+    }
+    .event-list-row:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+    .event-list-row.hidden {
+      opacity: 0.4;
+    }
+    .event-list-check {
+      flex-shrink: 0;
+      width: 16px;
+      height: 16px;
+      margin-top: 1px;
+      border: 1px solid #533483;
+      border-radius: 3px;
+      background: transparent;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      line-height: 1;
+      color: #7b52ab;
+    }
+    .event-list-row.hidden .event-list-check {
+      border-color: #3a2560;
+      color: transparent;
+    }
+    .event-list-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .event-list-name {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .event-list-dates {
+      color: #b0b0b0;
+      font-size: 11px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .event-list-body::-webkit-scrollbar {
+      width: 6px;
+    }
+    .event-list-body::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .event-list-body::-webkit-scrollbar-thumb {
+      background: #533483;
+      border-radius: 3px;
+    }
   </style>
 </head>
 <body>

@@ -1,11 +1,12 @@
 import { loadEvents } from './data/loader';
-import { render, computeFullRange, LAYOUT } from './timeline/renderer';
+import { render, computeFullRange, LAYOUT, LayoutTransition } from './timeline/renderer';
 import { computeLayout, LayoutItem } from './timeline/layout';
 import { Viewport, zoomViewport } from './timeline/viewport';
 import { hitTest } from './timeline/hitTest';
-import { TimelineSelection } from './types';
+import { TimelineEvent, TimelineSelection } from './types';
 import { setupInput } from './timeline/input';
 import { SnapState } from './timeline/snap';
+import { EventListPanel } from './ui/eventList';
 
 function setupCanvas(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
   const dpr = window.devicePixelRatio || 1;
@@ -27,8 +28,14 @@ async function main() {
 
   const events = await loadEvents('/events.json', '/events.example.json');
 
-  // Compute layout once (events are static)
-  const layout: LayoutItem[] = computeLayout(events, LAYOUT.eventsStartY);
+  // Visibility state and dynamic layout
+  const hiddenEvents = new Set<TimelineEvent>();
+  let layout: LayoutItem[] = computeLayout(events, LAYOUT.eventsStartY);
+
+  function relayout() {
+    const visible = events.filter(e => !hiddenEvents.has(e));
+    layout = computeLayout(visible, LAYOUT.eventsStartY);
+  }
 
   // Initialize viewport to show full data range
   let viewport: Viewport = computeFullRange(events);
@@ -51,6 +58,16 @@ async function main() {
   let animTo: Viewport | null = null;
   let animStartTime = 0;
   const ZOOM_ANIM_MS = 150;
+
+  // Layout transition animation state
+  interface LayoutTransitionState {
+    startTime: number;
+    fadingOut: LayoutItem[];
+    yOffsets: Map<TimelineEvent, number>;
+    fadingIn: Set<TimelineEvent>;
+  }
+  let layoutTransition: LayoutTransitionState | null = null;
+  const LAYOUT_ANIM_MS = 200;
 
   function easeInOut(t: number): number {
     return t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
@@ -75,9 +92,27 @@ async function main() {
       }
     }
 
+    // Layout transition animation
+    let transition: LayoutTransition | undefined;
+    if (layoutTransition) {
+      const elapsed = performance.now() - layoutTransition.startTime;
+      const lt = Math.min(elapsed / LAYOUT_ANIM_MS, 1);
+      transition = {
+        fadingOut: layoutTransition.fadingOut,
+        yOffsets: layoutTransition.yOffsets,
+        fadingIn: layoutTransition.fadingIn,
+        progress: easeInOut(lt),
+      };
+      if (lt < 1) {
+        if (rafId === 0) rafId = requestAnimationFrame(draw);
+      } else {
+        layoutTransition = null;
+      }
+    }
+
     const ctx = setupCanvas(canvas);
     const rect = canvas.getBoundingClientRect();
-    render(ctx, rect.width, rect.height, layout, viewport, hoveredItem, selectedItem, cursorX, selection, snapState);
+    render(ctx, rect.width, rect.height, layout, viewport, hoveredItem, selectedItem, cursorX, selection, snapState, transition);
   }
 
   function requestRedraw() {
@@ -167,6 +202,65 @@ async function main() {
       });
     }
   });
+
+  // Event list panel — visibility toggles
+  function isDescendantOf(item: LayoutItem, ancestor: TimelineEvent): boolean {
+    if (item.event === ancestor) return true;
+    if (!ancestor.nested) return false;
+    for (const child of ancestor.nested) {
+      if (item.event === child) return true;
+      if (child.nested && isDescendantOf(item, child)) return true;
+    }
+    return false;
+  }
+
+  function onToggleEvent(event: TimelineEvent, visible: boolean) {
+    // Capture old Y positions
+    const oldPositions = new Map<TimelineEvent, number>();
+    for (const item of layout) oldPositions.set(item.event, item.y);
+
+    // Capture items about to be hidden
+    const fadingOut: LayoutItem[] = [];
+    if (!visible) {
+      const hiding = layout.find(item => item.event === event);
+      if (hiding) fadingOut.push(hiding);
+    }
+
+    // Update hidden set and recompute layout
+    if (visible) hiddenEvents.delete(event);
+    else hiddenEvents.add(event);
+    relayout();
+
+    // Compute Y offsets for items that moved
+    const yOffsets = new Map<TimelineEvent, number>();
+    for (const item of layout) {
+      const oldY = oldPositions.get(item.event);
+      if (oldY !== undefined && oldY !== item.y) {
+        yOffsets.set(item.event, oldY - item.y);
+      }
+    }
+
+    // Items fading in
+    const fadingIn = new Set<TimelineEvent>();
+    if (visible) fadingIn.add(event);
+
+    // Start animation
+    layoutTransition = { startTime: performance.now(), fadingOut, yOffsets, fadingIn };
+
+    // Clear hovered/selected if they reference the hidden event
+    if (!visible) {
+      if (hoveredItem && isDescendantOf(hoveredItem, event)) hoveredItem = null;
+      if (selectedItem && isDescendantOf(selectedItem, event)) selectedItem = null;
+      if (dblClickItem && isDescendantOf(dblClickItem, event)) {
+        dblClickPrevViewport = null;
+        dblClickItem = null;
+      }
+    }
+
+    requestRedraw();
+  }
+
+  new EventListPanel(events, onToggleEvent);
 
   // Initial draw and resize handler
   draw();

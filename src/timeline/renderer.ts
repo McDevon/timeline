@@ -14,6 +14,13 @@ import {
 import { LayoutItem } from "./layout";
 import { SnapDetail, SnapState } from "./snap";
 
+export interface LayoutTransition {
+  fadingOut: LayoutItem[];
+  yOffsets: Map<TimelineEvent, number>;
+  fadingIn: Set<TimelineEvent>;
+  progress: number; // 0–1, already eased
+}
+
 const COLORS = {
   background: "#1a1a2e",
   axis: "#e0e0e0",
@@ -740,25 +747,38 @@ export function render(
   cursorX: number,
   selection: TimelineSelection | null,
   snapState: SnapState,
+  transition?: LayoutTransition,
 ) {
   ctx.fillStyle = COLORS.background;
   ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-  if (layout.length === 0) return;
-
   drawAxis(ctx, viewport, canvasWidth);
   drawSelectionBackground(ctx, selection, viewport, canvasWidth, canvasHeight);
 
+  // Draw fading-out items (old layout, decreasing alpha)
+  if (transition && transition.fadingOut.length > 0) {
+    ctx.save();
+    ctx.globalAlpha = 1 - transition.progress;
+    for (const item of transition.fadingOut) {
+      drawLayoutItem(ctx, item, viewport, canvasWidth, null, null, new Set());
+    }
+    ctx.restore();
+  }
+
+  // Draw current layout items with Y offsets and fade-in during transition
   for (const item of layout) {
-    drawLayoutItem(
-      ctx,
-      item,
-      viewport,
-      canvasWidth,
-      hoveredItem,
-      selectedItem,
-      snapState.highlightYears,
-    );
+    const offset = transition?.yOffsets.get(item.event);
+    const isFadingIn = transition?.fadingIn.has(item.event);
+
+    if ((offset || isFadingIn) && transition) {
+      ctx.save();
+      if (offset) ctx.translate(0, offset * (1 - transition.progress));
+      if (isFadingIn) ctx.globalAlpha = transition.progress;
+      drawLayoutItem(ctx, item, viewport, canvasWidth, hoveredItem, selectedItem, snapState.highlightYears);
+      ctx.restore();
+    } else {
+      drawLayoutItem(ctx, item, viewport, canvasWidth, hoveredItem, selectedItem, snapState.highlightYears);
+    }
   }
 
   drawTodayLine(ctx, viewport, canvasWidth, canvasHeight);
