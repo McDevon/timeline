@@ -44,15 +44,16 @@ function hitTestItem(
   const inX = px >= x1 && px <= x1 + itemWidth;
   const inY = py >= item.y && py <= item.y + item.height;
 
-  if (!inX || !inY) return null;
-
-  // For containers, check children first (deepest match wins)
-  if (item.isContainer && item.children.length > 0) {
+  // Check children first — they can extend horizontally outside parent bounds.
+  // Y check still applies since children are vertically within the parent.
+  if (item.isContainer && item.children.length > 0 && inY) {
     for (let i = item.children.length - 1; i >= 0; i--) {
       const childHit = hitTestItem(px, py, item.children[i], viewport, canvasWidth);
       if (childHit) return childHit;
     }
   }
+
+  if (!inX || !inY) return null;
 
   return item;
 }

@@ -1,5 +1,5 @@
 import { TimelineEvent } from '../types';
-import { dateToDecimalYear } from '../data/time';
+import { dateToDecimalYear, todayDecimalYear } from '../data/time';
 
 const LAYOUT = {
   parentBarHeight: 30,
@@ -84,7 +84,10 @@ function placeLevel(
   // Phase 1: compute heights (recursively for containers)
   const sized = events.map(event => {
     const nominalStart = dateToDecimalYear(event.start);
-    const nominalEnd = event.end !== undefined ? dateToDecimalYear(event.end) : nominalStart;
+    const isOngoing = event.end === 'ongoing';
+    const nominalEnd = isOngoing
+      ? todayDecimalYear()
+      : (event.end !== undefined ? dateToDecimalYear(event.end) : nominalStart);
 
     // Compute uncertainty ranges
     let approxStartRange: [number, number] | undefined;
@@ -98,9 +101,16 @@ function placeLevel(
       if (event.startApprox) {
         approxStartRange = [dateToDecimalYear(event.startApprox[0]), dateToDecimalYear(event.startApprox[1])];
       }
-      if (event.endApprox && event.end !== undefined) {
+      if (event.endApprox && event.end !== undefined && !isOngoing) {
         approxEndRange = [dateToDecimalYear(event.endApprox[0]), dateToDecimalYear(event.endApprox[1])];
       }
+    }
+
+    // Ongoing events: fade from today into the future
+    if (isOngoing) {
+      const duration = nominalEnd - nominalStart;
+      const fadeWidth = Math.min(50, Math.max(5, duration * 0.05));
+      approxEndRange = [nominalEnd, nominalEnd + fadeWidth];
     }
 
     // Widen start/end to include gradient extent

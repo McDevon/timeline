@@ -1,6 +1,6 @@
 import { LayoutItem } from './layout';
 import { Viewport, yearToX, xToYear } from './viewport';
-import { formatDate } from '../data/time';
+import { formatDate, todayIsoDate } from '../data/time';
 
 const SNAP_THRESHOLD_PX = 10;
 
@@ -46,13 +46,23 @@ export function getSnapDetail(year: number, layout: LayoutItem[]): SnapDetail | 
           });
         }
         if (item.nominalEndYear === year && item.event.end) {
-          matches.push({
-            label: `End of ${item.event.name}`,
-            date: formatDate(item.event.end),
-            isoDate: item.event.end,
-            isContainer: item.isContainer,
-            priority: 2,
-          });
+          if (item.event.end === 'ongoing') {
+            matches.push({
+              label: 'Now',
+              date: formatDate(todayIsoDate()),
+              isoDate: todayIsoDate(),
+              isContainer: item.isContainer,
+              priority: 2,
+            });
+          } else {
+            matches.push({
+              label: `End of ${item.event.name}`,
+              date: formatDate(item.event.end),
+              isoDate: item.event.end,
+              isContainer: item.isContainer,
+              priority: 2,
+            });
+          }
         }
       }
       if (item.children.length > 0) {

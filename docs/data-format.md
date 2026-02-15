@@ -55,6 +55,18 @@ The `start` field remains the "best guess" nominal date, and should fall within 
 {"start": "1346", "startApprox": ["1345", "1347"], "end": "1353", "endApprox": ["1351", "1355"], "name": "The Black Death"}
 ```
 
+### Ongoing Events
+
+Setting `"end": "ongoing"` marks an event as continuing to the present day with no known end. The timeline resolves this dynamically: the solid bar extends to today's date, followed by a gradient fade into the future to visually convey that the event is expected to continue.
+
+The fade width is 5% of the event's duration, clamped to a minimum of 5 years and a maximum of 50 years.
+
+The tooltip shows "present" as the end date.
+
+```json
+{"start": "1917-12-06", "end": "ongoing", "name": "Finland"}
+```
+
 ### Point Events
 
 Omitting the `end` field creates a point-in-time event. Point events are rendered as small circles instead of bars. They participate in the same layout as ranged events but cannot have children (`nested` is ignored on point events).

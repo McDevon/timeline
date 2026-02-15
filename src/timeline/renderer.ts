@@ -129,18 +129,20 @@ function drawRoundedRect(
   width: number,
   height: number,
   radius: number,
+  radiusRight?: number,
 ) {
-  const r = Math.min(radius, width / 2, height / 2);
+  const rl = Math.min(radius, width / 2, height / 2);
+  const rr = Math.min(radiusRight ?? radius, width / 2, height / 2);
   ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.lineTo(x + width - r, y);
-  ctx.arcTo(x + width, y, x + width, y + r, r);
-  ctx.lineTo(x + width, y + height - r);
-  ctx.arcTo(x + width, y + height, x + width - r, y + height, r);
-  ctx.lineTo(x + r, y + height);
-  ctx.arcTo(x, y + height, x, y + height - r, r);
-  ctx.lineTo(x, y + r);
-  ctx.arcTo(x, y, x + r, y, r);
+  ctx.moveTo(x + rl, y);
+  ctx.lineTo(x + width - rr, y);
+  ctx.arcTo(x + width, y, x + width, y + rr, rr);
+  ctx.lineTo(x + width, y + height - rr);
+  ctx.arcTo(x + width, y + height, x + width - rr, y + height, rr);
+  ctx.lineTo(x + rl, y + height);
+  ctx.arcTo(x, y + height, x, y + height - rl, rl);
+  ctx.lineTo(x, y + rl);
+  ctx.arcTo(x, y, x + rl, y, rl);
   ctx.closePath();
 }
 
@@ -517,9 +519,11 @@ function applyGradient(
   lineWidth: number,
 ) {
   const hasApprox = item.approxStartRange !== undefined || item.approxEndRange !== undefined;
+  const baseRadius = item.isContainer ? LAYOUT.containerRadius : LAYOUT.barRadius;
 
   drawRoundedRect(ctx, x1, item.y, barWidth, item.height,
-    item.isContainer ? LAYOUT.containerRadius : LAYOUT.barRadius);
+    item.approxStartRange ? 0 : baseRadius,
+    item.approxEndRange ? 0 : baseRadius);
 
   if (!hasApprox) {
     ctx.fillStyle = fillColor;
@@ -559,15 +563,21 @@ function applyGradient(
   ctx.fillStyle = fillGrad;
   ctx.fill();
 
-  // Stroke gradient
-  const strokeGrad = ctx.createLinearGradient(x1, 0, x1 + barWidth, 0);
-  strokeGrad.addColorStop(0, colorWithAlpha(strokeColor, 0));
-  strokeGrad.addColorStop(solidStart, strokeColor);
-  strokeGrad.addColorStop(solidEnd, strokeColor);
-  strokeGrad.addColorStop(1, colorWithAlpha(strokeColor, 0));
-  ctx.strokeStyle = strokeGrad;
+  // Stroke: clip to solid region so borders don't appear in fade zones
+  ctx.save();
+  const clipLeft = x1 + solidStart * barWidth;
+  const clipRight = x1 + solidEnd * barWidth;
+  ctx.beginPath();
+  ctx.rect(clipLeft, item.y - lineWidth, clipRight - clipLeft, item.height + lineWidth * 2);
+  ctx.clip();
+
+  drawRoundedRect(ctx, x1, item.y, barWidth, item.height,
+    item.approxStartRange ? 0 : baseRadius,
+    item.approxEndRange ? 0 : baseRadius);
+  ctx.strokeStyle = strokeColor;
   ctx.lineWidth = lineWidth;
   ctx.stroke();
+  ctx.restore();
 }
 
 function drawBar(
