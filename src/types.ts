@@ -2,6 +2,8 @@ export interface TimelineEvent {
   name: string;
   start: string;
   end?: string;
+  startApprox?: [string, string];
+  endApprox?: [string, string];
   info?: string;
   nested?: TimelineEvent[];
 }

@@ -23,6 +23,16 @@ export class Tooltip {
     } else {
       html += `<br><span class="tooltip-dates">${formatDate(event.start)}</span>`;
     }
+    if (event.startApprox || event.endApprox) {
+      const parts: string[] = [];
+      if (event.startApprox) {
+        parts.push(`~${formatDate(event.startApprox[0])} to ${formatDate(event.startApprox[1])}`);
+      }
+      if (event.endApprox) {
+        parts.push(`~${formatDate(event.endApprox[0])} to ${formatDate(event.endApprox[1])}`);
+      }
+      html += `<br><span class="tooltip-approx">${parts.join(' / ')}</span>`;
+    }
     if (event.info) {
       html += `<br><span class="tooltip-info">${this.escape(event.info)}</span>`;
     }

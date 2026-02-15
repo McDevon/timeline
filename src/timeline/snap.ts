@@ -27,7 +27,7 @@ export function getSnapDetail(year: number, layout: LayoutItem[]): SnapDetail | 
 
   function walk(items: LayoutItem[]) {
     for (const item of items) {
-      if (item.isPoint && item.startYear === year) {
+      if (item.isPoint && item.nominalStartYear === year) {
         matches.push({
           label: item.event.name,
           date: formatDate(item.event.start),
@@ -36,7 +36,7 @@ export function getSnapDetail(year: number, layout: LayoutItem[]): SnapDetail | 
           priority: 0,
         });
       } else {
-        if (item.startYear === year) {
+        if (item.nominalStartYear === year) {
           matches.push({
             label: `Beginning of ${item.event.name}`,
             date: formatDate(item.event.start),
@@ -45,7 +45,7 @@ export function getSnapDetail(year: number, layout: LayoutItem[]): SnapDetail | 
             priority: 1,
           });
         }
-        if (item.endYear === year && item.event.end) {
+        if (item.nominalEndYear === year && item.event.end) {
           matches.push({
             label: `End of ${item.event.name}`,
             date: formatDate(item.event.end),
@@ -88,8 +88,8 @@ export function collectSnapTargets(layout: LayoutItem[]): number[] {
 
   function walk(items: LayoutItem[]) {
     for (const item of items) {
-      years.add(item.startYear);
-      years.add(item.endYear);
+      years.add(item.nominalStartYear);
+      years.add(item.nominalEndYear);
       if (item.children.length > 0) {
         walk(item.children);
       }

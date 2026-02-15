@@ -25,6 +25,33 @@
     ]
   },
   {
+    "start": "-27-01-16",
+    "startApprox": ["-31", "-27"],
+    "end": "476-09-04",
+    "name": "Roman Empire",
+    "info": "From Augustus's consolidation of power to the fall of the Western Empire"
+  },
+  {
+    "start": "79-08-24",
+    "startApprox": ["79-08", "79-11"],
+    "name": "Eruption of Vesuvius",
+    "info": "Buried Pompeii and Herculaneum. Exact date debated; traditionally August 24 but possibly later in autumn."
+  },
+  {
+    "start": "-490-09",
+    "startApprox": ["-490-08", "-490-10"],
+    "name": "Battle of Marathon",
+    "info": "Athenian victory over the Persian Empire. Exact date uncertain."
+  },
+  {
+    "start": "1346",
+    "startApprox": ["1345", "1347"],
+    "end": "1353",
+    "endApprox": ["1351", "1355"],
+    "name": "The Black Death",
+    "info": "Devastating plague pandemic across Europe. Killed an estimated 30-60% of Europe's population."
+  },
+  {
     "start": "1492-10-12",
     "name": "Columbus reaches the Americas",
     "info": "First voyage of Christopher Columbus"

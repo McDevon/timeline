@@ -14,6 +14,10 @@ export interface LayoutItem {
   event: TimelineEvent;
   startYear: number;
   endYear: number;
+  nominalStartYear: number;
+  nominalEndYear: number;
+  approxStartRange?: [number, number];
+  approxEndRange?: [number, number];
   y: number;
   height: number;
   isContainer: boolean;
@@ -26,6 +30,10 @@ interface PlacedItem {
   event: TimelineEvent;
   startYear: number;
   endYear: number;
+  nominalStartYear: number;
+  nominalEndYear: number;
+  approxStartRange?: [number, number];
+  approxEndRange?: [number, number];
   relativeY: number;
   height: number;
   isContainer: boolean;
@@ -75,16 +83,45 @@ function placeLevel(
 ): { items: PlacedItem[]; totalHeight: number } {
   // Phase 1: compute heights (recursively for containers)
   const sized = events.map(event => {
-    const startYear = dateToDecimalYear(event.start);
-    const isPoint = event.end === undefined;
-    const endYear = event.end !== undefined ? dateToDecimalYear(event.end) : startYear;
+    const nominalStart = dateToDecimalYear(event.start);
+    const nominalEnd = event.end !== undefined ? dateToDecimalYear(event.end) : nominalStart;
+
+    // Compute uncertainty ranges
+    let approxStartRange: [number, number] | undefined;
+    let approxEndRange: [number, number] | undefined;
+
+    if (event.end === undefined && event.startApprox) {
+      // Point event with uncertainty: gradient bar peaking at nominal date
+      approxStartRange = [dateToDecimalYear(event.startApprox[0]), nominalStart];
+      approxEndRange = [nominalStart, dateToDecimalYear(event.startApprox[1])];
+    } else {
+      if (event.startApprox) {
+        approxStartRange = [dateToDecimalYear(event.startApprox[0]), dateToDecimalYear(event.startApprox[1])];
+      }
+      if (event.endApprox && event.end !== undefined) {
+        approxEndRange = [dateToDecimalYear(event.endApprox[0]), dateToDecimalYear(event.endApprox[1])];
+      }
+    }
+
+    // Widen start/end to include gradient extent
+    const startYear = approxStartRange ? approxStartRange[0] : nominalStart;
+    const endYear = approxEndRange ? approxEndRange[1] : nominalEnd;
+    const isPoint = event.end === undefined && !event.startApprox;
+
+    const base = {
+      event,
+      startYear,
+      endYear,
+      nominalStartYear: nominalStart,
+      nominalEndYear: nominalEnd,
+      approxStartRange,
+      approxEndRange,
+    };
 
     // Point events and leaf events without children
     if (isPoint || !event.nested || event.nested.length === 0) {
       return {
-        event,
-        startYear,
-        endYear,
+        ...base,
         height: barHeight,
         isContainer: false,
         isPoint,
@@ -102,9 +139,7 @@ function placeLevel(
       LAYOUT.containerPadding;
 
     return {
-      event,
-      startYear,
-      endYear,
+      ...base,
       height,
       isContainer: true,
       isPoint: false,
@@ -133,6 +168,10 @@ function placeLevel(
       event: item.event,
       startYear: item.startYear,
       endYear: item.endYear,
+      nominalStartYear: item.nominalStartYear,
+      nominalEndYear: item.nominalEndYear,
+      approxStartRange: item.approxStartRange,
+      approxEndRange: item.approxEndRange,
       relativeY: y,
       height: item.height,
       isContainer: item.isContainer,
@@ -158,13 +197,21 @@ function toLayoutItems(placed: PlacedItem[], offsetY: number): LayoutItem[] {
   return placed.map(item => {
     const y = offsetY + item.relativeY;
 
+    const base = {
+      event: item.event,
+      startYear: item.startYear,
+      endYear: item.endYear,
+      nominalStartYear: item.nominalStartYear,
+      nominalEndYear: item.nominalEndYear,
+      approxStartRange: item.approxStartRange,
+      approxEndRange: item.approxEndRange,
+      y,
+      height: item.height,
+    };
+
     if (!item.isContainer) {
       return {
-        event: item.event,
-        startYear: item.startYear,
-        endYear: item.endYear,
-        y,
-        height: item.height,
+        ...base,
         isContainer: false,
         isPoint: item.isPoint,
         children: [],
@@ -175,11 +222,7 @@ function toLayoutItems(placed: PlacedItem[], offsetY: number): LayoutItem[] {
     const children = toLayoutItems(item.placedChildren, childrenStartY);
 
     return {
-      event: item.event,
-      startYear: item.startYear,
-      endYear: item.endYear,
-      y,
-      height: item.height,
+      ...base,
       isContainer: true,
       isPoint: false,
       children,

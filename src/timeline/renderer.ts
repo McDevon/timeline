@@ -70,9 +70,11 @@ export function computeFullRange(events: TimelineEvent[]): Viewport {
     for (const e of list) {
       const s = dateToDecimalYear(e.start);
       const end = dateToDecimalYear(e.end ?? e.start);
-      if (s < min) min = s;
-      if (end > max) max = end;
-      if (s === end) {
+      const outerStart = e.startApprox ? dateToDecimalYear(e.startApprox[0]) : s;
+      const outerEnd = e.endApprox ? dateToDecimalYear(e.endApprox[1]) : end;
+      if (outerStart < min) min = outerStart;
+      if (outerEnd > max) max = outerEnd;
+      if (s === end && !e.startApprox) {
         if (s - 1 < min) min = s - 1;
         if (end + 1 > max) max = end + 1;
       }
@@ -102,6 +104,22 @@ export function chooseTickInterval(
     if (interval >= rawInterval) return interval;
   }
   return Math.ceil(rawInterval / 1000) * 1000;
+}
+
+/** Convert a color string to rgba with a given alpha multiplier. */
+function colorWithAlpha(color: string, alpha: number): string {
+  if (color.startsWith('#')) {
+    const r = parseInt(color.slice(1, 3), 16);
+    const g = parseInt(color.slice(3, 5), 16);
+    const b = parseInt(color.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+  const match = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+  if (match) {
+    const baseAlpha = match[4] !== undefined ? parseFloat(match[4]) : 1;
+    return `rgba(${match[1]}, ${match[2]}, ${match[3]}, ${baseAlpha * alpha})`;
+  }
+  return color;
 }
 
 function drawRoundedRect(
@@ -434,35 +452,27 @@ function drawContainer(
   const isSnap =
     !isSelected &&
     !isHovered &&
-    (snapHighlightYears.has(item.startYear) ||
-      snapHighlightYears.has(item.endYear));
+    (snapHighlightYears.has(item.nominalStartYear) ||
+      snapHighlightYears.has(item.nominalEndYear));
 
   // Container background
-  drawRoundedRect(
-    ctx,
-    x1,
-    item.y,
-    boxWidth,
-    item.height,
-    LAYOUT.containerRadius,
-  );
-  ctx.fillStyle = isSelected
+  const fillColor = isSelected
     ? COLORS.containerSelectedFill
     : isHovered
       ? COLORS.containerHoverFill
       : isSnap
         ? COLORS.containerSnapFill
         : COLORS.containerFill;
-  ctx.fill();
-  ctx.strokeStyle = isSelected
+  const strokeColor = isSelected
     ? COLORS.containerSelectedBorder
     : isHovered
       ? COLORS.containerHoverBorder
       : isSnap
         ? COLORS.containerSnapBorder
         : COLORS.containerBorder;
-  ctx.lineWidth = isSelected || isHovered ? 2 : 1;
-  ctx.stroke();
+  const lineWidth = isSelected || isHovered ? 2 : 1;
+
+  applyGradient(ctx, item, viewport, canvasWidth, x1, boxWidth, fillColor, strokeColor, lineWidth);
 
   // Container label at top
   ctx.fillStyle = COLORS.containerText;
@@ -471,7 +481,9 @@ function drawContainer(
   ctx.textAlign = "left";
 
   const labelY = item.y + 12;
-  const labelX = x1 + 8;
+  const labelX = item.approxStartRange
+    ? Math.max(x1 + 8, yearToX(item.approxStartRange[1], viewport, canvasWidth) + 8)
+    : x1 + 8;
   ctx.save();
   ctx.beginPath();
   ctx.rect(x1, item.y, boxWidth, item.height);
@@ -493,6 +505,71 @@ function drawContainer(
   }
 }
 
+function applyGradient(
+  ctx: CanvasRenderingContext2D,
+  item: LayoutItem,
+  viewport: Viewport,
+  canvasWidth: number,
+  x1: number,
+  barWidth: number,
+  fillColor: string,
+  strokeColor: string,
+  lineWidth: number,
+) {
+  const hasApprox = item.approxStartRange !== undefined || item.approxEndRange !== undefined;
+
+  drawRoundedRect(ctx, x1, item.y, barWidth, item.height,
+    item.isContainer ? LAYOUT.containerRadius : LAYOUT.barRadius);
+
+  if (!hasApprox) {
+    ctx.fillStyle = fillColor;
+    ctx.fill();
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = lineWidth;
+    ctx.stroke();
+    return;
+  }
+
+  // Compute normalized gradient stop positions
+  let solidStart = 0;
+  let solidEnd = 1;
+
+  if (item.approxStartRange) {
+    const innerX = yearToX(item.approxStartRange[1], viewport, canvasWidth);
+    solidStart = Math.max(0, Math.min(1, (innerX - x1) / barWidth));
+  }
+  if (item.approxEndRange) {
+    const innerX = yearToX(item.approxEndRange[0], viewport, canvasWidth);
+    solidEnd = Math.max(0, Math.min(1, (innerX - x1) / barWidth));
+  }
+
+  // If uncertainty overlaps (wider than bar), collapse to peak at midpoint
+  if (solidStart > solidEnd) {
+    const mid = (solidStart + solidEnd) / 2;
+    solidStart = mid;
+    solidEnd = mid;
+  }
+
+  // Fill gradient
+  const fillGrad = ctx.createLinearGradient(x1, 0, x1 + barWidth, 0);
+  fillGrad.addColorStop(0, colorWithAlpha(fillColor, 0));
+  fillGrad.addColorStop(solidStart, fillColor);
+  fillGrad.addColorStop(solidEnd, fillColor);
+  fillGrad.addColorStop(1, colorWithAlpha(fillColor, 0));
+  ctx.fillStyle = fillGrad;
+  ctx.fill();
+
+  // Stroke gradient
+  const strokeGrad = ctx.createLinearGradient(x1, 0, x1 + barWidth, 0);
+  strokeGrad.addColorStop(0, colorWithAlpha(strokeColor, 0));
+  strokeGrad.addColorStop(solidStart, strokeColor);
+  strokeGrad.addColorStop(solidEnd, strokeColor);
+  strokeGrad.addColorStop(1, colorWithAlpha(strokeColor, 0));
+  ctx.strokeStyle = strokeGrad;
+  ctx.lineWidth = lineWidth;
+  ctx.stroke();
+}
+
 function drawBar(
   ctx: CanvasRenderingContext2D,
   item: LayoutItem,
@@ -506,24 +583,23 @@ function drawBar(
   const x2 = yearToX(item.endYear, viewport, canvasWidth);
   const barWidth = Math.max(x2 - x1, 3);
 
-  drawRoundedRect(ctx, x1, item.y, barWidth, item.height, LAYOUT.barRadius);
-  ctx.fillStyle = isSelected
+  const fillColor = isSelected
     ? COLORS.barSelectedFill
     : isHovered
       ? COLORS.barHoverFill
       : isSnap
         ? COLORS.barSnapFill
         : COLORS.barFill;
-  ctx.fill();
-  ctx.strokeStyle = isSelected
+  const strokeColor = isSelected
     ? COLORS.barSelectedBorder
     : isHovered
       ? COLORS.barHoverBorder
       : isSnap
         ? COLORS.barSnapBorder
         : COLORS.barBorder;
-  ctx.lineWidth = isSelected || isHovered ? 2 : 1;
-  ctx.stroke();
+  const lineWidth = isSelected || isHovered ? 2 : 1;
+
+  applyGradient(ctx, item, viewport, canvasWidth, x1, barWidth, fillColor, strokeColor, lineWidth);
 
   // Label — only render when bar is wide enough to show text
   if (barWidth > 10) {
@@ -532,12 +608,35 @@ function drawBar(
     ctx.textBaseline = "middle";
     ctx.textAlign = "left";
 
+    // Position label in the solid region for approx events
+    const labelX = item.approxStartRange
+      ? Math.max(x1 + 6, yearToX(item.approxStartRange[1], viewport, canvasWidth) + 6)
+      : x1 + 6;
+
     ctx.save();
     ctx.beginPath();
     ctx.rect(x1, item.y, barWidth, item.height);
     ctx.clip();
-    ctx.fillText(item.event.name, x1 + 6, item.y + item.height / 2);
+    ctx.fillText(item.event.name, labelX, item.y + item.height / 2);
     ctx.restore();
+  }
+
+  // Diamond marker for point events with uncertainty
+  if (item.event.end === undefined && item.approxStartRange) {
+    const nx = yearToX(item.nominalStartYear, viewport, canvasWidth);
+    const cy = item.y + item.height / 2;
+    const r = 3;
+    ctx.beginPath();
+    ctx.moveTo(nx, cy - r);
+    ctx.lineTo(nx + r, cy);
+    ctx.lineTo(nx, cy + r);
+    ctx.lineTo(nx - r, cy);
+    ctx.closePath();
+    ctx.fillStyle = fillColor;
+    ctx.fill();
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = lineWidth;
+    ctx.stroke();
   }
 }
 
@@ -602,8 +701,8 @@ function drawLayoutItem(
     const isSnap =
       !isSelected &&
       !isHovered &&
-      (snapHighlightYears.has(item.startYear) ||
-        snapHighlightYears.has(item.endYear));
+      (snapHighlightYears.has(item.nominalStartYear) ||
+        snapHighlightYears.has(item.nominalEndYear));
     if (item.isPoint) {
       drawPointEvent(
         ctx,

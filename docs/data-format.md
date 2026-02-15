@@ -13,6 +13,8 @@ Timeline events are stored as a JSON array of event objects. Events can be neste
 | `name`   | `string`        | Yes      | Display name of the event or period |
 | `start`  | `string`        | Yes      | ISO date string. See Date Format below. |
 | `end`    | `string`        | No       | ISO date string. Omit for point-in-time events. |
+| `startApprox` | `[string, string]` | No | Uncertainty range for start date. See Uncertain Dates below. |
+| `endApprox` | `[string, string]` | No | Uncertainty range for end date. See Uncertain Dates below. |
 | `info`   | `string`        | No       | Additional descriptive text |
 | `nested` | `Event[]`       | No       | Child events contained within this event |
 
@@ -29,6 +31,29 @@ Dates are ISO date strings with variable precision:
 | BCE full | `"-3000-06-15"` | 15 June 3000 BCE |
 
 **Internal representation**: Dates are converted to decimal years for rendering math. `"1471-07-01"` becomes approximately `1471.5`. This conversion is handled by `src/data/time.ts` and is transparent to the data format.
+
+### Uncertain/Approximate Dates
+
+Events can specify uncertainty ranges for their start and/or end dates using the `startApprox` and `endApprox` fields. Each is a two-element array `[earliest, latest]` of ISO date strings.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `startApprox` | `[string, string]` | No | Uncertainty range for start: `[earliest possible, latest possible]` |
+| `endApprox` | `[string, string]` | No | Uncertainty range for end: `[earliest possible, latest possible]` |
+
+The `start` field remains the "best guess" nominal date, and should fall within the `startApprox` range. Same for `end` and `endApprox`.
+
+**Visual rendering**: Uncertain edges are shown as gradient fades from transparent to solid. The solid portion of the bar represents the certain date range. The faded edges represent the uncertainty window.
+
+**Point events with uncertainty**: A point event with `startApprox` is rendered as a gradient bar (not a circle) spanning the uncertainty range, with a diamond marker at the nominal date.
+
+**Examples**:
+
+```json
+{"start": "-490-09", "startApprox": ["-490-08", "-490-10"], "name": "Battle of Marathon"}
+{"start": "-753", "startApprox": ["-800", "-700"], "end": "476-09-04", "name": "Roman Empire"}
+{"start": "1346", "startApprox": ["1345", "1347"], "end": "1353", "endApprox": ["1351", "1355"], "name": "The Black Death"}
+```
 
 ### Point Events
 

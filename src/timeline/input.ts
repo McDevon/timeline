@@ -355,14 +355,14 @@ export function setupInput(
       if (hit) {
         setSelected(hit);
 
-        // Determine selection year: point → at the point; range → closer edge
+        // Determine selection year: point → nominal date; range → closer nominal edge
         let selYear: number | null = null;
         if (hit.isPoint) {
-          selYear = hit.startYear;
+          selYear = hit.nominalStartYear;
         } else {
-          const startX = yearToX(hit.startYear, viewport, canvas.clientWidth);
-          const endX = yearToX(hit.endYear, viewport, canvas.clientWidth);
-          selYear = Math.abs(x - startX) <= Math.abs(x - endX) ? hit.startYear : hit.endYear;
+          const startX = yearToX(hit.nominalStartYear, viewport, canvas.clientWidth);
+          const endX = yearToX(hit.nominalEndYear, viewport, canvas.clientWidth);
+          selYear = Math.abs(x - startX) <= Math.abs(x - endX) ? hit.nominalStartYear : hit.nominalEndYear;
         }
 
         if (selYear !== null) {
