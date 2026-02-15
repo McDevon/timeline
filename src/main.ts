@@ -260,7 +260,16 @@ async function main() {
     requestRedraw();
   }
 
-  new EventListPanel(events, onToggleEvent);
+  function onHoverEvent(event: TimelineEvent | null) {
+    if (event === null) {
+      hoveredItem = null;
+    } else {
+      hoveredItem = layout.find(item => item.event === event) ?? null;
+    }
+    requestRedraw();
+  }
+
+  new EventListPanel(events, onToggleEvent, onHoverEvent);
 
   // Initial draw and resize handler
   draw();

@@ -36,6 +36,8 @@ export function setupInput(
     tooltip.hide();
     setSelected(null);
     setSelection(null);
+    selAnchorOverride = null;
+    selExtendOverride = null;
   }
 
   // --- Snapping ---
@@ -104,6 +106,25 @@ export function setupInput(
   // --- Snap highlighting ---
   let cursorSnapYear: number | null = null;
 
+  // Overrides for selection details when set by clicking events (not axis)
+  let selAnchorOverride: SnapDetail | null = null;
+  let selExtendOverride: SnapDetail | null = null;
+
+  /** Build a SnapDetail for a specific clicked item and edge year. */
+  function clickDetail(item: LayoutItem, year: number): SnapDetail {
+    if (item.event.end === undefined) {
+      return { label: item.event.name, date: formatDate(item.event.start), isoDate: item.event.start };
+    }
+    if (year === item.nominalStartYear) {
+      return { label: `Beginning of ${item.event.name}`, date: formatDate(item.event.start), isoDate: item.event.start };
+    }
+    if (item.event.end === 'ongoing') {
+      ensureSnapCaches();
+      return { label: 'Now', date: formatDate(cachedNowIso), isoDate: cachedNowIso };
+    }
+    return { label: `End of ${item.event.name}`, date: formatDate(item.event.end), isoDate: item.event.end };
+  }
+
   function nowSnapDetail(): SnapDetail {
     return { label: 'Now', date: formatDate(cachedNowIso), isoDate: cachedNowIso };
   }
@@ -138,15 +159,20 @@ export function setupInput(
     }
     const sel = getSelection();
     if (sel !== null) {
-      selStartDetail = snapDetailFor(sel.start, layout);
+      if (sel.start === sel.end) {
+        // Single point
+        selStartDetail = selAnchorOverride ?? snapDetailFor(sel.start, layout);
+      } else {
+        // Range — assign anchor/extend overrides to correct ends
+        const anchorIsStart = sel.anchor === sel.start;
+        selStartDetail = (anchorIsStart ? selAnchorOverride : selExtendOverride) ?? snapDetailFor(sel.start, layout);
+        selEndDetail = (anchorIsStart ? selExtendOverride : selAnchorOverride) ?? snapDetailFor(sel.end, layout);
+      }
       if (selStartDetail !== null) {
         years.add(sel.start);
       }
-      if (sel.start !== sel.end) {
-        selEndDetail = snapDetailFor(sel.end, layout);
-        if (selEndDetail !== null) {
-          years.add(sel.end);
-        }
+      if (sel.start !== sel.end && selEndDetail !== null) {
+        years.add(sel.end);
       }
     }
     setSnapState({ highlightYears: years, cursorDetail, selStartDetail, selEndDetail });
@@ -249,6 +275,8 @@ export function setupInput(
       dragMode = 'axis-selecting';
       axisAnchorYear = snapYear(x);
       canvas.style.cursor = 'col-resize';
+      selAnchorOverride = null;
+      selExtendOverride = null;
     } else {
       // Events region — start panning
       dragMode = 'panning';
@@ -366,8 +394,10 @@ export function setupInput(
         }
 
         if (selYear !== null) {
+          const detail = clickDetail(hit, selYear);
           const existing = getSelection();
           if (e.shiftKey && existing !== null) {
+            selExtendOverride = detail;
             setSelection({
               start: Math.min(existing.anchor, selYear),
               end: Math.max(existing.anchor, selYear),
@@ -376,12 +406,16 @@ export function setupInput(
           } else if (e.shiftKey) {
             ensureSnapCaches();
             const now = cachedNowYear;
+            selAnchorOverride = null;
+            selExtendOverride = detail;
             setSelection({
               start: Math.min(now, selYear),
               end: Math.max(now, selYear),
               anchor: now,
             });
           } else {
+            selAnchorOverride = detail;
+            selExtendOverride = null;
             setSelection({ start: selYear, end: selYear, anchor: selYear });
           }
         }

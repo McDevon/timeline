@@ -7,6 +7,7 @@ export class EventListPanel {
   constructor(
     events: TimelineEvent[],
     onToggle: (event: TimelineEvent, visible: boolean) => void,
+    onHover: (event: TimelineEvent | null) => void,
   ) {
     this.el = document.createElement('div');
     this.el.className = 'event-list-panel';
@@ -59,6 +60,8 @@ export class EventListPanel {
         row.classList.toggle('hidden', !visible);
         onToggle(event, visible);
       });
+      row.addEventListener('mouseenter', () => { onHover(event); });
+      row.addEventListener('mouseleave', () => { onHover(null); });
 
       body.appendChild(row);
     }
