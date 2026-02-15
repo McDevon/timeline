@@ -1,5 +1,5 @@
 import { TimelineEvent } from '../types';
-import { formatDate, formatDuration, todayIsoDate } from '../data/time';
+import { formatDate, formatDuration, formatPreciseDuration, hasFullDate, todayIsoDate } from '../data/time';
 
 const TOOLTIP_MARGIN = 12;
 
@@ -17,12 +17,17 @@ export class Tooltip {
     let html = `<strong>${this.escape(event.name)}</strong>`;
     if (event.end === 'ongoing') {
       const start = formatDate(event.start);
-      const duration = formatDuration(event.start, todayIsoDate());
+      const today = todayIsoDate();
+      const duration = hasFullDate(event.start)
+        ? formatPreciseDuration(event.start, today)
+        : formatDuration(event.start, today);
       html += `<br><span class="tooltip-dates">${start} – present (${duration})</span>`;
     } else if (event.end !== undefined) {
       const start = formatDate(event.start);
       const end = formatDate(event.end);
-      const duration = formatDuration(event.start, event.end);
+      const duration = hasFullDate(event.start) && hasFullDate(event.end)
+        ? formatPreciseDuration(event.start, event.end)
+        : formatDuration(event.start, event.end);
       html += `<br><span class="tooltip-dates">${start} – ${end} (${duration})</span>`;
     } else {
       html += `<br><span class="tooltip-dates">${formatDate(event.start)}</span>`;

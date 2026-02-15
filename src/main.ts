@@ -2,6 +2,7 @@ import { loadEvents } from './data/loader';
 import { render, computeFullRange, LAYOUT } from './timeline/renderer';
 import { computeLayout, LayoutItem } from './timeline/layout';
 import { Viewport, zoomViewport } from './timeline/viewport';
+import { hitTest } from './timeline/hitTest';
 import { TimelineSelection } from './types';
 import { setupInput } from './timeline/input';
 import { SnapState } from './timeline/snap';
@@ -36,6 +37,11 @@ async function main() {
   let cursorX = -1;
   let selection: TimelineSelection | null = null;
   let snapState: SnapState = { highlightYears: new Set(), cursorDetail: null, selStartDetail: null, selEndDetail: null };
+  let dblClickPrevViewport: Viewport | null = null;
+  let dblClickItem: LayoutItem | null = null;
+  let preClickSelection: TimelineSelection | null = null;
+  let preClickSelectedItem: LayoutItem | null = null;
+  let lastMouseDownTime = 0;
 
   // rAF-batched rendering
   let rafId = 0;
@@ -91,7 +97,15 @@ async function main() {
   setupInput(
     canvas,
     () => viewport,
-    (v: Viewport) => { viewport = v; },
+    (v: Viewport) => {
+      const spanBefore = viewport.end - viewport.start;
+      const spanAfter = v.end - v.start;
+      if (Math.abs(spanAfter - spanBefore) > 1e-6) {
+        dblClickPrevViewport = null;
+        dblClickItem = null;
+      }
+      viewport = v;
+    },
     () => layout,
     () => hoveredItem,
     (item: LayoutItem | null) => { hoveredItem = item; },
@@ -114,6 +128,44 @@ async function main() {
     const center = canvas.clientWidth / 2;
     const base = animTo ?? viewport;
     animateZoom(zoomViewport(base, center, canvas.clientWidth, ZOOM_DELTA));
+  });
+
+  // Snapshot selection state on first mousedown of a potential double-click
+  canvas.addEventListener('mousedown', () => {
+    const now = performance.now();
+    if (now - lastMouseDownTime > 500) {
+      preClickSelection = selection ? { ...selection } : null;
+      preClickSelectedItem = selectedItem;
+    }
+    lastMouseDownTime = now;
+  });
+
+  // Double-click to zoom into event (toggle back on second double-click)
+  canvas.addEventListener('dblclick', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const hit = hitTest(x, y, layout, viewport, canvas.clientWidth);
+
+    if (!hit || hit.event.end === undefined) return;
+
+    // Restore selection state from before the double-click
+    selection = preClickSelection;
+    selectedItem = preClickSelectedItem;
+
+    if (dblClickItem === hit && dblClickPrevViewport) {
+      animateZoom(dblClickPrevViewport);
+      dblClickPrevViewport = null;
+      dblClickItem = null;
+    } else {
+      dblClickPrevViewport = { ...(animTo ?? viewport) };
+      dblClickItem = hit;
+      const padding = (hit.nominalEndYear - hit.nominalStartYear) * 0.1;
+      animateZoom({
+        start: hit.nominalStartYear - padding,
+        end: hit.nominalEndYear + padding,
+      });
+    }
   });
 
   // Initial draw and resize handler

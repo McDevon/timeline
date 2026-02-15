@@ -27,7 +27,7 @@ export function getSnapDetail(year: number, layout: LayoutItem[]): SnapDetail | 
 
   function walk(items: LayoutItem[]) {
     for (const item of items) {
-      if (item.isPoint && item.nominalStartYear === year) {
+      if (item.event.end === undefined && item.nominalStartYear === year) {
         matches.push({
           label: item.event.name,
           date: formatDate(item.event.start),
