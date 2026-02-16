@@ -367,8 +367,23 @@ async function main() {
     if (dropIndex !== reorderLastIndex) {
       reorderLastIndex = dropIndex;
 
-      // Rebuild order from current visual positions
+      // Capture current visual positions of siblings for animation
       const siblingItems = findSiblingLayoutItems(item);
+      const oldPositions = new Map<TimelineEvent, number>();
+      for (const s of siblingItems) {
+        let visualY = s.y;
+        if (layoutTransition) {
+          const offset = layoutTransition.yOffsets.get(s.event);
+          if (offset) {
+            const elapsed = performance.now() - layoutTransition.startTime;
+            const progress = easeInOut(Math.min(elapsed / LAYOUT_ANIM_MS, 1));
+            visualY = s.y + offset * (1 - progress);
+          }
+        }
+        oldPositions.set(s.event, visualY);
+      }
+
+      // Rebuild order from current visual positions
       const oldOrder = eventOrders.get(parentPath);
       const oldIndexMap = oldOrder
         ? new Map(oldOrder.map((name, i) => [name, i]))
@@ -401,6 +416,19 @@ async function main() {
 
       eventOrders.set(parentPath, visualOrder);
       relayout();
+
+      // Animate siblings to new positions
+      const newSiblings = findSiblingLayoutItems(item);
+      const yOffsets = new Map<TimelineEvent, number>();
+      for (const s of newSiblings) {
+        const oldY = oldPositions.get(s.event);
+        if (oldY !== undefined && Math.abs(oldY - s.y) > 0.5) {
+          yOffsets.set(s.event, oldY - s.y);
+        }
+      }
+      layoutTransition = yOffsets.size > 0
+        ? { startTime: performance.now(), fadingOut: [], yOffsets, fadingIn: new Set() }
+        : null;
     }
     requestRedraw();
   }

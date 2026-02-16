@@ -457,6 +457,7 @@ function drawContainer(
   hoveredItem: LayoutItem | null,
   selectedItem: LayoutItem | null,
   snapHighlightYears: Set<number>,
+  transition?: LayoutTransition,
 ) {
   const x1 = yearToX(item.startYear, viewport, canvasWidth);
   const x2 = yearToX(item.endYear, viewport, canvasWidth);
@@ -533,6 +534,7 @@ function drawContainer(
         hoveredItem,
         selectedItem,
         snapHighlightYears,
+        transition,
       );
     }
   }
@@ -726,8 +728,20 @@ function drawLayoutItem(
   hoveredItem: LayoutItem | null,
   selectedItem: LayoutItem | null,
   snapHighlightYears: Set<number>,
+  transition?: LayoutTransition,
 ) {
   if (!isVisible(item.startYear, item.endYear, viewport)) return;
+
+  // Apply transition offset and fade-in
+  const yOffset = transition?.yOffsets.get(item.event);
+  const isFadingIn = transition?.fadingIn.has(item.event);
+  const hasTransitionEffect = (yOffset || isFadingIn) && transition;
+
+  if (hasTransitionEffect) {
+    ctx.save();
+    if (yOffset) ctx.translate(0, yOffset * (1 - transition!.progress));
+    if (isFadingIn) ctx.globalAlpha = transition!.progress;
+  }
 
   // During reorder: draw dragged item (including nested) at reduced alpha
   const isDragged = currentDraggedEvent !== null && item.event === currentDraggedEvent;
@@ -745,6 +759,7 @@ function drawLayoutItem(
       hoveredItem,
       selectedItem,
       snapHighlightYears,
+      transition,
     );
   } else {
     const isSelected = selectedItem === item;
@@ -770,6 +785,9 @@ function drawLayoutItem(
   }
 
   if (isDragged) {
+    ctx.restore();
+  }
+  if (hasTransitionEffect) {
     ctx.restore();
   }
 }
@@ -819,20 +837,9 @@ export function render(
   // Set module-level drag state so nested drawLayoutItem calls can dim the dragged item
   currentDraggedEvent = reorderState?.draggedEvent ?? null;
 
-  // Draw current layout items with Y offsets and fade-in during transition
+  // Draw current layout items (transition offsets/fades applied inside drawLayoutItem)
   for (const item of layout) {
-    const offset = transition?.yOffsets.get(item.event);
-    const isFadingIn = transition?.fadingIn.has(item.event);
-
-    if ((offset || isFadingIn) && transition) {
-      ctx.save();
-      if (offset) ctx.translate(0, offset * (1 - transition.progress));
-      if (isFadingIn) ctx.globalAlpha = transition.progress;
-      drawLayoutItem(ctx, item, viewport, canvasWidth, hoveredItem, selectedItem, snapState.highlightYears);
-      ctx.restore();
-    } else {
-      drawLayoutItem(ctx, item, viewport, canvasWidth, hoveredItem, selectedItem, snapState.highlightYears);
-    }
+    drawLayoutItem(ctx, item, viewport, canvasWidth, hoveredItem, selectedItem, snapState.highlightYears, transition);
   }
 
   // Draw reorder ghost on top of everything else
