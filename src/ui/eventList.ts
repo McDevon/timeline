@@ -3,6 +3,8 @@ import { formatDate } from '../data/time';
 
 export class EventListPanel {
   private el: HTMLDivElement;
+  private rowMap = new Map<TimelineEvent, HTMLDivElement>();
+  private highlightedRow: HTMLDivElement | null = null;
 
   constructor(
     events: TimelineEvent[],
@@ -10,7 +12,7 @@ export class EventListPanel {
     onHover: (event: TimelineEvent | null) => void,
   ) {
     this.el = document.createElement('div');
-    this.el.className = 'event-list-panel';
+    this.el.className = 'event-list-panel collapsed';
 
     // Header
     const header = document.createElement('div');
@@ -63,11 +65,26 @@ export class EventListPanel {
       row.addEventListener('mouseenter', () => { onHover(event); });
       row.addEventListener('mouseleave', () => { onHover(null); });
 
+      this.rowMap.set(event, row);
       body.appendChild(row);
     }
 
     this.el.appendChild(body);
     document.body.appendChild(this.el);
+  }
+
+  highlightEvent(event: TimelineEvent | null) {
+    if (this.highlightedRow) {
+      this.highlightedRow.classList.remove('highlighted');
+      this.highlightedRow = null;
+    }
+    if (event) {
+      const row = this.rowMap.get(event) ?? null;
+      if (row) {
+        row.classList.add('highlighted');
+        this.highlightedRow = row;
+      }
+    }
   }
 
   private formatEventDates(event: TimelineEvent): string {

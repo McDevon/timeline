@@ -40,6 +40,30 @@ async function main() {
   // Initialize viewport to show full data range
   let viewport: Viewport = computeFullRange(events);
   let hoveredItem: LayoutItem | null = null;
+  let eventListPanel: EventListPanel | null = null;
+
+  function findTopLevelEvent(item: LayoutItem): TimelineEvent | null {
+    for (const evt of events) {
+      if (evt === item.event) return evt;
+      if (evt.nested) {
+        const found = (function walk(nested: TimelineEvent[]): boolean {
+          for (const child of nested) {
+            if (child === item.event) return true;
+            if (child.nested && walk(child.nested)) return true;
+          }
+          return false;
+        })(evt.nested);
+        if (found) return evt;
+      }
+    }
+    return null;
+  }
+
+  function setHoveredItem(item: LayoutItem | null) {
+    hoveredItem = item;
+    const topEvent = item ? findTopLevelEvent(item) : null;
+    eventListPanel?.highlightEvent(topEvent);
+  }
   let selectedItem: LayoutItem | null = null;
   let cursorX = -1;
   let selection: TimelineSelection | null = null;
@@ -143,7 +167,7 @@ async function main() {
     },
     () => layout,
     () => hoveredItem,
-    (item: LayoutItem | null) => { hoveredItem = item; },
+    setHoveredItem,
     (item: LayoutItem | null) => { selectedItem = item; },
     (x: number) => { cursorX = x; },
     () => selection,
@@ -249,7 +273,7 @@ async function main() {
 
     // Clear hovered/selected if they reference the hidden event
     if (!visible) {
-      if (hoveredItem && isDescendantOf(hoveredItem, event)) hoveredItem = null;
+      if (hoveredItem && isDescendantOf(hoveredItem, event)) setHoveredItem(null);
       if (selectedItem && isDescendantOf(selectedItem, event)) selectedItem = null;
       if (dblClickItem && isDescendantOf(dblClickItem, event)) {
         dblClickPrevViewport = null;
@@ -262,14 +286,14 @@ async function main() {
 
   function onHoverEvent(event: TimelineEvent | null) {
     if (event === null) {
-      hoveredItem = null;
+      setHoveredItem(null);
     } else {
-      hoveredItem = layout.find(item => item.event === event) ?? null;
+      setHoveredItem(layout.find(item => item.event === event) ?? null);
     }
     requestRedraw();
   }
 
-  new EventListPanel(events, onToggleEvent, onHoverEvent);
+  eventListPanel = new EventListPanel(events, onToggleEvent, onHoverEvent);
 
   // Initial draw and resize handler
   draw();
