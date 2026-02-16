@@ -79,15 +79,13 @@ function computeOverlaps(events: { event: TimelineEvent; startYear: number; endY
 }
 
 /**
- * Find the minimum Y position where an item of the given height fits
- * without overlapping any existing item. Input must be sorted by Y.
+ * Find the minimum Y position past all conflicting items.
+ * Returns max(bottom + gap) across all conflicting items, so the result
+ * depends only on already-placed items — not on the new item's height.
  */
-function findMinY(conflicting: PlacedItem[], height: number, gap: number): number {
+function findMinY(conflicting: PlacedItem[], gap: number): number {
   let y = 0;
   for (const item of conflicting) {
-    if (y + height + gap <= item.relativeY) {
-      break; // found a gap
-    }
     y = Math.max(y, item.relativeY + item.height + gap);
   }
   return y;
@@ -247,7 +245,7 @@ function placeLevel(
     }
     conflicting.sort((a, b) => a.relativeY - b.relativeY);
 
-    const y = findMinY(conflicting, item.height, gap);
+    const y = findMinY(conflicting, gap);
 
     const placedItem: PlacedItem = {
       event: item.event,

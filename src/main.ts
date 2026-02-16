@@ -309,13 +309,24 @@ async function main() {
       }
     }
 
-    // Count items in rows whose midpoint is above the cursor
+    // Count items in rows whose boundary is above the cursor.
+    // Boundary = gap midpoint between consecutive rows, capped so the
+    // user never needs to drag more than MAX_BOUNDARY_GAP past a row.
+    const MAX_BOUNDARY_GAP = 60;
     let count = 0;
-    for (const row of rows) {
-      const maxBottom = Math.max(...row.map(r => r.y + r.height));
-      const midY = (row[0].y + maxBottom) / 2;
-      if (cursorY >= midY) {
-        count += row.length;
+    for (let i = 0; i < rows.length; i++) {
+      let boundary: number;
+      if (i === 0) {
+        boundary = rows[0][0].y;
+      } else {
+        const prevBottom = Math.max(...rows[i - 1].map(r => r.y + r.height));
+        const rowTop = rows[i][0].y;
+        const gapMid = (prevBottom + rowTop) / 2;
+        boundary = Math.min(gapMid, prevBottom + MAX_BOUNDARY_GAP);
+      }
+
+      if (cursorY >= boundary) {
+        count += rows[i].length;
       } else {
         break;
       }
@@ -358,16 +369,28 @@ async function main() {
 
       // Rebuild order from current visual positions
       const siblingItems = findSiblingLayoutItems(item);
+      const oldOrder = eventOrders.get(parentPath);
+      const oldIndexMap = oldOrder
+        ? new Map(oldOrder.map((name, i) => [name, i]))
+        : null;
       const visualOrder = [...siblingItems]
         .filter(s => s.event !== item.event)
-        .sort((a, b) => a.y - b.y || a.startYear - b.startYear)
+        .sort((a, b) => {
+          if (Math.abs(a.y - b.y) > 1) return a.y - b.y;
+          // Same row: preserve existing custom order
+          if (oldIndexMap) {
+            const ai = oldIndexMap.get(a.event.name) ?? Infinity;
+            const bi = oldIndexMap.get(b.event.name) ?? Infinity;
+            return ai - bi;
+          }
+          return a.startYear - b.startYear;
+        })
         .map(s => s.event.name);
 
       // Insert dragged item at the computed row-group position
       visualOrder.splice(dropIndex, 0, item.event.name);
 
       // Preserve names from old order not in current layout (hidden events)
-      const oldOrder = eventOrders.get(parentPath);
       if (oldOrder) {
         for (const name of oldOrder) {
           if (!visualOrder.includes(name)) {
@@ -465,7 +488,7 @@ async function main() {
     selection = preClickSelection;
     selectedItem = preClickSelectedItem;
 
-    if (dblClickItem === hit && dblClickPrevViewport) {
+    if (dblClickItem && hit.event === dblClickItem.event && dblClickPrevViewport) {
       animateZoom(dblClickPrevViewport);
       dblClickPrevViewport = null;
       dblClickItem = null;
