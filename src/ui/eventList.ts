@@ -29,50 +29,43 @@ export class EventListPanel {
     body.className = 'event-list-body';
 
     // Sort events by start date
-    const sorted = [...events].sort((a, b) => {
-      return this.compareDate(a.start, b.start);
-    });
+    const sorted = [...events].sort((a, b) => this.parseYear(a.start) - this.parseYear(b.start));
 
     for (const event of sorted) {
-      const row = document.createElement('div');
-      row.className = 'event-list-row';
-
-      const check = document.createElement('div');
-      check.className = 'event-list-check';
-      check.textContent = '\u2713';
-
-      const info = document.createElement('div');
-      info.className = 'event-list-info';
-
-      const name = document.createElement('div');
-      name.className = 'event-list-name';
-      name.textContent = event.name;
-
-      const dates = document.createElement('div');
-      dates.className = 'event-list-dates';
-      dates.textContent = this.formatEventDates(event);
-
-      info.appendChild(name);
-      info.appendChild(dates);
-      row.appendChild(check);
-      row.appendChild(info);
-
-      let visible = !hiddenEvents?.has(event);
-      if (!visible) row.classList.add('hidden');
-      row.addEventListener('click', () => {
-        visible = !visible;
-        row.classList.toggle('hidden', !visible);
-        onToggle(event, visible);
-      });
-      row.addEventListener('mouseenter', () => { onHover(event); });
-      row.addEventListener('mouseleave', () => { onHover(null); });
-
-      this.rowMap.set(event, row);
+      const hidden = hiddenEvents?.has(event) ?? false;
+      const row = this.createRow(event, onToggle, onHover, hidden);
       body.appendChild(row);
     }
 
     this.el.appendChild(body);
     document.body.appendChild(this.el);
+  }
+
+  addEvents(
+    newEvents: TimelineEvent[],
+    onToggle: (event: TimelineEvent, visible: boolean) => void,
+    onHover: (event: TimelineEvent | null) => void,
+  ): void {
+    const body = this.el.querySelector('.event-list-body');
+    if (!body) return;
+
+    for (const event of newEvents) {
+      const row = this.createRow(event, onToggle, onHover, false);
+      const eventYear = this.parseYear(event.start);
+
+      // Insert in sorted position
+      let inserted = false;
+      for (const child of Array.from(body.children) as HTMLDivElement[]) {
+        if (parseFloat(child.dataset.startYear ?? '0') > eventYear) {
+          body.insertBefore(row, child);
+          inserted = true;
+          break;
+        }
+      }
+      if (!inserted) {
+        body.appendChild(row);
+      }
+    }
   }
 
   highlightEvent(event: TimelineEvent | null) {
@@ -89,6 +82,50 @@ export class EventListPanel {
     }
   }
 
+  private createRow(
+    event: TimelineEvent,
+    onToggle: (event: TimelineEvent, visible: boolean) => void,
+    onHover: (event: TimelineEvent | null) => void,
+    hidden: boolean,
+  ): HTMLDivElement {
+    const row = document.createElement('div');
+    row.className = 'event-list-row';
+    row.dataset.startYear = String(this.parseYear(event.start));
+
+    const check = document.createElement('div');
+    check.className = 'event-list-check';
+    check.textContent = '\u2713';
+
+    const info = document.createElement('div');
+    info.className = 'event-list-info';
+
+    const name = document.createElement('div');
+    name.className = 'event-list-name';
+    name.textContent = event.name;
+
+    const dates = document.createElement('div');
+    dates.className = 'event-list-dates';
+    dates.textContent = this.formatEventDates(event);
+
+    info.appendChild(name);
+    info.appendChild(dates);
+    row.appendChild(check);
+    row.appendChild(info);
+
+    let visible = !hidden;
+    if (!visible) row.classList.add('hidden');
+    row.addEventListener('click', () => {
+      visible = !visible;
+      row.classList.toggle('hidden', !visible);
+      onToggle(event, visible);
+    });
+    row.addEventListener('mouseenter', () => { onHover(event); });
+    row.addEventListener('mouseleave', () => { onHover(null); });
+
+    this.rowMap.set(event, row);
+    return row;
+  }
+
   private formatEventDates(event: TimelineEvent): string {
     const start = formatDate(event.start);
     if (event.end === 'ongoing') {
@@ -100,12 +137,8 @@ export class EventListPanel {
     return start;
   }
 
-  private compareDate(a: string, b: string): number {
-    // Handle negative years (BCE)
-    const parseYear = (s: string) => {
-      if (s.startsWith('-')) return -parseInt(s.slice(1), 10);
-      return parseInt(s, 10);
-    };
-    return parseYear(a) - parseYear(b);
+  private parseYear(s: string): number {
+    if (s.startsWith('-')) return -parseInt(s.slice(1), 10);
+    return parseInt(s, 10);
   }
 }

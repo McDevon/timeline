@@ -1,0 +1,127 @@
+[
+  {
+    "name": "Roman Republic",
+    "start": "-509",
+    "end": "-27",
+    "info": "Period of ancient Roman civilization governed as a republic",
+    "nested": [
+      {
+        "name": "Conflict of the Orders",
+        "start": "-494",
+        "end": "-287",
+        "info": "Struggle between patricians and plebeians for political equality"
+      },
+      {
+        "name": "Twelve Tables",
+        "start": "-451",
+        "end": "-449",
+        "info": "First codification of Roman law"
+      },
+      {
+        "name": "Sack of Rome by the Gauls",
+        "start": "-390",
+        "info": "Senones under Brennus captured and sacked most of Rome"
+      },
+      {
+        "name": "Punic Wars",
+        "start": "-264",
+        "end": "-146",
+        "info": "Three wars between Rome and Carthage",
+        "nested": [
+          {
+            "name": "First Punic War",
+            "start": "-264",
+            "end": "-241",
+            "info": "Rome gained control of Sicily"
+          },
+          {
+            "name": "Second Punic War",
+            "start": "-218",
+            "end": "-201",
+            "info": "Hannibal's invasion of Italy"
+          },
+          {
+            "name": "Battle of Cannae",
+            "start": "-216-08-02",
+            "info": "Hannibal's greatest victory; worst Roman defeat"
+          },
+          {
+            "name": "Battle of Zama",
+            "start": "-202-10-19",
+            "info": "Scipio Africanus defeated Hannibal, ending the Second Punic War"
+          },
+          {
+            "name": "Third Punic War",
+            "start": "-149",
+            "end": "-146",
+            "info": "Destruction of Carthage"
+          }
+        ]
+      },
+      {
+        "name": "Gracchi Reforms",
+        "start": "-133",
+        "end": "-121",
+        "info": "Tiberius and Gaius Gracchus attempted land and political reforms"
+      },
+      {
+        "name": "Jugurthine War",
+        "start": "-112",
+        "end": "-106",
+        "info": "War against Jugurtha of Numidia; rise of Marius"
+      },
+      {
+        "name": "Social War",
+        "start": "-91",
+        "end": "-87",
+        "info": "Italian allies revolted for Roman citizenship"
+      },
+      {
+        "name": "Sulla's Dictatorship",
+        "start": "-82",
+        "end": "-79",
+        "info": "Sulla marched on Rome and ruled as dictator, reformed the constitution"
+      },
+      {
+        "name": "Spartacus Revolt",
+        "start": "-73",
+        "end": "-71",
+        "info": "Major slave uprising led by the gladiator Spartacus"
+      },
+      {
+        "name": "First Triumvirate",
+        "start": "-60",
+        "end": "-53",
+        "info": "Informal alliance of Caesar, Pompey, and Crassus"
+      },
+      {
+        "name": "Gallic Wars",
+        "start": "-58",
+        "end": "-50",
+        "info": "Caesar's conquest of Gaul"
+      },
+      {
+        "name": "Caesar's Civil War",
+        "start": "-49",
+        "end": "-45",
+        "info": "War between Caesar and the Senatorial faction led by Pompey"
+      },
+      {
+        "name": "Assassination of Caesar",
+        "start": "-44-03-15",
+        "info": "Julius Caesar stabbed to death in the Senate"
+      },
+      {
+        "name": "Second Triumvirate",
+        "start": "-43",
+        "end": "-33",
+        "info": "Official alliance of Octavian, Antony, and Lepidus"
+      },
+      {
+        "name": "Battle of Actium",
+        "start": "-31-09-02",
+        "info": "Octavian's naval victory over Antony and Cleopatra"
+      }
+    ]
+  }
+]

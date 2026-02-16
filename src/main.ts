@@ -7,8 +7,11 @@ import { TimelineEvent, TimelineSelection } from './types';
 import { setupInput } from './timeline/input';
 import { SnapState } from './timeline/snap';
 import { EventListPanel } from './ui/eventList';
+import { InfoLog } from './ui/infoLog';
 import { saveState, loadState } from './state';
 import { dateToDecimalYear } from './data/time';
+import { loadImportedEvents, saveImportedEvents } from './data/store';
+import { validateEvents } from './data/validate';
 
 function setupCanvas(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
   const dpr = window.devicePixelRatio || 1;
@@ -29,6 +32,16 @@ async function main() {
   }
 
   const events = await loadEvents('/events.json', '/events.example.json');
+
+  // Merge previously imported events from IndexedDB
+  const imported = await loadImportedEvents();
+  for (const ie of imported) {
+    if (!events.some(e => e.name === ie.name)) {
+      events.push(ie);
+    }
+  }
+
+  const infoLog = new InfoLog();
 
   // Visibility, collapse, and ordering state
   const hiddenEvents = new Set<TimelineEvent>();
@@ -598,6 +611,119 @@ async function main() {
   }
 
   eventListPanel = new EventListPanel(events, onToggleEvent, onHoverEvent, hiddenEvents);
+
+  // --- File drop import ---
+  let dropOverlay: HTMLDivElement | null = null;
+  let dragCounter = 0;
+
+  function getDropOverlay(): HTMLDivElement {
+    if (!dropOverlay) {
+      dropOverlay = document.createElement('div');
+      dropOverlay.className = 'drop-overlay';
+      dropOverlay.textContent = 'Drop JSON file to import events';
+      document.body.appendChild(dropOverlay);
+    }
+    return dropOverlay;
+  }
+
+  document.body.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+  });
+
+  document.body.addEventListener('dragenter', (e) => {
+    e.preventDefault();
+    dragCounter++;
+    if (dragCounter === 1) {
+      getDropOverlay().classList.add('visible');
+    }
+  });
+
+  document.body.addEventListener('dragleave', () => {
+    dragCounter--;
+    if (dragCounter <= 0) {
+      dragCounter = 0;
+      dropOverlay?.classList.remove('visible');
+    }
+  });
+
+  document.body.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dragCounter = 0;
+    dropOverlay?.classList.remove('visible');
+
+    const file = e.dataTransfer?.files[0];
+    if (!file) return;
+
+    if (!file.name.endsWith('.json')) {
+      infoLog.show(`Cannot import "${file.name}": only .json files are supported`);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(reader.result as string);
+      } catch {
+        infoLog.show(`Invalid JSON in "${file.name}"`);
+        return;
+      }
+
+      const result = validateEvents(parsed);
+      if ('error' in result) {
+        infoLog.show(result.error);
+        return;
+      }
+
+      // Deduplicate against existing events
+      const newEvents: TimelineEvent[] = [];
+      for (const ie of result.events) {
+        if (events.some(e => e.name === ie.name)) {
+          infoLog.show(`Skipped duplicate event: ${ie.name}`);
+        } else {
+          newEvents.push(ie);
+        }
+      }
+
+      if (newEvents.length === 0) {
+        infoLog.show(`No new events to add from "${file.name}"`);
+        return;
+      }
+
+      // Add to main events array
+      events.push(...newEvents);
+
+      // Persist all imported events to IndexedDB
+      const allImported = await loadImportedEvents();
+      allImported.push(...newEvents);
+      await saveImportedEvents(allImported);
+
+      // Recompute layout with fade-in animation for new events
+      relayout();
+
+      const fadingIn = new Set<TimelineEvent>();
+      for (const ne of newEvents) fadingIn.add(ne);
+      layoutTransition = {
+        startTime: performance.now(),
+        fadingOut: [],
+        yOffsets: new Map(),
+        fadingIn,
+      };
+
+      // Update event list panel
+      eventListPanel?.addEvents(newEvents, onToggleEvent, onHoverEvent);
+
+      infoLog.show(`Added ${newEvents.length} event${newEvents.length !== 1 ? 's' : ''} from "${file.name}"`);
+      requestRedraw();
+    };
+
+    reader.onerror = () => {
+      infoLog.show(`Failed to read "${file.name}"`);
+    };
+
+    reader.readAsText(file);
+  });
 
   // Initial draw and resize handler
   draw();
