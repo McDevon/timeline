@@ -309,20 +309,20 @@ async function main() {
       }
     }
 
-    // Count items in rows whose boundary is above the cursor.
-    // Boundary = gap midpoint between consecutive rows, capped so the
-    // user never needs to drag more than MAX_BOUNDARY_GAP past a row.
+    // Count items in rows whose midpoint is above the cursor.
+    // The cursor must pass a row's vertical center to count it.
+    // For distant rows (tall containers), cap the boundary so the user
+    // never needs to drag more than MAX_BOUNDARY_GAP past the previous row.
     const MAX_BOUNDARY_GAP = 60;
     let count = 0;
     for (let i = 0; i < rows.length; i++) {
-      let boundary: number;
-      if (i === 0) {
-        boundary = rows[0][0].y;
-      } else {
+      const rowTop = rows[i][0].y;
+      const rowBottom = Math.max(...rows[i].map(r => r.y + r.height));
+      let boundary = (rowTop + rowBottom) / 2;
+
+      if (i > 0) {
         const prevBottom = Math.max(...rows[i - 1].map(r => r.y + r.height));
-        const rowTop = rows[i][0].y;
-        const gapMid = (prevBottom + rowTop) / 2;
-        boundary = Math.min(gapMid, prevBottom + MAX_BOUNDARY_GAP);
+        boundary = Math.min(boundary, prevBottom + MAX_BOUNDARY_GAP);
       }
 
       if (cursorY >= boundary) {
