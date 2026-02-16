@@ -1,6 +1,13 @@
 import { TimelineEvent } from '../types';
 import { dateToDecimalYear, todayDecimalYear } from '../data/time';
 
+/**
+ * Maps a parent path key to an ordered array of child event names.
+ * Keys: "" for root level, JSON-stringified path arrays for nested levels.
+ * Only levels where the user has manually reordered are stored.
+ */
+export type EventOrderMap = Map<string, string[]>;
+
 const LAYOUT = {
   parentBarHeight: 30,
   childBarHeight: 22,
@@ -45,45 +52,85 @@ interface PlacedItem {
 }
 
 /**
- * Find the minimum Y position where an item of the given height fits
- * without overlapping any active event. Active list must be sorted by Y.
+ * Per-level adjacency map: for each event, the set of other events it
+ * overlaps with in time. Derived from time ranges only — independent of
+ * sort order, heights, or other levels.
  */
-function findMinY(active: PlacedItem[], height: number, gap: number): number {
+type OverlapGraph = Map<TimelineEvent, Set<TimelineEvent>>;
+
+/**
+ * Compute time-overlap relationships for a set of sized events.
+ * Two events overlap if their time ranges intersect (strictly).
+ */
+function computeOverlaps(events: { event: TimelineEvent; startYear: number; endYear: number }[]): OverlapGraph {
+  const graph: OverlapGraph = new Map();
+  for (const e of events) graph.set(e.event, new Set());
+
+  for (let i = 0; i < events.length; i++) {
+    for (let j = i + 1; j < events.length; j++) {
+      const a = events[i], b = events[j];
+      if (a.endYear > b.startYear && a.startYear < b.endYear) {
+        graph.get(a.event)!.add(b.event);
+        graph.get(b.event)!.add(a.event);
+      }
+    }
+  }
+  return graph;
+}
+
+/**
+ * Find the minimum Y position where an item of the given height fits
+ * without overlapping any existing item. Input must be sorted by Y.
+ */
+function findMinY(conflicting: PlacedItem[], height: number, gap: number): number {
   let y = 0;
-  for (const event of active) {
-    if (y + height + gap <= event.relativeY) {
+  for (const item of conflicting) {
+    if (y + height + gap <= item.relativeY) {
       break; // found a gap
     }
-    y = Math.max(y, event.relativeY + event.height + gap);
+    y = Math.max(y, item.relativeY + item.height + gap);
   }
   return y;
 }
 
 /**
- * Insert an item into a Y-sorted active list, maintaining sort order.
+ * Sort sized items by a custom name order. Items not in the custom order
+ * appear after explicitly ordered items, sorted by startYear.
  */
-function insertSorted(active: PlacedItem[], item: PlacedItem): void {
-  let i = active.length;
-  while (i > 0 && active[i - 1].relativeY > item.relativeY) {
-    i--;
-  }
-  active.splice(i, 0, item);
+function sortByCustomOrder<T extends { event: TimelineEvent; startYear: number }>(
+  items: T[],
+  customOrder: string[],
+): T[] {
+  const indexMap = new Map(customOrder.map((name, i) => [name, i]));
+  return [...items].sort((a, b) => {
+    const ai = indexMap.get(a.event.name);
+    const bi = indexMap.get(b.event.name);
+    if (ai !== undefined && bi !== undefined) return ai - bi;
+    if (ai !== undefined) return -1;
+    if (bi !== undefined) return 1;
+    return a.startYear - b.startYear;
+  });
 }
 
 /**
  * Recursively compute sizes and place events at a given level.
  *
- * Uses sweep-and-prune: events are processed in time order, maintaining
- * an active set of time-overlapping events sorted by Y position.
- * Each event is placed at the highest Y that doesn't collide with any
- * active event. Works for arbitrary nesting depth — containers recursively
- * place their children the same way.
+ * Four phases:
+ * 1. Size — compute heights (recursive for containers, depends on collapse)
+ * 2. Overlaps — build per-event adjacency graph from time ranges
+ * 3. Sort — by custom order or startYear
+ * 4. Place — assign Y positions using overlap graph + sort priority
+ *
+ * The overlap graph is independent of sort order, so reordering events
+ * never causes incorrect overlap detection.
  */
 function placeLevel(
   events: TimelineEvent[],
   barHeight: number,
   gap: number,
   collapsedEvents?: Set<TimelineEvent>,
+  eventOrders?: EventOrderMap,
+  parentPath?: string[],
 ): { items: PlacedItem[]; totalHeight: number } {
   // Phase 1: compute heights (recursively for containers)
   const sized = events.map(event => {
@@ -156,8 +203,9 @@ function placeLevel(
       };
     }
 
+    const childPath = [...(parentPath ?? []), event.name];
     const { items: placedChildren, totalHeight: contentHeight } =
-      placeLevel(event.nested, LAYOUT.childBarHeight, LAYOUT.rowGap, collapsedEvents);
+      placeLevel(event.nested, LAYOUT.childBarHeight, LAYOUT.rowGap, collapsedEvents, eventOrders, childPath);
 
     const height =
       LAYOUT.containerHeaderHeight +
@@ -175,22 +223,31 @@ function placeLevel(
     };
   });
 
-  // Sort by start time for sweep
-  const sorted = [...sized].sort((a, b) => a.startYear - b.startYear);
+  // Phase 2: compute overlap graph from time ranges
+  const overlaps = computeOverlaps(sized);
 
-  // Phase 2: sweep-and-prune placement
-  const active: PlacedItem[] = []; // Y-sorted active set
+  // Phase 3: sort by custom order or start time
+  const orderKey = JSON.stringify(parentPath ?? []);
+  const customOrder = eventOrders?.get(orderKey);
+  const sorted = customOrder
+    ? sortByCustomOrder(sized, customOrder)
+    : [...sized].sort((a, b) => a.startYear - b.startYear);
+
+  // Phase 4: place events using overlap graph
+  const placedMap = new Map<TimelineEvent, PlacedItem>();
   const placed: PlacedItem[] = [];
 
   for (const item of sorted) {
-    // Prune: remove events whose time range no longer overlaps
-    for (let i = active.length - 1; i >= 0; i--) {
-      if (active[i].endYear <= item.startYear) {
-        active.splice(i, 1);
-      }
+    // Find already-placed items that overlap this one in time
+    const neighbors = overlaps.get(item.event) ?? new Set();
+    const conflicting: PlacedItem[] = [];
+    for (const n of neighbors) {
+      const p = placedMap.get(n);
+      if (p) conflicting.push(p);
     }
+    conflicting.sort((a, b) => a.relativeY - b.relativeY);
 
-    const y = findMinY(active, item.height, gap);
+    const y = findMinY(conflicting, item.height, gap);
 
     const placedItem: PlacedItem = {
       event: item.event,
@@ -208,7 +265,7 @@ function placeLevel(
       placedChildren: item.placedChildren,
     };
 
-    insertSorted(active, placedItem);
+    placedMap.set(item.event, placedItem);
     placed.push(placedItem);
   }
 
@@ -278,7 +335,8 @@ export function computeLayout(
   events: TimelineEvent[],
   startY: number,
   collapsedEvents?: Set<TimelineEvent>,
+  eventOrders?: EventOrderMap,
 ): LayoutItem[] {
-  const { items } = placeLevel(events, LAYOUT.parentBarHeight, LAYOUT.itemGap, collapsedEvents);
+  const { items } = placeLevel(events, LAYOUT.parentBarHeight, LAYOUT.itemGap, collapsedEvents, eventOrders, []);
   return toLayoutItems(items, startY);
 }

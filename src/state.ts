@@ -9,6 +9,7 @@ interface SerializedState {
   selection: { start: number; end: number; anchor: number } | null;
   hiddenEventPaths: EventPath[];
   collapsedEventPaths: EventPath[];
+  eventOrders?: Record<string, string[]>;
 }
 
 const STORAGE_KEY = 'timeline-state';
@@ -46,6 +47,7 @@ export function saveState(
   hiddenEvents: Set<TimelineEvent>,
   collapsedEvents: Set<TimelineEvent>,
   allEvents: TimelineEvent[],
+  eventOrders?: Map<string, string[]>,
 ): void {
   const hiddenEventPaths: EventPath[] = [];
   for (const e of hiddenEvents) {
@@ -59,12 +61,18 @@ export function saveState(
     if (path) collapsedEventPaths.push(path);
   }
 
+  const serializedOrders: Record<string, string[]> | undefined =
+    eventOrders && eventOrders.size > 0
+      ? Object.fromEntries(eventOrders)
+      : undefined;
+
   const state: SerializedState = {
     version: 1,
     viewport: { start: viewport.start, end: viewport.end },
     selection,
     hiddenEventPaths,
     collapsedEventPaths,
+    eventOrders: serializedOrders,
   };
 
   try {
@@ -81,6 +89,7 @@ export function loadState(
   selection: TimelineSelection | null;
   hiddenEvents: Set<TimelineEvent>;
   collapsedEvents: Set<TimelineEvent>;
+  eventOrders: Map<string, string[]>;
 } | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -101,11 +110,19 @@ export function loadState(
       if (event) collapsedEvents.add(event);
     }
 
+    const eventOrders = new Map<string, string[]>();
+    if (state.eventOrders) {
+      for (const [key, order] of Object.entries(state.eventOrders)) {
+        eventOrders.set(key, order);
+      }
+    }
+
     return {
       viewport: { start: state.viewport.start, end: state.viewport.end },
       selection: state.selection,
       hiddenEvents,
       collapsedEvents,
+      eventOrders,
     };
   } catch {
     return null;

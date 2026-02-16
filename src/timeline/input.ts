@@ -29,6 +29,9 @@ export function setupInput(
   setSelection: (sel: TimelineSelection | null) => void,
   setSnapState: (state: SnapState) => void,
   onCollapseToggle: (event: import('../types').TimelineEvent) => void,
+  onReorderMove: (item: LayoutItem, cursorY: number) => void,
+  onReorderEnd: (item: LayoutItem) => void,
+  onReorderCancel: () => void,
   requestRedraw: () => void,
 ): InputHandlers {
   const tooltip = new Tooltip();
@@ -225,12 +228,18 @@ export function setupInput(
   }
 
   // --- Mouse drag + click ---
-  let dragMode: 'none' | 'panning' | 'axis-selecting' = 'none';
+  let dragMode: 'none' | 'panning' | 'axis-selecting' | 'reordering' = 'none';
   let mouseDownX = 0;
   let mouseDownY = 0;
   let lastMouseX = 0;
   let didDrag = false;
   let axisAnchorYear = 0;
+
+  // Reorder drag state
+  const REORDER_DECISION_THRESHOLD = 8;
+  let dragDecided = false;
+  let viewportAtDragStart: Viewport | null = null;
+  let reorderItem: LayoutItem | null = null;
 
   // Last known cursor position on the canvas (for hover updates during scroll)
   let cursorCanvasX = -1;
@@ -279,8 +288,12 @@ export function setupInput(
       selAnchorOverride = null;
       selExtendOverride = null;
     } else {
-      // Events region — start panning
+      // Events region — start panning (may pivot to reorder)
       dragMode = 'panning';
+      dragDecided = false;
+      viewportAtDragStart = { ...getViewport() };
+      const hit = hitTest(x, y, getLayout(), getViewport(), canvas.clientWidth);
+      reorderItem = hit;
       updateCursorLine(-1, LAYOUT.eventsStartY);
       canvas.style.cursor = 'grabbing';
     }
@@ -308,11 +321,41 @@ export function setupInput(
       return;
     }
 
+    if (dragMode === 'reordering') {
+      const rect = canvas.getBoundingClientRect();
+      const canvasY = e.clientY - rect.top;
+      onReorderMove(reorderItem!, canvasY);
+      scheduleRedraw();
+      return;
+    }
+
     if (dragMode === 'panning') {
       const dx = lastMouseX - e.clientX;
       lastMouseX = e.clientX;
 
       const dist = Math.hypot(e.clientX - mouseDownX, e.clientY - mouseDownY);
+
+      // Direction decision: after threshold, check if vertical drag on an event
+      if (!dragDecided && dist >= REORDER_DECISION_THRESHOLD && reorderItem !== null) {
+        const absDx = Math.abs(e.clientX - mouseDownX);
+        const absDy = Math.abs(e.clientY - mouseDownY);
+        if (absDy > absDx) {
+          // Pivot to reorder mode
+          dragDecided = true;
+          dragMode = 'reordering';
+          if (viewportAtDragStart) setViewport(viewportAtDragStart);
+          tooltip.hide();
+          canvas.style.cursor = 'ns-resize';
+          const rect = canvas.getBoundingClientRect();
+          onReorderMove(reorderItem, e.clientY - rect.top);
+          scheduleRedraw();
+          return;
+        }
+        // Horizontal — confirm pan
+        dragDecided = true;
+        reorderItem = null;
+      }
+
       if (dist >= CLICK_THRESHOLD) {
         didDrag = true;
       }
@@ -340,6 +383,20 @@ export function setupInput(
     modifierHeld = e.ctrlKey || e.metaKey;
     const mode = dragMode;
     dragMode = 'none';
+
+    if (mode === 'reordering') {
+      onReorderEnd(reorderItem!);
+      reorderItem = null;
+      viewportAtDragStart = null;
+      const rect = canvas.getBoundingClientRect();
+      cursorCanvasX = e.clientX - rect.left;
+      cursorCanvasY = e.clientY - rect.top;
+      updateCursorLine(cursorCanvasX, cursorCanvasY);
+      updateHover();
+      canvas.style.cursor = getHovered() ? 'pointer' : 'grab';
+      scheduleRedraw();
+      return;
+    }
 
     if (mode === 'axis-selecting') {
       if (!didDrag) {
@@ -482,6 +539,17 @@ export function setupInput(
     }
   }
 
+  function onKeyDown(e: KeyboardEvent) {
+    if (e.key === 'Escape' && dragMode === 'reordering') {
+      dragMode = 'none';
+      onReorderCancel();
+      reorderItem = null;
+      viewportAtDragStart = null;
+      canvas.style.cursor = 'grab';
+      scheduleRedraw();
+    }
+  }
+
   // Attach listeners
   canvas.addEventListener('wheel', onWheel, { passive: false });
   canvas.addEventListener('mousedown', onMouseDown);
@@ -490,6 +558,7 @@ export function setupInput(
   canvas.addEventListener('mouseleave', onMouseLeave);
   canvas.addEventListener('touchstart', onTouchStart, { passive: true });
   canvas.addEventListener('touchmove', onTouchMove, { passive: false });
+  window.addEventListener('keydown', onKeyDown);
 
   canvas.style.cursor = 'grab';
 
@@ -502,6 +571,7 @@ export function setupInput(
       canvas.removeEventListener('mouseleave', onMouseLeave);
       canvas.removeEventListener('touchstart', onTouchStart);
       canvas.removeEventListener('touchmove', onTouchMove);
+      window.removeEventListener('keydown', onKeyDown);
       tooltip.hide();
     },
   };

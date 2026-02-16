@@ -10,6 +10,7 @@ Persist the timeline's view state to `localStorage` so that the page restores it
 - **Selection** (start, end, anchor) or null
 - **Hidden events** (from event list panel toggles)
 - **Collapsed events** (from ctrl/cmd+click collapse)
+- **Event orders** (from drag-and-drop reordering, see Feature 09)
 
 ## Event Identification
 
@@ -30,6 +31,7 @@ interface SerializedState {
   selection: { start: number; end: number; anchor: number } | null;
   hiddenEventPaths: string[][];
   collapsedEventPaths: string[][];
+  eventOrders?: Record<string, string[]>;
 }
 ```
 

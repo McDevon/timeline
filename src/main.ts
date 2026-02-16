@@ -1,5 +1,5 @@
 import { loadEvents } from './data/loader';
-import { render, computeFullRange, LAYOUT, LayoutTransition } from './timeline/renderer';
+import { render, computeFullRange, LAYOUT, LayoutTransition, ReorderState } from './timeline/renderer';
 import { computeLayout, LayoutItem } from './timeline/layout';
 import { Viewport, zoomViewport } from './timeline/viewport';
 import { hitTest } from './timeline/hitTest';
@@ -8,6 +8,7 @@ import { setupInput } from './timeline/input';
 import { SnapState } from './timeline/snap';
 import { EventListPanel } from './ui/eventList';
 import { saveState, loadState } from './state';
+import { dateToDecimalYear } from './data/time';
 
 function setupCanvas(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
   const dpr = window.devicePixelRatio || 1;
@@ -29,26 +30,29 @@ async function main() {
 
   const events = await loadEvents('/events.json', '/events.example.json');
 
-  // Visibility and collapse state
+  // Visibility, collapse, and ordering state
   const hiddenEvents = new Set<TimelineEvent>();
   const collapsedEvents = new Set<TimelineEvent>();
+  const eventOrders = new Map<string, string[]>();
 
   // Restore saved state
   const saved = loadState(events);
   if (saved) {
     saved.hiddenEvents.forEach(e => hiddenEvents.add(e));
     saved.collapsedEvents.forEach(e => collapsedEvents.add(e));
+    for (const [k, v] of saved.eventOrders) eventOrders.set(k, v);
   }
 
   let layout: LayoutItem[] = computeLayout(
     events.filter(e => !hiddenEvents.has(e)),
     LAYOUT.eventsStartY,
     collapsedEvents,
+    eventOrders,
   );
 
   function relayout() {
     const visible = events.filter(e => !hiddenEvents.has(e));
-    layout = computeLayout(visible, LAYOUT.eventsStartY, collapsedEvents);
+    layout = computeLayout(visible, LAYOUT.eventsStartY, collapsedEvents, eventOrders);
   }
 
   // Initialize viewport — use saved or compute full range
@@ -150,7 +154,7 @@ async function main() {
 
     const ctx = setupCanvas(canvas);
     const rect = canvas.getBoundingClientRect();
-    render(ctx, rect.width, rect.height, layout, viewport, hoveredItem, selectedItem, cursorX, selection, snapState, transition);
+    render(ctx, rect.width, rect.height, layout, viewport, hoveredItem, selectedItem, cursorX, selection, snapState, transition, reorderState ?? undefined);
   }
 
   // Debounced state persistence
@@ -158,7 +162,7 @@ async function main() {
   function scheduleSave() {
     clearTimeout(saveTimer);
     saveTimer = window.setTimeout(() => {
-      saveState(viewport, selection, hiddenEvents, collapsedEvents, events);
+      saveState(viewport, selection, hiddenEvents, collapsedEvents, events, eventOrders);
     }, 500);
   }
 
@@ -230,6 +234,173 @@ async function main() {
     requestRedraw();
   }
 
+  // --- Reorder drag ---
+  let reorderState: ReorderState | null = null;
+  let reorderOriginalOrders: Map<string, string[]> | null = null;
+  let reorderLastIndex = -1;
+
+  /** Find the sibling list and parent path key for an event. */
+  function findSiblingInfo(event: TimelineEvent): { siblings: TimelineEvent[]; parentPath: string } {
+    const visibleRoot = events.filter(e => !hiddenEvents.has(e));
+    if (visibleRoot.includes(event)) {
+      return { siblings: visibleRoot, parentPath: '[]' };
+    }
+    function walk(list: TimelineEvent[], path: string[]): { siblings: TimelineEvent[]; parentPath: string } | null {
+      for (const e of list) {
+        if (e.nested && e.nested.includes(event)) {
+          return { siblings: e.nested, parentPath: JSON.stringify([...path, e.name]) };
+        }
+        if (e.nested) {
+          const found = walk(e.nested, [...path, e.name]);
+          if (found) return found;
+        }
+      }
+      return null;
+    }
+    return walk(events, []) ?? { siblings: [event], parentPath: '[]' };
+  }
+
+  /** Find layout items that are siblings of the given item. */
+  function findSiblingLayoutItems(item: LayoutItem): LayoutItem[] {
+    if (layout.some(l => l.event === item.event)) return layout;
+    function walkChildren(items: LayoutItem[]): LayoutItem[] | null {
+      for (const parent of items) {
+        if (parent.children.some(c => c.event === item.event)) return parent.children;
+        if (parent.children.length > 0) {
+          const found = walkChildren(parent.children);
+          if (found) return found;
+        }
+      }
+      return null;
+    }
+    return walkChildren(layout) ?? [item];
+  }
+
+  /** Find the parent layout item for a nested event. */
+  function findParentLayoutItem(event: TimelineEvent): LayoutItem | null {
+    function walk(items: LayoutItem[]): LayoutItem | null {
+      for (const item of items) {
+        if (item.children.some(c => c.event === event)) return item;
+        if (item.children.length > 0) {
+          const found = walk(item.children);
+          if (found) return found;
+        }
+      }
+      return null;
+    }
+    return walk(layout);
+  }
+
+  /** Compute drop index from cursor Y, grouping same-row siblings. */
+  function computeDropIndex(draggedItem: LayoutItem, cursorY: number): number {
+    const others = findSiblingLayoutItems(draggedItem)
+      .filter(s => s.event !== draggedItem.event)
+      .sort((a, b) => a.y - b.y);
+    if (others.length === 0) return 0;
+
+    // Group into rows (items at the same Y ± 1px)
+    const rows: LayoutItem[][] = [];
+    for (const item of others) {
+      const lastRow = rows[rows.length - 1];
+      if (!lastRow || Math.abs(item.y - lastRow[0].y) > 1) {
+        rows.push([item]);
+      } else {
+        lastRow.push(item);
+      }
+    }
+
+    // Count items in rows whose midpoint is above the cursor
+    let count = 0;
+    for (const row of rows) {
+      const maxBottom = Math.max(...row.map(r => r.y + r.height));
+      const midY = (row[0].y + maxBottom) / 2;
+      if (cursorY >= midY) {
+        count += row.length;
+      } else {
+        break;
+      }
+    }
+    return count;
+  }
+
+  function onReorderMove(item: LayoutItem, cursorY: number) {
+    // Save original orders for cancel on first move
+    if (!reorderOriginalOrders) {
+      reorderOriginalOrders = new Map(eventOrders);
+    }
+
+    const { siblings, parentPath } = findSiblingInfo(item.event);
+
+    // Clamp ghostY to parent bounds for nested events
+    let ghostY = cursorY;
+    if (parentPath !== '[]') {
+      const parentItem = findParentLayoutItem(item.event);
+      if (parentItem) {
+        const minY = parentItem.y + 30; // containerHeaderHeight + padding
+        const maxY = parentItem.y + parentItem.height - 6;
+        ghostY = Math.max(minY, Math.min(maxY, cursorY));
+      }
+    }
+
+    reorderState = { draggedEvent: item.event, ghostY };
+
+    // Initialize order for this level if needed
+    if (!eventOrders.has(parentPath)) {
+      const defaultOrder = [...siblings]
+        .sort((a, b) => dateToDecimalYear(a.start) - dateToDecimalYear(b.start))
+        .map(e => e.name);
+      eventOrders.set(parentPath, defaultOrder);
+    }
+
+    const dropIndex = computeDropIndex(item, ghostY);
+    if (dropIndex !== reorderLastIndex) {
+      reorderLastIndex = dropIndex;
+
+      // Rebuild order from current visual positions
+      const siblingItems = findSiblingLayoutItems(item);
+      const visualOrder = [...siblingItems]
+        .filter(s => s.event !== item.event)
+        .sort((a, b) => a.y - b.y || a.startYear - b.startYear)
+        .map(s => s.event.name);
+
+      // Insert dragged item at the computed row-group position
+      visualOrder.splice(dropIndex, 0, item.event.name);
+
+      // Preserve names from old order not in current layout (hidden events)
+      const oldOrder = eventOrders.get(parentPath);
+      if (oldOrder) {
+        for (const name of oldOrder) {
+          if (!visualOrder.includes(name)) {
+            visualOrder.push(name);
+          }
+        }
+      }
+
+      eventOrders.set(parentPath, visualOrder);
+      relayout();
+    }
+    requestRedraw();
+  }
+
+  function onReorderEnd(_item: LayoutItem) {
+    reorderState = null;
+    reorderOriginalOrders = null;
+    reorderLastIndex = -1;
+    requestRedraw();
+  }
+
+  function onReorderCancel() {
+    if (reorderOriginalOrders) {
+      eventOrders.clear();
+      for (const [k, v] of reorderOriginalOrders) eventOrders.set(k, v);
+      reorderOriginalOrders = null;
+    }
+    reorderState = null;
+    reorderLastIndex = -1;
+    relayout();
+    requestRedraw();
+  }
+
   // Wire up input
   setupInput(
     canvas,
@@ -252,6 +423,9 @@ async function main() {
     (sel: TimelineSelection | null) => { selection = sel; },
     (state: SnapState) => { snapState = state; },
     onCollapseToggle,
+    onReorderMove,
+    onReorderEnd,
+    onReorderCancel,
     requestRedraw,
   );
 

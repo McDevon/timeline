@@ -21,6 +21,11 @@ export interface LayoutTransition {
   progress: number; // 0–1, already eased
 }
 
+export interface ReorderState {
+  draggedEvent: TimelineEvent;
+  ghostY: number;
+}
+
 const COLORS = {
   background: "#1a1a2e",
   axis: "#e0e0e0",
@@ -710,6 +715,9 @@ function drawPointEvent(
   ctx.stroke();
 }
 
+// Module-level state set during render() so nested drawing can detect the dragged event
+let currentDraggedEvent: TimelineEvent | null = null;
+
 function drawLayoutItem(
   ctx: CanvasRenderingContext2D,
   item: LayoutItem,
@@ -720,6 +728,13 @@ function drawLayoutItem(
   snapHighlightYears: Set<number>,
 ) {
   if (!isVisible(item.startYear, item.endYear, viewport)) return;
+
+  // During reorder: draw dragged item (including nested) at reduced alpha
+  const isDragged = currentDraggedEvent !== null && item.event === currentDraggedEvent;
+  if (isDragged) {
+    ctx.save();
+    ctx.globalAlpha = 0.3;
+  }
 
   if (item.isContainer) {
     drawContainer(
@@ -753,6 +768,22 @@ function drawLayoutItem(
       drawBar(ctx, item, viewport, canvasWidth, isHovered, isSelected, isSnap);
     }
   }
+
+  if (isDragged) {
+    ctx.restore();
+  }
+}
+
+/** Find a layout item by event reference, searching recursively through children. */
+function findLayoutItemByEvent(event: TimelineEvent, items: LayoutItem[]): LayoutItem | null {
+  for (const item of items) {
+    if (item.event === event) return item;
+    if (item.children.length > 0) {
+      const found = findLayoutItemByEvent(event, item.children);
+      if (found) return found;
+    }
+  }
+  return null;
 }
 
 export function render(
@@ -767,6 +798,7 @@ export function render(
   selection: TimelineSelection | null,
   snapState: SnapState,
   transition?: LayoutTransition,
+  reorderState?: ReorderState,
 ) {
   ctx.fillStyle = COLORS.background;
   ctx.fillRect(0, 0, canvasWidth, canvasHeight);
@@ -784,6 +816,9 @@ export function render(
     ctx.restore();
   }
 
+  // Set module-level drag state so nested drawLayoutItem calls can dim the dragged item
+  currentDraggedEvent = reorderState?.draggedEvent ?? null;
+
   // Draw current layout items with Y offsets and fade-in during transition
   for (const item of layout) {
     const offset = transition?.yOffsets.get(item.event);
@@ -799,6 +834,22 @@ export function render(
       drawLayoutItem(ctx, item, viewport, canvasWidth, hoveredItem, selectedItem, snapState.highlightYears);
     }
   }
+
+  // Draw reorder ghost on top of everything else
+  if (reorderState) {
+    const draggedItem = findLayoutItemByEvent(reorderState.draggedEvent, layout);
+    if (draggedItem) {
+      const offsetY = reorderState.ghostY - draggedItem.y - draggedItem.height / 2;
+      currentDraggedEvent = null; // don't dim inside the ghost
+      ctx.save();
+      ctx.globalAlpha = 0.7;
+      ctx.translate(0, offsetY);
+      drawLayoutItem(ctx, draggedItem, viewport, canvasWidth, draggedItem, null, snapState.highlightYears);
+      ctx.restore();
+    }
+  }
+
+  currentDraggedEvent = null;
 
   drawTodayLine(ctx, viewport, canvasWidth, canvasHeight);
   drawSelectionForeground(
