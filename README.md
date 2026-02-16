@@ -1,6 +1,6 @@
 # Timeline
 
-Timeline is a tool to visualise historical timeframes and events.
+Timeline is a tool to visualise historical timeframes and events, and their relations. Events can be added and customised for different needs, for example learning history, investigating timeframes, timelines of family tree, etc.
 
 ![Example timeline](example.png)
 
@@ -12,7 +12,7 @@ Current features include
 
 - Zoomable and scrollable timeline
 - Use static file for event data
-- Point events, ranged events, and events with not certain beginnning or end dates
+- Point events, ranged events, and events with no certain beginnning or end dates
 - Ongoing events with no known end date
 - Additional event info shown in a tooltip bubble
 - Nested structure for organising events
