@@ -7,6 +7,7 @@ import { TimelineEvent, TimelineSelection } from './types';
 import { setupInput } from './timeline/input';
 import { SnapState } from './timeline/snap';
 import { EventListPanel } from './ui/eventList';
+import { saveState, loadState } from './state';
 
 function setupCanvas(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
   const dpr = window.devicePixelRatio || 1;
@@ -28,17 +29,30 @@ async function main() {
 
   const events = await loadEvents('/events.json', '/events.example.json');
 
-  // Visibility state and dynamic layout
+  // Visibility and collapse state
   const hiddenEvents = new Set<TimelineEvent>();
-  let layout: LayoutItem[] = computeLayout(events, LAYOUT.eventsStartY);
+  const collapsedEvents = new Set<TimelineEvent>();
+
+  // Restore saved state
+  const saved = loadState(events);
+  if (saved) {
+    saved.hiddenEvents.forEach(e => hiddenEvents.add(e));
+    saved.collapsedEvents.forEach(e => collapsedEvents.add(e));
+  }
+
+  let layout: LayoutItem[] = computeLayout(
+    events.filter(e => !hiddenEvents.has(e)),
+    LAYOUT.eventsStartY,
+    collapsedEvents,
+  );
 
   function relayout() {
     const visible = events.filter(e => !hiddenEvents.has(e));
-    layout = computeLayout(visible, LAYOUT.eventsStartY);
+    layout = computeLayout(visible, LAYOUT.eventsStartY, collapsedEvents);
   }
 
-  // Initialize viewport to show full data range
-  let viewport: Viewport = computeFullRange(events);
+  // Initialize viewport — use saved or compute full range
+  let viewport: Viewport = saved?.viewport ?? computeFullRange(events);
   let hoveredItem: LayoutItem | null = null;
   let eventListPanel: EventListPanel | null = null;
 
@@ -66,7 +80,7 @@ async function main() {
   }
   let selectedItem: LayoutItem | null = null;
   let cursorX = -1;
-  let selection: TimelineSelection | null = null;
+  let selection: TimelineSelection | null = saved?.selection ?? null;
   let snapState: SnapState = { highlightYears: new Set(), cursorDetail: null, selStartDetail: null, selEndDetail: null };
   let dblClickPrevViewport: Viewport | null = null;
   let dblClickItem: LayoutItem | null = null;
@@ -139,16 +153,80 @@ async function main() {
     render(ctx, rect.width, rect.height, layout, viewport, hoveredItem, selectedItem, cursorX, selection, snapState, transition);
   }
 
+  // Debounced state persistence
+  let saveTimer = 0;
+  function scheduleSave() {
+    clearTimeout(saveTimer);
+    saveTimer = window.setTimeout(() => {
+      saveState(viewport, selection, hiddenEvents, collapsedEvents, events);
+    }, 500);
+  }
+
   function requestRedraw() {
     if (rafId === 0) {
       rafId = requestAnimationFrame(draw);
     }
+    scheduleSave();
   }
 
   function animateZoom(target: Viewport) {
     animFrom = { ...viewport };
     animTo = target;
     animStartTime = performance.now();
+    requestRedraw();
+  }
+
+  // Collapse toggle handler
+  function onCollapseToggle(event: TimelineEvent) {
+    const oldPositions = new Map<TimelineEvent, number>();
+    for (const item of layout) oldPositions.set(item.event, item.y);
+
+    const fadingOut: LayoutItem[] = [];
+    const fadingIn = new Set<TimelineEvent>();
+    const wasCollapsed = collapsedEvents.has(event);
+
+    if (!wasCollapsed) {
+      // Collapsing — capture children for fade-out
+      const container = layout.find(item => item.event === event);
+      if (container) {
+        for (const child of container.children) fadingOut.push(child);
+      }
+      collapsedEvents.add(event);
+    } else {
+      collapsedEvents.delete(event);
+    }
+
+    relayout();
+
+    // Compute Y offsets for animated items
+    const yOffsets = new Map<TimelineEvent, number>();
+    for (const item of layout) {
+      const oldY = oldPositions.get(item.event);
+      if (oldY !== undefined && oldY !== item.y) {
+        yOffsets.set(item.event, oldY - item.y);
+      }
+    }
+
+    // Mark newly visible children as fading in
+    if (wasCollapsed) {
+      const container = layout.find(item => item.event === event);
+      if (container) {
+        for (const child of container.children) fadingIn.add(child.event);
+      }
+    }
+
+    layoutTransition = { startTime: performance.now(), fadingOut, yOffsets, fadingIn };
+
+    // Clear state referencing now-hidden children
+    if (!wasCollapsed) {
+      if (hoveredItem && hoveredItem.event !== event && isDescendantOf(hoveredItem, event)) {
+        setHoveredItem(null);
+      }
+      if (selectedItem && selectedItem.event !== event && isDescendantOf(selectedItem, event)) {
+        selectedItem = null;
+      }
+    }
+
     requestRedraw();
   }
 
@@ -173,6 +251,7 @@ async function main() {
     () => selection,
     (sel: TimelineSelection | null) => { selection = sel; },
     (state: SnapState) => { snapState = state; },
+    onCollapseToggle,
     requestRedraw,
   );
 
@@ -293,7 +372,7 @@ async function main() {
     requestRedraw();
   }
 
-  eventListPanel = new EventListPanel(events, onToggleEvent, onHoverEvent);
+  eventListPanel = new EventListPanel(events, onToggleEvent, onHoverEvent, hiddenEvents);
 
   // Initial draw and resize handler
   draw();

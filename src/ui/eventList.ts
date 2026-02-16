@@ -10,6 +10,7 @@ export class EventListPanel {
     events: TimelineEvent[],
     onToggle: (event: TimelineEvent, visible: boolean) => void,
     onHover: (event: TimelineEvent | null) => void,
+    hiddenEvents?: Set<TimelineEvent>,
   ) {
     this.el = document.createElement('div');
     this.el.className = 'event-list-panel collapsed';
@@ -56,7 +57,8 @@ export class EventListPanel {
       row.appendChild(check);
       row.appendChild(info);
 
-      let visible = true;
+      let visible = !hiddenEvents?.has(event);
+      if (!visible) row.classList.add('hidden');
       row.addEventListener('click', () => {
         visible = !visible;
         row.classList.toggle('hidden', !visible);

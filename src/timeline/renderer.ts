@@ -483,34 +483,53 @@ function drawContainer(
 
   applyGradient(ctx, item, viewport, canvasWidth, x1, boxWidth, fillColor, strokeColor, lineWidth);
 
-  // Container label at top
-  ctx.fillStyle = COLORS.containerText;
-  ctx.font = `${LAYOUT.fontSize}px sans-serif`;
-  ctx.textBaseline = "middle";
-  ctx.textAlign = "left";
+  if (item.isCollapsed) {
+    // Collapsed: small font, vertically centered label, no children
+    ctx.fillStyle = COLORS.containerText;
+    ctx.font = `${LAYOUT.smallFontSize}px sans-serif`;
+    ctx.textBaseline = "middle";
+    ctx.textAlign = "left";
 
-  const labelY = item.y + 12;
-  const labelX = item.approxStartRange
-    ? Math.max(x1 + 8, yearToX(item.approxStartRange[1], viewport, canvasWidth) + 8)
-    : x1 + 8;
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(x1, item.y, boxWidth, item.height);
-  ctx.clip();
-  ctx.fillText(item.event.name, labelX, labelY);
-  ctx.restore();
+    const labelY = item.y + item.height / 2;
+    const labelX = item.approxStartRange
+      ? Math.max(x1 + 6, yearToX(item.approxStartRange[1], viewport, canvasWidth) + 6)
+      : x1 + 6;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x1, item.y, boxWidth, item.height);
+    ctx.clip();
+    ctx.fillText(item.event.name, labelX, labelY);
+    ctx.restore();
+  } else {
+    // Container label at top
+    ctx.fillStyle = COLORS.containerText;
+    ctx.font = `${LAYOUT.fontSize}px sans-serif`;
+    ctx.textBaseline = "middle";
+    ctx.textAlign = "left";
 
-  // Draw children
-  for (const child of item.children) {
-    drawLayoutItem(
-      ctx,
-      child,
-      viewport,
-      canvasWidth,
-      hoveredItem,
-      selectedItem,
-      snapHighlightYears,
-    );
+    const labelY = item.y + 12;
+    const labelX = item.approxStartRange
+      ? Math.max(x1 + 8, yearToX(item.approxStartRange[1], viewport, canvasWidth) + 8)
+      : x1 + 8;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x1, item.y, boxWidth, item.height);
+    ctx.clip();
+    ctx.fillText(item.event.name, labelX, labelY);
+    ctx.restore();
+
+    // Draw children
+    for (const child of item.children) {
+      drawLayoutItem(
+        ctx,
+        child,
+        viewport,
+        canvasWidth,
+        hoveredItem,
+        selectedItem,
+        snapHighlightYears,
+      );
+    }
   }
 }
 

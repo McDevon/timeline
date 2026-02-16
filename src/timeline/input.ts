@@ -28,6 +28,7 @@ export function setupInput(
   getSelection: () => TimelineSelection | null,
   setSelection: (sel: TimelineSelection | null) => void,
   setSnapState: (state: SnapState) => void,
+  onCollapseToggle: (event: import('../types').TimelineEvent) => void,
   requestRedraw: () => void,
 ): InputHandlers {
   const tooltip = new Tooltip();
@@ -379,6 +380,19 @@ export function setupInput(
       const layout = getLayout();
       const viewport = getViewport();
       const hit = hitTest(x, y, layout, viewport, canvas.clientWidth);
+
+      // Ctrl/Cmd+click on a container toggles collapse
+      if (modifierHeld && hit && hit.isContainer) {
+        onCollapseToggle(hit.event);
+        // Restore cursor and hover after collapse
+        cursorCanvasX = x;
+        cursorCanvasY = y;
+        updateCursorLine(cursorCanvasX, cursorCanvasY);
+        updateHover();
+        canvas.style.cursor = getHovered() ? 'pointer' : 'grab';
+        scheduleRedraw();
+        return;
+      }
 
       if (hit) {
         setSelected(hit);

@@ -4,6 +4,7 @@ import { dateToDecimalYear, todayDecimalYear } from '../data/time';
 const LAYOUT = {
   parentBarHeight: 30,
   childBarHeight: 22,
+  collapsedBarHeight: 20,
   rowGap: 4,
   containerPadding: 6,
   containerHeaderHeight: 24,
@@ -21,6 +22,7 @@ export interface LayoutItem {
   y: number;
   height: number;
   isContainer: boolean;
+  isCollapsed: boolean;
   isPoint: boolean;
   children: LayoutItem[];
 }
@@ -37,6 +39,7 @@ interface PlacedItem {
   relativeY: number;
   height: number;
   isContainer: boolean;
+  isCollapsed: boolean;
   isPoint: boolean;
   placedChildren: PlacedItem[];
 }
@@ -80,6 +83,7 @@ function placeLevel(
   events: TimelineEvent[],
   barHeight: number,
   gap: number,
+  collapsedEvents?: Set<TimelineEvent>,
 ): { items: PlacedItem[]; totalHeight: number } {
   // Phase 1: compute heights (recursively for containers)
   const sized = events.map(event => {
@@ -134,13 +138,26 @@ function placeLevel(
         ...base,
         height: barHeight,
         isContainer: false,
+        isCollapsed: false,
         isPoint,
         placedChildren: [] as PlacedItem[],
       };
     }
 
+    // Collapsed container: thin bar, no children
+    if (collapsedEvents?.has(event)) {
+      return {
+        ...base,
+        height: LAYOUT.collapsedBarHeight,
+        isContainer: true,
+        isCollapsed: true,
+        isPoint: false,
+        placedChildren: [] as PlacedItem[],
+      };
+    }
+
     const { items: placedChildren, totalHeight: contentHeight } =
-      placeLevel(event.nested, LAYOUT.childBarHeight, LAYOUT.rowGap);
+      placeLevel(event.nested, LAYOUT.childBarHeight, LAYOUT.rowGap, collapsedEvents);
 
     const height =
       LAYOUT.containerHeaderHeight +
@@ -152,6 +169,7 @@ function placeLevel(
       ...base,
       height,
       isContainer: true,
+      isCollapsed: false,
       isPoint: false,
       placedChildren,
     };
@@ -185,6 +203,7 @@ function placeLevel(
       relativeY: y,
       height: item.height,
       isContainer: item.isContainer,
+      isCollapsed: item.isCollapsed,
       isPoint: item.isPoint,
       placedChildren: item.placedChildren,
     };
@@ -223,7 +242,18 @@ function toLayoutItems(placed: PlacedItem[], offsetY: number): LayoutItem[] {
       return {
         ...base,
         isContainer: false,
+        isCollapsed: false,
         isPoint: item.isPoint,
+        children: [],
+      };
+    }
+
+    if (item.isCollapsed) {
+      return {
+        ...base,
+        isContainer: true,
+        isCollapsed: true,
+        isPoint: false,
         children: [],
       };
     }
@@ -234,6 +264,7 @@ function toLayoutItems(placed: PlacedItem[], offsetY: number): LayoutItem[] {
     return {
       ...base,
       isContainer: true,
+      isCollapsed: false,
       isPoint: false,
       children,
     };
@@ -243,7 +274,11 @@ function toLayoutItems(placed: PlacedItem[], offsetY: number): LayoutItem[] {
 /**
  * Recursively compute layout for a list of events starting at a given Y offset.
  */
-export function computeLayout(events: TimelineEvent[], startY: number): LayoutItem[] {
-  const { items } = placeLevel(events, LAYOUT.parentBarHeight, LAYOUT.itemGap);
+export function computeLayout(
+  events: TimelineEvent[],
+  startY: number,
+  collapsedEvents?: Set<TimelineEvent>,
+): LayoutItem[] {
+  const { items } = placeLevel(events, LAYOUT.parentBarHeight, LAYOUT.itemGap, collapsedEvents);
   return toLayoutItems(items, startY);
 }
