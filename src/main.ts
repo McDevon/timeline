@@ -61,15 +61,15 @@ async function main() {
   }
 
   let layout: LayoutItem[] = computeLayout(
-    events.filter(e => !hiddenEvents.has(e)),
+    events,
     LAYOUT.eventsStartY,
     collapsedEvents,
     eventOrders,
+    hiddenEvents,
   );
 
   function relayout() {
-    const visible = events.filter(e => !hiddenEvents.has(e));
-    layout = computeLayout(visible, LAYOUT.eventsStartY, collapsedEvents, eventOrders);
+    layout = computeLayout(events, LAYOUT.eventsStartY, collapsedEvents, eventOrders, hiddenEvents);
   }
 
   // Initialize viewport — use saved or compute full range
@@ -77,18 +77,12 @@ async function main() {
   let hoveredItem: LayoutItem | null = null;
   let eventListPanel: EventListPanel | null = null;
 
-  function findTopLevelEvent(item: LayoutItem): TimelineEvent | null {
-    for (const evt of events) {
-      if (evt === item.event) return evt;
-      if (evt.nested) {
-        const found = (function walk(nested: TimelineEvent[]): boolean {
-          for (const child of nested) {
-            if (child === item.event) return true;
-            if (child.nested && walk(child.nested)) return true;
-          }
-          return false;
-        })(evt.nested);
-        if (found) return evt;
+  function findLayoutItem(event: TimelineEvent, items: LayoutItem[]): LayoutItem | null {
+    for (const item of items) {
+      if (item.event === event) return item;
+      if (item.children.length > 0) {
+        const found = findLayoutItem(event, item.children);
+        if (found) return found;
       }
     }
     return null;
@@ -96,8 +90,7 @@ async function main() {
 
   function setHoveredItem(item: LayoutItem | null) {
     hoveredItem = item;
-    const topEvent = item ? findTopLevelEvent(item) : null;
-    eventListPanel?.highlightEvent(topEvent);
+    eventListPanel?.highlightEvent(item?.event ?? null);
   }
   let selectedItem: LayoutItem | null = null;
   let cursorX = -1;
@@ -197,10 +190,28 @@ async function main() {
     requestRedraw();
   }
 
+  // Recursive position capture helper
+  function capturePositions(items: LayoutItem[], map: Map<TimelineEvent, number>) {
+    for (const item of items) {
+      map.set(item.event, item.y);
+      if (item.children.length > 0) capturePositions(item.children, map);
+    }
+  }
+
+  function computeOffsets(items: LayoutItem[], oldPositions: Map<TimelineEvent, number>, yOffsets: Map<TimelineEvent, number>) {
+    for (const item of items) {
+      const oldY = oldPositions.get(item.event);
+      if (oldY !== undefined && oldY !== item.y) {
+        yOffsets.set(item.event, oldY - item.y);
+      }
+      if (item.children.length > 0) computeOffsets(item.children, oldPositions, yOffsets);
+    }
+  }
+
   // Collapse toggle handler
   function onCollapseToggle(event: TimelineEvent) {
     const oldPositions = new Map<TimelineEvent, number>();
-    for (const item of layout) oldPositions.set(item.event, item.y);
+    capturePositions(layout, oldPositions);
 
     const fadingOut: LayoutItem[] = [];
     const fadingIn = new Set<TimelineEvent>();
@@ -208,7 +219,7 @@ async function main() {
 
     if (!wasCollapsed) {
       // Collapsing — capture children for fade-out
-      const container = layout.find(item => item.event === event);
+      const container = findLayoutItem(event, layout);
       if (container) {
         for (const child of container.children) fadingOut.push(child);
       }
@@ -221,16 +232,11 @@ async function main() {
 
     // Compute Y offsets for animated items
     const yOffsets = new Map<TimelineEvent, number>();
-    for (const item of layout) {
-      const oldY = oldPositions.get(item.event);
-      if (oldY !== undefined && oldY !== item.y) {
-        yOffsets.set(item.event, oldY - item.y);
-      }
-    }
+    computeOffsets(layout, oldPositions, yOffsets);
 
     // Mark newly visible children as fading in
     if (wasCollapsed) {
-      const container = layout.find(item => item.event === event);
+      const container = findLayoutItem(event, layout);
       if (container) {
         for (const child of container.children) fadingIn.add(child.event);
       }
@@ -562,12 +568,12 @@ async function main() {
   function onToggleEvent(event: TimelineEvent, visible: boolean) {
     // Capture old Y positions
     const oldPositions = new Map<TimelineEvent, number>();
-    for (const item of layout) oldPositions.set(item.event, item.y);
+    capturePositions(layout, oldPositions);
 
     // Capture items about to be hidden
     const fadingOut: LayoutItem[] = [];
     if (!visible) {
-      const hiding = layout.find(item => item.event === event);
+      const hiding = findLayoutItem(event, layout);
       if (hiding) fadingOut.push(hiding);
     }
 
@@ -578,12 +584,7 @@ async function main() {
 
     // Compute Y offsets for items that moved
     const yOffsets = new Map<TimelineEvent, number>();
-    for (const item of layout) {
-      const oldY = oldPositions.get(item.event);
-      if (oldY !== undefined && oldY !== item.y) {
-        yOffsets.set(item.event, oldY - item.y);
-      }
-    }
+    computeOffsets(layout, oldPositions, yOffsets);
 
     // Items fading in
     const fadingIn = new Set<TimelineEvent>();
@@ -609,7 +610,7 @@ async function main() {
     if (event === null) {
       setHoveredItem(null);
     } else {
-      setHoveredItem(layout.find(item => item.event === event) ?? null);
+      setHoveredItem(findLayoutItem(event, layout));
     }
     requestRedraw();
   }

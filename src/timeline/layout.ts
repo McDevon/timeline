@@ -129,9 +129,15 @@ function placeLevel(
   collapsedEvents?: Set<TimelineEvent>,
   eventOrders?: EventOrderMap,
   parentPath?: string[],
+  hiddenEvents?: Set<TimelineEvent>,
 ): { items: PlacedItem[]; totalHeight: number } {
+  // Filter out hidden events at this level
+  const visibleEvents = hiddenEvents
+    ? events.filter(e => !hiddenEvents.has(e))
+    : events;
+
   // Phase 1: compute heights (recursively for containers)
-  const sized = events.map(event => {
+  const sized = visibleEvents.map(event => {
     const nominalStart = dateToDecimalYear(event.start);
     const isOngoing = event.end === 'ongoing';
     const nominalEnd = isOngoing
@@ -203,7 +209,7 @@ function placeLevel(
 
     const childPath = [...(parentPath ?? []), event.name];
     const { items: placedChildren, totalHeight: contentHeight } =
-      placeLevel(event.nested, LAYOUT.childBarHeight, LAYOUT.rowGap, collapsedEvents, eventOrders, childPath);
+      placeLevel(event.nested, LAYOUT.childBarHeight, LAYOUT.rowGap, collapsedEvents, eventOrders, childPath, hiddenEvents);
 
     const height =
       LAYOUT.containerHeaderHeight +
@@ -334,7 +340,8 @@ export function computeLayout(
   startY: number,
   collapsedEvents?: Set<TimelineEvent>,
   eventOrders?: EventOrderMap,
+  hiddenEvents?: Set<TimelineEvent>,
 ): LayoutItem[] {
-  const { items } = placeLevel(events, LAYOUT.parentBarHeight, LAYOUT.itemGap, collapsedEvents, eventOrders, []);
+  const { items } = placeLevel(events, LAYOUT.parentBarHeight, LAYOUT.itemGap, collapsedEvents, eventOrders, [], hiddenEvents);
   return toLayoutItems(items, startY);
 }

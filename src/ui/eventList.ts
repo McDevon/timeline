@@ -4,6 +4,8 @@ import { formatDate } from '../data/time';
 export class EventListPanel {
   private el: HTMLDivElement;
   private rowMap = new Map<TimelineEvent, HTMLDivElement>();
+  private childrenMap = new Map<TimelineEvent, HTMLDivElement>();
+  private expandedEvents = new Set<TimelineEvent>();
   private highlightedRow: HTMLDivElement | null = null;
 
   constructor(
@@ -32,9 +34,7 @@ export class EventListPanel {
     const sorted = [...events].sort((a, b) => this.parseYear(a.start) - this.parseYear(b.start));
 
     for (const event of sorted) {
-      const hidden = hiddenEvents?.has(event) ?? false;
-      const row = this.createRow(event, onToggle, onHover, hidden);
-      body.appendChild(row);
+      body.appendChild(this.createItem(event, onToggle, onHover, hiddenEvents, 0));
     }
 
     this.el.appendChild(body);
@@ -50,20 +50,21 @@ export class EventListPanel {
     if (!body) return;
 
     for (const event of newEvents) {
-      const row = this.createRow(event, onToggle, onHover, false);
+      const item = this.createItem(event, onToggle, onHover, undefined, 0);
       const eventYear = this.parseYear(event.start);
 
       // Insert in sorted position
       let inserted = false;
-      for (const child of Array.from(body.children) as HTMLDivElement[]) {
-        if (parseFloat(child.dataset.startYear ?? '0') > eventYear) {
-          body.insertBefore(row, child);
+      for (const child of Array.from(body.children) as HTMLElement[]) {
+        const childYear = parseFloat(child.dataset.startYear ?? '0');
+        if (childYear > eventYear) {
+          body.insertBefore(item, child);
           inserted = true;
           break;
         }
       }
       if (!inserted) {
-        body.appendChild(row);
+        body.appendChild(item);
       }
     }
   }
@@ -72,6 +73,8 @@ export class EventListPanel {
     const body = this.el.querySelector('.event-list-body');
     if (body) body.innerHTML = '';
     this.rowMap.clear();
+    this.childrenMap.clear();
+    this.expandedEvents.clear();
     this.highlightedRow = null;
   }
 
@@ -89,48 +92,128 @@ export class EventListPanel {
     }
   }
 
-  private createRow(
+  private createItem(
     event: TimelineEvent,
     onToggle: (event: TimelineEvent, visible: boolean) => void,
     onHover: (event: TimelineEvent | null) => void,
-    hidden: boolean,
+    hiddenEvents: Set<TimelineEvent> | undefined,
+    depth: number,
   ): HTMLDivElement {
+    const item = document.createElement('div');
+    item.className = 'event-list-item';
+    item.dataset.startYear = String(this.parseYear(event.start));
+
     const row = document.createElement('div');
     row.className = 'event-list-row';
-    row.dataset.startYear = String(this.parseYear(event.start));
+    row.style.paddingLeft = `${10 + depth * 16}px`;
+    if (depth > 0) {
+      row.style.background = `rgba(255,255,255,${depth * 0.02})`;
+    }
 
+    const hasChildren = event.nested !== undefined && event.nested.length > 0;
+
+    // Arrow (left)
+    const arrow = document.createElement('div');
+    arrow.className = 'event-list-arrow' + (hasChildren ? '' : ' placeholder');
+    arrow.textContent = '\u25B6';
+
+    // Info (center, flex:1)
+    const info = document.createElement('div');
+    info.className = 'event-list-info';
+    const name = document.createElement('div');
+    name.className = 'event-list-name';
+    name.textContent = event.name;
+    const dates = document.createElement('div');
+    dates.className = 'event-list-dates';
+    dates.textContent = this.formatEventDates(event);
+    info.appendChild(name);
+    info.appendChild(dates);
+
+    // Checkbox (right)
     const check = document.createElement('div');
     check.className = 'event-list-check';
     check.textContent = '\u2713';
 
-    const info = document.createElement('div');
-    info.className = 'event-list-info';
-
-    const name = document.createElement('div');
-    name.className = 'event-list-name';
-    name.textContent = event.name;
-
-    const dates = document.createElement('div');
-    dates.className = 'event-list-dates';
-    dates.textContent = this.formatEventDates(event);
-
-    info.appendChild(name);
-    info.appendChild(dates);
-    row.appendChild(check);
+    row.appendChild(arrow);
     row.appendChild(info);
+    row.appendChild(check);
+    item.appendChild(row);
 
-    let visible = !hidden;
+    // Visibility state
+    let visible = !(hiddenEvents?.has(event) ?? false);
     if (!visible) row.classList.add('hidden');
-    row.addEventListener('click', () => {
+
+    // Checkbox click → toggle canvas visibility
+    check.addEventListener('click', (e) => {
+      e.stopPropagation();
       visible = !visible;
       row.classList.toggle('hidden', !visible);
       onToggle(event, visible);
     });
+
+    // Hover sync
     row.addEventListener('mouseenter', () => { onHover(event); });
     row.addEventListener('mouseleave', () => { onHover(null); });
 
     this.rowMap.set(event, row);
-    return row;
+
+    // Children container
+    if (hasChildren) {
+      const childrenContainer = document.createElement('div');
+      childrenContainer.className = 'event-list-children';
+      childrenContainer.style.maxHeight = '0';
+
+      const sortedChildren = [...event.nested!].sort(
+        (a, b) => this.parseYear(a.start) - this.parseYear(b.start),
+      );
+      for (const child of sortedChildren) {
+        childrenContainer.appendChild(
+          this.createItem(child, onToggle, onHover, hiddenEvents, depth + 1),
+        );
+      }
+
+      item.appendChild(childrenContainer);
+      this.childrenMap.set(event, childrenContainer);
+
+      // Arrow click → expand/collapse children in list
+      arrow.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.toggleExpand(event, arrow, childrenContainer);
+      });
+    }
+
+    return item;
+  }
+
+  private toggleExpand(
+    event: TimelineEvent,
+    arrow: HTMLDivElement,
+    container: HTMLDivElement,
+  ): void {
+    const isExpanded = this.expandedEvents.has(event);
+
+    if (isExpanded) {
+      // Collapse: animate from scrollHeight to 0
+      this.expandedEvents.delete(event);
+      arrow.classList.remove('expanded');
+      container.style.maxHeight = container.scrollHeight + 'px';
+      // Force reflow so the browser registers the starting value
+      void container.offsetHeight;
+      container.style.maxHeight = '0';
+    } else {
+      // Expand: animate from 0 to scrollHeight, then set to 'none'
+      this.expandedEvents.add(event);
+      arrow.classList.add('expanded');
+      container.style.maxHeight = container.scrollHeight + 'px';
+
+      const onEnd = () => {
+        container.removeEventListener('transitionend', onEnd);
+        if (this.expandedEvents.has(event)) {
+          container.style.maxHeight = 'none';
+        }
+      };
+      container.addEventListener('transitionend', onEnd);
+    }
   }
 
   private formatEventDates(event: TimelineEvent): string {
