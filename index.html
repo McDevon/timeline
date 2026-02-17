@@ -242,6 +242,128 @@
     .drop-overlay.visible {
       opacity: 1;
     }
+    .timeline-menu {
+      position: fixed;
+      bottom: 20px;
+      left: 288px;
+      width: 200px;
+      background: #16213e;
+      border: 1px solid #533483;
+      border-radius: 6px;
+      color: #e0e0e0;
+      font-family: sans-serif;
+      font-size: 13px;
+      z-index: 50;
+      overflow: hidden;
+    }
+    .timeline-menu-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 10px;
+      cursor: pointer;
+      user-select: none;
+      border-bottom: 1px solid #533483;
+    }
+    .timeline-menu-header:hover {
+      background: #1a3a5c;
+    }
+    .timeline-menu-title {
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    .timeline-menu-chevron {
+      font-size: 14px;
+      transition: transform 0.2s ease;
+    }
+    .timeline-menu.collapsed .timeline-menu-chevron {
+      transform: rotate(180deg);
+    }
+    .timeline-menu.collapsed .timeline-menu-header {
+      border-bottom: none;
+    }
+    .timeline-menu-body {
+      transition: max-height 0.2s ease;
+    }
+    .timeline-menu.collapsed .timeline-menu-body {
+      max-height: 0;
+      overflow: hidden;
+    }
+    .timeline-menu-btn {
+      padding: 8px 10px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .timeline-menu-btn:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+    .timeline-menu-btn:active {
+      background: rgba(255, 255, 255, 0.1);
+    }
+    .timeline-menu-btn.destructive {
+      color: #e05050;
+    }
+    .timeline-menu-btn.destructive:hover {
+      background: rgba(224, 80, 80, 0.1);
+    }
+    .confirm-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 300;
+      opacity: 0;
+      transition: opacity 0.15s ease-in-out;
+    }
+    .confirm-backdrop.visible {
+      opacity: 1;
+    }
+    .confirm-dialog {
+      background: #16213e;
+      border: 1px solid #533483;
+      border-radius: 8px;
+      padding: 20px 24px;
+      max-width: 360px;
+      color: #e0e0e0;
+      font-family: sans-serif;
+      font-size: 14px;
+    }
+    .confirm-message {
+      margin-bottom: 16px;
+      line-height: 1.5;
+    }
+    .confirm-buttons {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+    .confirm-btn {
+      padding: 6px 16px;
+      border: 1px solid #533483;
+      border-radius: 4px;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      font-size: 13px;
+      cursor: pointer;
+      font-family: sans-serif;
+    }
+    .confirm-btn:hover {
+      background: #1a3a5c;
+      border-color: #7b52ab;
+    }
+    .confirm-btn.destructive {
+      background: #3a1515;
+      border-color: #a03030;
+      color: #e05050;
+    }
+    .confirm-btn.destructive:hover {
+      background: #4a1f1f;
+      border-color: #c04040;
+    }
   </style>
 </head>
 <body>

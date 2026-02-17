@@ -8,9 +8,11 @@ import { setupInput } from './timeline/input';
 import { SnapState } from './timeline/snap';
 import { EventListPanel } from './ui/eventList';
 import { InfoLog } from './ui/infoLog';
+import { TimelineMenu } from './ui/timelineMenu';
+import { showConfirmDialog } from './ui/confirmDialog';
 import { saveState, loadState } from './state';
 import { dateToDecimalYear } from './data/time';
-import { loadImportedEvents, saveImportedEvents } from './data/store';
+import { isStoreInitialized, setStoreInitialized, loadStoredEvents, saveStoredEvents, clearStoredEvents, clearStore } from './data/store';
 import { validateEvents } from './data/validate';
 
 function setupCanvas(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
@@ -31,14 +33,15 @@ async function main() {
     throw new Error('Canvas element not found');
   }
 
-  const events = await loadEvents('/events.json', '/events.example.json');
-
-  // Merge previously imported events from IndexedDB
-  const imported = await loadImportedEvents();
-  for (const ie of imported) {
-    if (!events.some(e => e.name === ie.name)) {
-      events.push(ie);
-    }
+  // IndexedDB is the primary data store. On first load, seed from static JSON.
+  let events: TimelineEvent[];
+  const initialized = await isStoreInitialized();
+  if (initialized) {
+    events = await loadStoredEvents();
+  } else {
+    events = await loadEvents('/events.json', '/events.example.json');
+    await saveStoredEvents(events);
+    await setStoreInitialized();
   }
 
   const infoLog = new InfoLog();
@@ -612,7 +615,75 @@ async function main() {
 
   eventListPanel = new EventListPanel(events, onToggleEvent, onHoverEvent, hiddenEvents);
 
-  // --- File drop import ---
+  // --- Event import (shared by drop handler and menu) ---
+  function importEventsFromFile(file: File) {
+    if (!file.name.endsWith('.json')) {
+      infoLog.show(`Cannot import "${file.name}": only .json files are supported`);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(reader.result as string);
+      } catch {
+        infoLog.show(`Invalid JSON in "${file.name}"`);
+        return;
+      }
+
+      const result = validateEvents(parsed);
+      if ('error' in result) {
+        infoLog.show(result.error);
+        return;
+      }
+
+      // Deduplicate against existing events
+      const newEvents: TimelineEvent[] = [];
+      for (const ie of result.events) {
+        if (events.some(e => e.name === ie.name)) {
+          infoLog.show(`Skipped duplicate event: ${ie.name}`);
+        } else {
+          newEvents.push(ie);
+        }
+      }
+
+      if (newEvents.length === 0) {
+        infoLog.show(`No new events to add from "${file.name}"`);
+        return;
+      }
+
+      // Add to main events array and persist
+      events.push(...newEvents);
+      await saveStoredEvents(events);
+
+      // Recompute layout with fade-in animation for new events
+      relayout();
+
+      const fadingIn = new Set<TimelineEvent>();
+      for (const ne of newEvents) fadingIn.add(ne);
+      layoutTransition = {
+        startTime: performance.now(),
+        fadingOut: [],
+        yOffsets: new Map(),
+        fadingIn,
+      };
+
+      // Update event list panel
+      eventListPanel?.addEvents(newEvents, onToggleEvent, onHoverEvent);
+
+      infoLog.show(`Added ${newEvents.length} event${newEvents.length !== 1 ? 's' : ''} from "${file.name}"`);
+      requestRedraw();
+    };
+
+    reader.onerror = () => {
+      infoLog.show(`Failed to read "${file.name}"`);
+    };
+
+    reader.readAsText(file);
+  }
+
+  // --- File drop handler ---
   let dropOverlay: HTMLDivElement | null = null;
   let dragCounter = 0;
 
@@ -653,76 +724,56 @@ async function main() {
     dropOverlay?.classList.remove('visible');
 
     const file = e.dataTransfer?.files[0];
-    if (!file) return;
+    if (file) importEventsFromFile(file);
+  });
 
-    if (!file.name.endsWith('.json')) {
-      infoLog.show(`Cannot import "${file.name}": only .json files are supported`);
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = async () => {
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(reader.result as string);
-      } catch {
-        infoLog.show(`Invalid JSON in "${file.name}"`);
-        return;
-      }
-
-      const result = validateEvents(parsed);
-      if ('error' in result) {
-        infoLog.show(result.error);
-        return;
-      }
-
-      // Deduplicate against existing events
-      const newEvents: TimelineEvent[] = [];
-      for (const ie of result.events) {
-        if (events.some(e => e.name === ie.name)) {
-          infoLog.show(`Skipped duplicate event: ${ie.name}`);
-        } else {
-          newEvents.push(ie);
-        }
-      }
-
-      if (newEvents.length === 0) {
-        infoLog.show(`No new events to add from "${file.name}"`);
-        return;
-      }
-
-      // Add to main events array
-      events.push(...newEvents);
-
-      // Persist all imported events to IndexedDB
-      const allImported = await loadImportedEvents();
-      allImported.push(...newEvents);
-      await saveImportedEvents(allImported);
-
-      // Recompute layout with fade-in animation for new events
-      relayout();
-
-      const fadingIn = new Set<TimelineEvent>();
-      for (const ne of newEvents) fadingIn.add(ne);
-      layoutTransition = {
-        startTime: performance.now(),
-        fadingOut: [],
-        yOffsets: new Map(),
-        fadingIn,
-      };
-
-      // Update event list panel
-      eventListPanel?.addEvents(newEvents, onToggleEvent, onHoverEvent);
-
-      infoLog.show(`Added ${newEvents.length} event${newEvents.length !== 1 ? 's' : ''} from "${file.name}"`);
-      requestRedraw();
-    };
-
-    reader.onerror = () => {
-      infoLog.show(`Failed to read "${file.name}"`);
-    };
-
-    reader.readAsText(file);
+  // --- Timeline menu ---
+  new TimelineMenu({
+    onImport: () => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.json';
+      input.addEventListener('change', () => {
+        const file = input.files?.[0];
+        if (file) importEventsFromFile(file);
+      });
+      input.click();
+    },
+    onExport: () => {
+      const json = JSON.stringify(events, null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'timeline-events.json';
+      a.click();
+      URL.revokeObjectURL(url);
+      infoLog.show(`Exported ${events.length} events`);
+    },
+    onDeleteAll: () => {
+      showConfirmDialog('Delete all events? This cannot be undone.', async () => {
+        events.length = 0;
+        hiddenEvents.clear();
+        collapsedEvents.clear();
+        eventOrders.clear();
+        await clearStoredEvents();
+        eventListPanel?.clear();
+        hoveredItem = null;
+        selectedItem = null;
+        dblClickPrevViewport = null;
+        dblClickItem = null;
+        relayout();
+        requestRedraw();
+        infoLog.show('All events deleted');
+      });
+    },
+    onReloadDefaults: () => {
+      showConfirmDialog('Reload default events? All imported events and settings will be lost.', async () => {
+        await clearStore();
+        localStorage.removeItem('timeline-state');
+        location.reload();
+      });
+    },
   });
 
   // Initial draw and resize handler

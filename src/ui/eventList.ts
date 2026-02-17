@@ -68,6 +68,13 @@ export class EventListPanel {
     }
   }
 
+  clear(): void {
+    const body = this.el.querySelector('.event-list-body');
+    if (body) body.innerHTML = '';
+    this.rowMap.clear();
+    this.highlightedRow = null;
+  }
+
   highlightEvent(event: TimelineEvent | null) {
     if (this.highlightedRow) {
       this.highlightedRow.classList.remove('highlighted');
