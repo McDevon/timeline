@@ -12,7 +12,7 @@ import { TimelineMenu } from './ui/timelineMenu';
 import { EventMenu } from './ui/eventMenu';
 import { showConfirmDialog } from './ui/confirmDialog';
 import { saveState, loadState } from './state';
-import { dateToDecimalYear } from './data/time';
+import { dateToDecimalYear, decimalYearToIso } from './data/time';
 import { isStoreInitialized, setStoreInitialized, loadStoredEvents, saveStoredEvents, clearStoredEvents, clearStore } from './data/store';
 import { validateEvents } from './data/validate';
 import { loadSavedTheme, applyTheme } from './themes';
@@ -278,6 +278,7 @@ async function main() {
         selectedItem = null;
         eventListPanel?.selectEvent(null);
         eventMenu.hide();
+        updateNewEventBtnPosition();
       }
     }
 
@@ -522,6 +523,7 @@ async function main() {
       selectedItem = item;
       eventListPanel?.selectEvent(item?.event ?? null);
       if (item) eventMenu.show(item.event); else eventMenu.hide();
+      updateNewEventBtnPosition();
     },
     (x: number) => { cursorX = x; },
     () => selection,
@@ -574,6 +576,7 @@ async function main() {
     selectedItem = preClickSelectedItem;
     eventListPanel?.selectEvent(selectedItem?.event ?? null);
     if (selectedItem) eventMenu.show(selectedItem.event); else eventMenu.hide();
+    updateNewEventBtnPosition();
 
     if (dblClickItem && hit.event === dblClickItem.event && dblClickPrevViewport) {
       animateZoom(dblClickPrevViewport);
@@ -636,6 +639,7 @@ async function main() {
         selectedItem = null;
         eventListPanel?.selectEvent(null);
         eventMenu.hide();
+        updateNewEventBtnPosition();
       }
       if (dblClickItem && isDescendantOf(dblClickItem, event)) {
         dblClickPrevViewport = null;
@@ -660,6 +664,7 @@ async function main() {
     selectedItem = item;
     eventListPanel?.selectEvent(event);
     eventMenu.show(event);
+    updateNewEventBtnPosition();
 
     if (item) {
       const rect = canvas.getBoundingClientRect();
@@ -819,6 +824,7 @@ async function main() {
       collapsedEvents.delete(event);
       selectedItem = null;
       eventMenu.hide();
+      updateNewEventBtnPosition();
       eventListPanel?.selectEvent(null);
       eventListPanel?.removeEvent(event);
       relayout();
@@ -848,6 +854,86 @@ async function main() {
       return result;
     },
     getCurrentParent: (event) => findParent(events, event),
+  });
+
+  // --- New event button ---
+  const newEventBtn = document.createElement('div');
+  newEventBtn.className = 'new-event-btn';
+  newEventBtn.textContent = '+';
+  newEventBtn.title = 'New event';
+  document.body.appendChild(newEventBtn);
+
+  function updateNewEventBtnPosition() {
+    const left = eventMenu.isVisible() ? 744 : 536;
+    newEventBtn.style.left = `${left}px`;
+  }
+  updateNewEventBtnPosition();
+
+  newEventBtn.addEventListener('click', () => {
+    // 1. Determine parent
+    const parent = (selectedItem && selectedItem.event.end !== undefined)
+      ? selectedItem.event : null;
+
+    // 2. Determine date/type
+    let start: string;
+    let end: string | undefined;
+
+    const parentStart = parent ? dateToDecimalYear(parent.start) : null;
+    const parentEnd = parent
+      ? (parent.end === 'ongoing' ? dateToDecimalYear(new Date().toISOString().slice(0, 10)) : dateToDecimalYear(parent.end!))
+      : null;
+
+    if (selection && selection.start !== selection.end) {
+      // Range selection
+      let selStart = selection.start;
+      let selEnd = selection.end;
+      if (parent && parentStart !== null && parentEnd !== null) {
+        // Clamp to parent range if overlapping
+        if (selStart < parentEnd && selEnd > parentStart) {
+          selStart = Math.max(selStart, parentStart);
+          selEnd = Math.min(selEnd, parentEnd);
+        }
+      }
+      start = decimalYearToIso(selStart);
+      end = decimalYearToIso(selEnd);
+    } else if (selection && selection.start === selection.end) {
+      // Single cursor point
+      start = decimalYearToIso(selection.start);
+    } else {
+      // No cursor/selection — use center of parent or viewport
+      if (parent && parentStart !== null && parentEnd !== null) {
+        start = decimalYearToIso((parentStart + parentEnd) / 2);
+      } else {
+        const vp = animTo ?? viewport;
+        start = decimalYearToIso((vp.start + vp.end) / 2);
+      }
+    }
+
+    // 3. Create event
+    const newEvent: TimelineEvent = { name: 'New event', start };
+    if (end !== undefined) newEvent.end = end;
+
+    // 4. Add to data
+    if (parent) {
+      if (!parent.nested) parent.nested = [];
+      parent.nested.push(newEvent);
+    } else {
+      events.push(newEvent);
+    }
+
+    // 5. Update
+    relayout();
+    requestRedraw();
+    saveStoredEvents(events);
+    eventListPanel?.rebuild(events, onToggleEvent, onHoverEvent, onSelectEvent, hiddenEvents);
+
+    // 6. Select and edit
+    const item = findLayoutItem(newEvent, layout);
+    selectedItem = item;
+    eventListPanel?.selectEvent(newEvent);
+    eventMenu.show(newEvent);
+    eventMenu.focusName();
+    updateNewEventBtnPosition();
   });
 
   // --- Event import (shared by drop handler and menu) ---
@@ -996,6 +1082,7 @@ async function main() {
         hoveredItem = null;
         selectedItem = null;
         eventMenu.hide();
+        updateNewEventBtnPosition();
         dblClickPrevViewport = null;
         dblClickItem = null;
         relayout();

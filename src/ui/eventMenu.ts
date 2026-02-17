@@ -266,6 +266,16 @@ export class EventMenu {
     this.currentEvent = null;
   }
 
+  isVisible(): boolean {
+    return !this.el.classList.contains('hidden');
+  }
+
+  focusName(): void {
+    this.el.classList.remove('collapsed');
+    this.nameInput.focus();
+    this.nameInput.select();
+  }
+
   private updateTypeButtons(): void {
     const hasKids = this.currentEvent ? this.callbacks.hasChildren(this.currentEvent) : false;
 
