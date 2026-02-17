@@ -61,15 +61,21 @@ type OverlapGraph = Map<TimelineEvent, Set<TimelineEvent>>;
 /**
  * Compute time-overlap relationships for a set of sized events.
  * Two events overlap if their time ranges intersect (strictly).
+ * Uses overlapStart/overlapEnd when present (containers with protruding children),
+ * falling back to startYear/endYear.
  */
-function computeOverlaps(events: { event: TimelineEvent; startYear: number; endYear: number }[]): OverlapGraph {
+function computeOverlaps(events: { event: TimelineEvent; startYear: number; endYear: number; overlapStart?: number; overlapEnd?: number }[]): OverlapGraph {
   const graph: OverlapGraph = new Map();
   for (const e of events) graph.set(e.event, new Set());
 
   for (let i = 0; i < events.length; i++) {
     for (let j = i + 1; j < events.length; j++) {
       const a = events[i], b = events[j];
-      if (a.endYear > b.startYear && a.startYear < b.endYear) {
+      const aStart = a.overlapStart ?? a.startYear;
+      const aEnd = a.overlapEnd ?? a.endYear;
+      const bStart = b.overlapStart ?? b.startYear;
+      const bEnd = b.overlapEnd ?? b.endYear;
+      if (aEnd > bStart && aStart < bEnd) {
         graph.get(a.event)!.add(b.event);
         graph.get(b.event)!.add(a.event);
       }
@@ -211,6 +217,14 @@ function placeLevel(
     const { items: placedChildren, totalHeight: contentHeight } =
       placeLevel(event.nested, LAYOUT.childBarHeight, LAYOUT.rowGap, collapsedEvents, eventOrders, childPath, hiddenEvents);
 
+    // Compute overlap range that includes children extending beyond the parent
+    let overlapStart = base.startYear;
+    let overlapEnd = base.endYear;
+    for (const child of placedChildren) {
+      if (child.startYear < overlapStart) overlapStart = child.startYear;
+      if (child.endYear > overlapEnd) overlapEnd = child.endYear;
+    }
+
     const height =
       LAYOUT.containerHeaderHeight +
       LAYOUT.containerPadding +
@@ -219,6 +233,8 @@ function placeLevel(
 
     return {
       ...base,
+      overlapStart,
+      overlapEnd,
       height,
       isContainer: true,
       isCollapsed: false,
