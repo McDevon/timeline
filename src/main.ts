@@ -17,6 +17,16 @@ import { isStoreInitialized, setStoreInitialized, loadStoredEvents, saveStoredEv
 import { validateEvents } from './data/validate';
 import { loadSavedTheme, applyTheme } from './themes';
 
+function toSnakeCase(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+}
+
+function countEvents(event: TimelineEvent): number {
+  let n = 1;
+  if (event.nested) for (const child of event.nested) n += countEvents(child);
+  return n;
+}
+
 function setupCanvas(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
   const dpr = window.devicePixelRatio || 1;
   canvas.style.width = '100vw';
@@ -885,6 +895,18 @@ async function main() {
       requestRedraw();
       saveStoredEvents(events);
       infoLog.show(`Deleted "${event.name}"`);
+    },
+    onExport: (event) => {
+      const json = JSON.stringify(event, null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = toSnakeCase(event.name) + '.json';
+      a.click();
+      URL.revokeObjectURL(url);
+      const count = countEvents(event);
+      infoLog.show(`Exported "${event.name}"${count > 1 ? ` with ${count - 1} sub-events` : ''}`);
     },
     hasChildren: (event) => {
       return event.nested !== undefined && event.nested.length > 0;

@@ -19,6 +19,7 @@ export interface EventMenuCallbacks {
   onChangeParent: (event: TimelineEvent, newParent: TimelineEvent | null) => void;
   onHoverEvent: (event: TimelineEvent | null) => void;
   onDelete: (event: TimelineEvent) => void;
+  onExport: (event: TimelineEvent) => void;
   hasChildren: (event: TimelineEvent) => boolean;
   getParentCandidates: (event: TimelineEvent) => ParentCandidate[];
   getCurrentParent: (event: TimelineEvent) => TimelineEvent | null;
@@ -45,6 +46,10 @@ export class EventMenu {
   private endApproxInput: ApproxInput;
   private endOngoingLabel: HTMLDivElement;
   private endDateContainer: HTMLDivElement;
+
+  // Stashed end date (for type switching round-trips)
+  private stashedEnd: string | undefined;
+  private stashedEndApprox: [string, string] | undefined;
 
   // Parent flyout
   private parentTriggerText: HTMLSpanElement;
@@ -112,19 +117,6 @@ export class EventMenu {
     infoField.appendChild(this.infoInput);
     body.appendChild(infoField);
 
-    // Type selector
-    const typeRow = document.createElement('div');
-    typeRow.className = 'event-menu-type';
-    for (const type of ['point', 'range', 'ongoing'] as EventType[]) {
-      const btn = document.createElement('div');
-      btn.className = 'event-menu-type-btn';
-      btn.textContent = type.charAt(0).toUpperCase() + type.slice(1);
-      btn.addEventListener('click', () => this.onTypeClick(type));
-      typeRow.appendChild(btn);
-      this.typeBtns.set(type, btn);
-    }
-    body.appendChild(typeRow);
-
     // Start section
     const startHeader = document.createElement('div');
     startHeader.className = 'event-menu-section';
@@ -175,6 +167,19 @@ export class EventMenu {
     this.endSection.appendChild(this.endDateContainer);
     body.appendChild(this.endSection);
 
+    // Type selector
+    const typeRow = document.createElement('div');
+    typeRow.className = 'event-menu-type';
+    for (const type of ['point', 'range', 'ongoing'] as EventType[]) {
+      const btn = document.createElement('div');
+      btn.className = 'event-menu-type-btn';
+      btn.textContent = type.charAt(0).toUpperCase() + type.slice(1);
+      btn.addEventListener('click', () => this.onTypeClick(type));
+      typeRow.appendChild(btn);
+      this.typeBtns.set(type, btn);
+    }
+    body.appendChild(typeRow);
+
     // Parent section — hover-triggered flyout
     const parentHeader = document.createElement('div');
     parentHeader.className = 'event-menu-section';
@@ -208,6 +213,16 @@ export class EventMenu {
 
     body.appendChild(parentRow);
 
+    // Export button
+    const exportBtn = document.createElement('div');
+    exportBtn.className = 'event-menu-btn';
+    exportBtn.textContent = 'Export event';
+    exportBtn.addEventListener('click', () => {
+      if (!this.currentEvent) return;
+      callbacks.onExport(this.currentEvent);
+    });
+    body.appendChild(exportBtn);
+
     // Delete button
     const deleteBtn = document.createElement('div');
     deleteBtn.className = 'event-menu-btn destructive';
@@ -230,6 +245,10 @@ export class EventMenu {
     this.titleSpan.textContent = event.name;
     this.nameInput.value = event.name;
     this.infoInput.value = event.info ?? '';
+
+    // Clear stashed end date from previous event
+    this.stashedEnd = undefined;
+    this.stashedEndApprox = undefined;
 
     // Determine type
     if (event.end === undefined) {
@@ -574,6 +593,13 @@ export class EventMenu {
     if (newType === 'point' && hasKids) return; // blocked
 
     const oldType = this.currentType;
+
+    // Stash end date when leaving range
+    if (oldType === 'range' && this.currentEvent.end && this.currentEvent.end !== 'ongoing') {
+      this.stashedEnd = this.currentEvent.end;
+      this.stashedEndApprox = this.currentEvent.endApprox;
+    }
+
     this.currentType = newType;
 
     // Apply data changes
@@ -584,9 +610,13 @@ export class EventMenu {
       this.callbacks.onChangeEnd(this.currentEvent, 'ongoing');
       this.callbacks.onChangeEndApprox(this.currentEvent, undefined);
     } else {
-      // Switching to range
-      if (oldType === 'point' || oldType === 'ongoing') {
-        // Default end: start year + 1, same precision
+      // Switching to range — restore stash or use default
+      if (this.stashedEnd) {
+        this.callbacks.onChangeEnd(this.currentEvent, this.stashedEnd);
+        if (this.stashedEndApprox) {
+          this.callbacks.onChangeEndApprox(this.currentEvent, this.stashedEndApprox);
+        }
+      } else {
         const defaultEnd = offsetStartYear(this.currentEvent.start, 1);
         this.callbacks.onChangeEnd(this.currentEvent, defaultEnd);
       }
