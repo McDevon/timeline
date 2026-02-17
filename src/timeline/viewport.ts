@@ -4,7 +4,7 @@ export interface Viewport {
 }
 
 /** Padding in pixels on left/right of the drawing area. Must match renderer LAYOUT.paddingX. */
-const PADDING_X = 60;
+const PADDING_X = 0;
 
 const MIN_SPAN = 0.1;     // ~1 month visible
 const MAX_SPAN = 10_000;  // practical ceiling

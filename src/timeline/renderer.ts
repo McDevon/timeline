@@ -64,7 +64,7 @@ export function setCanvasColors(newColors: CanvasColors) {
 }
 
 const LAYOUT = {
-  paddingX: 60,
+  paddingX: 0,
   axisY: 80,
   tickHeight: 8,
   eventsStartY: 110,

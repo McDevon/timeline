@@ -290,6 +290,42 @@ export function setupInput(
   let viewportAtDragStart: Viewport | null = null;
   let reorderItem: LayoutItem | null = null;
 
+  // Auto-scroll during reorder drag
+  const AUTOSCROLL_ZONE = 60; // px from edge
+  const AUTOSCROLL_MAX_SPEED = 8; // px per frame
+  let autoScrollRaf = 0;
+  let lastClientY = 0;
+
+  function startAutoScroll(): void {
+    if (autoScrollRaf) return;
+    function tick() {
+      if (dragMode !== 'reordering') { autoScrollRaf = 0; return; }
+      const rect = canvas.getBoundingClientRect();
+      const relY = lastClientY - rect.top;
+      let delta = 0;
+      if (relY < AUTOSCROLL_ZONE) {
+        delta = -AUTOSCROLL_MAX_SPEED * (1 - relY / AUTOSCROLL_ZONE);
+      } else if (relY > rect.height - AUTOSCROLL_ZONE) {
+        delta = AUTOSCROLL_MAX_SPEED * (1 - (rect.height - relY) / AUTOSCROLL_ZONE);
+      }
+      if (delta !== 0) {
+        const newScroll = Math.max(0, Math.min(getScrollY() + delta, getMaxScrollY()));
+        setScrollY(newScroll);
+        onReorderMove(reorderItem!, (lastClientY - rect.top) + newScroll);
+        scheduleRedraw();
+      }
+      autoScrollRaf = requestAnimationFrame(tick);
+    }
+    autoScrollRaf = requestAnimationFrame(tick);
+  }
+
+  function stopAutoScroll(): void {
+    if (autoScrollRaf) {
+      cancelAnimationFrame(autoScrollRaf);
+      autoScrollRaf = 0;
+    }
+  }
+
   // Last known cursor position on the canvas (for hover updates during scroll)
   let cursorCanvasX = -1;
   let cursorCanvasY = -1;
@@ -371,6 +407,7 @@ export function setupInput(
     }
 
     if (dragMode === 'reordering') {
+      lastClientY = e.clientY;
       const rect = canvas.getBoundingClientRect();
       const canvasY = e.clientY - rect.top;
       onReorderMove(reorderItem!, canvasY + getScrollY());
@@ -395,8 +432,10 @@ export function setupInput(
           if (viewportAtDragStart) setViewport(viewportAtDragStart);
           tooltip.hide();
           canvas.style.cursor = 'ns-resize';
+          lastClientY = e.clientY;
           const rect = canvas.getBoundingClientRect();
           onReorderMove(reorderItem, e.clientY - rect.top + getScrollY());
+          startAutoScroll();
           scheduleRedraw();
           return;
         }
@@ -436,6 +475,7 @@ export function setupInput(
     if (mode === 'none') return; // mousedown wasn't on the canvas
 
     if (mode === 'reordering') {
+      stopAutoScroll();
       onReorderEnd(reorderItem!);
       reorderItem = null;
       viewportAtDragStart = null;
@@ -592,6 +632,7 @@ export function setupInput(
 
   function onKeyDown(e: KeyboardEvent) {
     if (e.key === 'Escape' && dragMode === 'reordering') {
+      stopAutoScroll();
       dragMode = 'none';
       onReorderCancel();
       reorderItem = null;
