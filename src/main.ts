@@ -717,6 +717,37 @@ async function main() {
       event.info = info || undefined;
       saveStoredEvents(events);
     },
+    onChangeStart: (event, start) => {
+      event.start = start;
+      relayout();
+      requestRedraw();
+      saveStoredEvents(events);
+    },
+    onChangeEnd: (event, end) => {
+      if (end === undefined) {
+        delete event.end;
+        delete event.endApprox;
+      } else {
+        event.end = end;
+      }
+      relayout();
+      requestRedraw();
+      saveStoredEvents(events);
+    },
+    onChangeStartApprox: (event, approx) => {
+      if (approx === undefined) delete event.startApprox;
+      else event.startApprox = approx;
+      relayout();
+      requestRedraw();
+      saveStoredEvents(events);
+    },
+    onChangeEndApprox: (event, approx) => {
+      if (approx === undefined) delete event.endApprox;
+      else event.endApprox = approx;
+      relayout();
+      requestRedraw();
+      saveStoredEvents(events);
+    },
     onDelete: (event) => {
       removeEvent(events, event);
       hiddenEvents.delete(event);
@@ -729,6 +760,9 @@ async function main() {
       requestRedraw();
       saveStoredEvents(events);
       infoLog.show(`Deleted "${event.name}"`);
+    },
+    hasChildren: (event) => {
+      return event.nested !== undefined && event.nested.length > 0;
     },
   });
 
