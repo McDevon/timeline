@@ -275,6 +275,7 @@ async function main() {
       }
       if (selectedItem && selectedItem.event !== event && isDescendantOf(selectedItem, event)) {
         selectedItem = null;
+        eventListPanel?.selectEvent(null);
       }
     }
 
@@ -515,7 +516,7 @@ async function main() {
     () => layout,
     () => hoveredItem,
     setHoveredItem,
-    (item: LayoutItem | null) => { selectedItem = item; },
+    (item: LayoutItem | null) => { selectedItem = item; eventListPanel?.selectEvent(item?.event ?? null); },
     (x: number) => { cursorX = x; },
     () => selection,
     (sel: TimelineSelection | null) => { selection = sel; },
@@ -565,6 +566,7 @@ async function main() {
     // Restore selection state from before the double-click
     selection = preClickSelection;
     selectedItem = preClickSelectedItem;
+    eventListPanel?.selectEvent(selectedItem?.event ?? null);
 
     if (dblClickItem && hit.event === dblClickItem.event && dblClickPrevViewport) {
       animateZoom(dblClickPrevViewport);
@@ -623,7 +625,10 @@ async function main() {
     // Clear hovered/selected if they reference the hidden event
     if (!visible) {
       if (hoveredItem && isDescendantOf(hoveredItem, event)) setHoveredItem(null);
-      if (selectedItem && isDescendantOf(selectedItem, event)) selectedItem = null;
+      if (selectedItem && isDescendantOf(selectedItem, event)) {
+        selectedItem = null;
+        eventListPanel?.selectEvent(null);
+      }
       if (dblClickItem && isDescendantOf(dblClickItem, event)) {
         dblClickPrevViewport = null;
         dblClickItem = null;
@@ -642,7 +647,40 @@ async function main() {
     requestRedraw();
   }
 
-  eventListPanel = new EventListPanel(events, onToggleEvent, onHoverEvent, hiddenEvents);
+  function onSelectEvent(event: TimelineEvent) {
+    const item = findLayoutItem(event, layout);
+    selectedItem = item;
+    eventListPanel?.selectEvent(event);
+
+    if (item) {
+      const rect = canvas.getBoundingClientRect();
+
+      // Horizontal: pan viewport if event is not visible
+      const vp = animTo ?? viewport;
+      const eventOutLeft = item.endYear < vp.start;
+      const eventOutRight = item.startYear > vp.end;
+      if (eventOutLeft || eventOutRight) {
+        const span = vp.end - vp.start;
+        const eventMid = (item.startYear + item.endYear) / 2;
+        animateZoom({ start: eventMid - span / 2, end: eventMid + span / 2 });
+      }
+
+      // Vertical: scroll if event is not visible
+      const visibleTop = scrollY + LAYOUT.eventsStartY;
+      const visibleBottom = scrollY + rect.height;
+      const itemTop = item.y;
+      const itemBottom = item.y + item.height;
+      if (itemBottom > visibleBottom) {
+        scrollY = Math.min(itemBottom - rect.height + 20, computeMaxScrollY());
+      } else if (itemTop < visibleTop) {
+        scrollY = Math.max(itemTop - LAYOUT.eventsStartY - 10, 0);
+      }
+    }
+
+    requestRedraw();
+  }
+
+  eventListPanel = new EventListPanel(events, onToggleEvent, onHoverEvent, onSelectEvent, hiddenEvents);
 
   // --- Event import (shared by drop handler and menu) ---
   function importEventsFromFile(file: File) {
@@ -699,7 +737,7 @@ async function main() {
       };
 
       // Update event list panel
-      eventListPanel?.addEvents(newEvents, onToggleEvent, onHoverEvent);
+      eventListPanel?.addEvents(newEvents, onToggleEvent, onHoverEvent, onSelectEvent);
 
       infoLog.show(`Added ${newEvents.length} event${newEvents.length !== 1 ? 's' : ''} from "${file.name}"`);
       requestRedraw();

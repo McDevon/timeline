@@ -7,11 +7,13 @@ export class EventListPanel {
   private childrenMap = new Map<TimelineEvent, HTMLDivElement>();
   private expandedEvents = new Set<TimelineEvent>();
   private highlightedRow: HTMLDivElement | null = null;
+  private selectedRow: HTMLDivElement | null = null;
 
   constructor(
     events: TimelineEvent[],
     onToggle: (event: TimelineEvent, visible: boolean) => void,
     onHover: (event: TimelineEvent | null) => void,
+    onSelect: (event: TimelineEvent) => void,
     hiddenEvents?: Set<TimelineEvent>,
   ) {
     this.el = document.createElement('div');
@@ -34,7 +36,7 @@ export class EventListPanel {
     const sorted = [...events].sort((a, b) => this.parseYear(a.start) - this.parseYear(b.start));
 
     for (const event of sorted) {
-      body.appendChild(this.createItem(event, onToggle, onHover, hiddenEvents, 0));
+      body.appendChild(this.createItem(event, onToggle, onHover, onSelect, hiddenEvents, 0));
     }
 
     this.el.appendChild(body);
@@ -45,12 +47,13 @@ export class EventListPanel {
     newEvents: TimelineEvent[],
     onToggle: (event: TimelineEvent, visible: boolean) => void,
     onHover: (event: TimelineEvent | null) => void,
+    onSelect: (event: TimelineEvent) => void,
   ): void {
     const body = this.el.querySelector('.event-list-body');
     if (!body) return;
 
     for (const event of newEvents) {
-      const item = this.createItem(event, onToggle, onHover, undefined, 0);
+      const item = this.createItem(event, onToggle, onHover, onSelect, undefined, 0);
       const eventYear = this.parseYear(event.start);
 
       // Insert in sorted position
@@ -76,6 +79,21 @@ export class EventListPanel {
     this.childrenMap.clear();
     this.expandedEvents.clear();
     this.highlightedRow = null;
+    this.selectedRow = null;
+  }
+
+  selectEvent(event: TimelineEvent | null) {
+    if (this.selectedRow) {
+      this.selectedRow.classList.remove('selected');
+      this.selectedRow = null;
+    }
+    if (event) {
+      const row = this.rowMap.get(event) ?? null;
+      if (row) {
+        row.classList.add('selected');
+        this.selectedRow = row;
+      }
+    }
   }
 
   highlightEvent(event: TimelineEvent | null) {
@@ -96,6 +114,7 @@ export class EventListPanel {
     event: TimelineEvent,
     onToggle: (event: TimelineEvent, visible: boolean) => void,
     onHover: (event: TimelineEvent | null) => void,
+    onSelect: (event: TimelineEvent) => void,
     hiddenEvents: Set<TimelineEvent> | undefined,
     depth: number,
   ): HTMLDivElement {
@@ -155,6 +174,9 @@ export class EventListPanel {
       onToggle(event, visible);
     });
 
+    // Click → select on timeline
+    row.addEventListener('click', () => { onSelect(event); });
+
     // Hover sync
     row.addEventListener('mouseenter', () => { onHover(event); });
     row.addEventListener('mouseleave', () => { onHover(null); });
@@ -172,7 +194,7 @@ export class EventListPanel {
       );
       for (const child of sortedChildren) {
         childrenContainer.appendChild(
-          this.createItem(child, onToggle, onHover, hiddenEvents, depth + 1),
+          this.createItem(child, onToggle, onHover, onSelect, hiddenEvents, depth + 1),
         );
       }
 
