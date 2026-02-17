@@ -157,6 +157,18 @@ async function main() {
       }
     }
 
+    // Scroll animation
+    if (scrollTo !== null) {
+      const elapsed = performance.now() - scrollAnimStart;
+      const t = Math.min(elapsed / SCROLL_ANIM_MS, 1);
+      scrollY = scrollFrom + (scrollTo - scrollFrom) * easeInOut(t);
+      if (t < 1) {
+        if (rafId === 0) rafId = requestAnimationFrame(draw);
+      } else {
+        scrollTo = null;
+      }
+    }
+
     // Layout transition animation
     let transition: LayoutTransition | undefined;
     if (layoutTransition) {
@@ -201,6 +213,40 @@ async function main() {
     animTo = target;
     animStartTime = performance.now();
     requestRedraw();
+  }
+
+  // Scroll animation state
+  let scrollFrom = 0;
+  let scrollTo: number | null = null;
+  let scrollAnimStart = 0;
+  const SCROLL_ANIM_MS = 150;
+
+  function animateScroll(target: number) {
+    scrollFrom = scrollY;
+    scrollTo = Math.max(0, Math.min(target, computeMaxScrollY()));
+    scrollAnimStart = performance.now();
+    requestRedraw();
+  }
+
+  /** After relayout, re-find and re-select the event, scrolling into view if needed. */
+  function reselectEvent(event: TimelineEvent, prevScroll?: number) {
+    const item = findLayoutItem(event, layout);
+    selectedItem = item;
+    if (item) {
+      const rect = canvas.getBoundingClientRect();
+      // Use pre-relayout scroll to detect if the event moved out of the old view
+      const checkScroll = prevScroll ?? scrollY;
+      const visibleTop = checkScroll + LAYOUT.eventsStartY;
+      const visibleBottom = checkScroll + rect.height;
+      if (item.y + item.height > visibleBottom) {
+        // Restore pre-clamp scroll so animation starts from the right place
+        if (prevScroll !== undefined) scrollY = prevScroll;
+        animateScroll(item.y + item.height - rect.height + 20);
+      } else if (item.y < visibleTop) {
+        if (prevScroll !== undefined) scrollY = prevScroll;
+        animateScroll(Math.max(item.y - LAYOUT.eventsStartY - 10, 0));
+      }
+    }
   }
 
   // Position capture: record absolute Y for every item at all depths.
@@ -767,7 +813,9 @@ async function main() {
     },
     onChangeStart: (event, start) => {
       event.start = start;
+      const prevScroll = scrollY;
       relayout();
+      reselectEvent(event, prevScroll);
       requestRedraw();
       saveStoredEvents(events);
     },
@@ -778,21 +826,27 @@ async function main() {
       } else {
         event.end = end;
       }
+      const prevScroll = scrollY;
       relayout();
+      reselectEvent(event, prevScroll);
       requestRedraw();
       saveStoredEvents(events);
     },
     onChangeStartApprox: (event, approx) => {
       if (approx === undefined) delete event.startApprox;
       else event.startApprox = approx;
+      const prevScroll = scrollY;
       relayout();
+      reselectEvent(event, prevScroll);
       requestRedraw();
       saveStoredEvents(events);
     },
     onChangeEndApprox: (event, approx) => {
       if (approx === undefined) delete event.endApprox;
       else event.endApprox = approx;
+      const prevScroll = scrollY;
       relayout();
+      reselectEvent(event, prevScroll);
       requestRedraw();
       saveStoredEvents(events);
     },
