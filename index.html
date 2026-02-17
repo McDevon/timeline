@@ -606,6 +606,58 @@
       font-style: italic;
       font-size: 12px;
     }
+    .parent-flyout {
+      position: fixed;
+      background: var(--tl-panel-bg);
+      border: 1px solid var(--tl-border);
+      border-radius: 6px;
+      padding: 4px 0;
+      z-index: 60;
+      font-family: sans-serif;
+      font-size: 13px;
+      color: var(--tl-text);
+      min-width: 200px;
+      max-height: calc(100vh - 40px);
+      overflow-y: auto;
+    }
+    .parent-flyout-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 8px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .parent-flyout-row:hover {
+      background: var(--tl-list-highlight);
+    }
+    .parent-flyout-row.active {
+      background: var(--tl-list-highlight-strong);
+    }
+    .parent-flyout-arrow {
+      font-size: 10px;
+      color: var(--tl-text-muted);
+      transition: transform 0.15s ease;
+      flex-shrink: 0;
+      width: 12px;
+      text-align: center;
+    }
+    .parent-flyout-arrow.expanded {
+      transform: rotate(90deg);
+    }
+    .parent-flyout-children {
+      overflow: hidden;
+      max-height: 0;
+      transition: max-height 0.15s ease;
+    }
+    .parent-flyout-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .parent-flyout::-webkit-scrollbar { width: 6px; }
+    .parent-flyout::-webkit-scrollbar-track { background: transparent; }
+    .parent-flyout::-webkit-scrollbar-thumb { background: var(--tl-scrollbar-thumb); border-radius: 3px; }
     .confirm-backdrop {
       position: fixed;
       inset: 0;

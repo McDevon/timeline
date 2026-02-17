@@ -103,6 +103,46 @@ export class EventListPanel {
     this.expandedEvents.delete(event);
   }
 
+  rebuild(
+    events: TimelineEvent[],
+    onToggle: (event: TimelineEvent, visible: boolean) => void,
+    onHover: (event: TimelineEvent | null) => void,
+    onSelect: (event: TimelineEvent) => void,
+    hiddenEvents?: Set<TimelineEvent>,
+  ): void {
+    // Save expanded & selected state
+    const expanded = new Set(this.expandedEvents);
+    const prevSelected = this.selectedRow
+      ? [...this.rowMap.entries()].find(([, r]) => r === this.selectedRow)?.[0] ?? null
+      : null;
+
+    this.clear();
+    const body = this.el.querySelector('.event-list-body');
+    if (!body) return;
+
+    const sorted = [...events].sort((a, b) => this.parseYear(a.start) - this.parseYear(b.start));
+    for (const event of sorted) {
+      body.appendChild(this.createItem(event, onToggle, onHover, onSelect, hiddenEvents, 0));
+    }
+
+    // Restore expanded state
+    for (const event of expanded) {
+      const container = this.childrenMap.get(event);
+      const row = this.rowMap.get(event);
+      if (container && row) {
+        this.expandedEvents.add(event);
+        const icon = row.querySelector('.event-list-arrow-icon');
+        if (icon) icon.classList.add('expanded');
+        container.style.maxHeight = 'none';
+      }
+    }
+
+    // Restore selection
+    if (prevSelected) {
+      this.selectEvent(prevSelected);
+    }
+  }
+
   selectEvent(event: TimelineEvent | null) {
     if (this.selectedRow) {
       this.selectedRow.classList.remove('selected');

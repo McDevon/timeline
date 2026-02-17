@@ -691,7 +691,30 @@ async function main() {
 
   eventListPanel = new EventListPanel(events, onToggleEvent, onHoverEvent, onSelectEvent, hiddenEvents);
 
-  // --- Event editing menu ---
+  // --- Event editing helpers ---
+  function findParent(list: TimelineEvent[], target: TimelineEvent): TimelineEvent | null {
+    for (const e of list) {
+      if (e.nested?.includes(target)) return e;
+      if (e.nested) {
+        const found = findParent(e.nested, target);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+
+  function collectDescendants(event: TimelineEvent): Set<TimelineEvent> {
+    const result = new Set<TimelineEvent>();
+    function walk(list: TimelineEvent[]) {
+      for (const e of list) {
+        result.add(e);
+        if (e.nested) walk(e.nested);
+      }
+    }
+    if (event.nested) walk(event.nested);
+    return result;
+  }
+
   function removeEvent(arr: TimelineEvent[], target: TimelineEvent): boolean {
     for (let i = 0; i < arr.length; i++) {
       if (arr[i] === target) {
@@ -748,6 +771,28 @@ async function main() {
       requestRedraw();
       saveStoredEvents(events);
     },
+    onHoverEvent: (event) => {
+      onHoverEvent(event);
+    },
+    onChangeParent: (event, newParent) => {
+      // Remove from current location
+      removeEvent(events, event);
+
+      // Add to new location
+      if (newParent === null) {
+        events.push(event);
+      } else {
+        if (!newParent.nested) newParent.nested = [];
+        newParent.nested.push(event);
+      }
+
+      // Update UI
+      relayout();
+      requestRedraw();
+      eventListPanel?.rebuild(events, onToggleEvent, onHoverEvent, onSelectEvent, hiddenEvents);
+      saveStoredEvents(events);
+      infoLog.show(`Moved "${event.name}" to ${newParent ? `"${newParent.name}"` : 'top level'}`);
+    },
     onDelete: (event) => {
       removeEvent(events, event);
       hiddenEvents.delete(event);
@@ -764,6 +809,25 @@ async function main() {
     hasChildren: (event) => {
       return event.nested !== undefined && event.nested.length > 0;
     },
+    getParentCandidates: (event) => {
+      const descendants = collectDescendants(event);
+      const result: { event: TimelineEvent; name: string; depth: number }[] = [];
+
+      function walk(list: TimelineEvent[], depth: number) {
+        const sorted = [...list].sort(
+          (a, b) => dateToDecimalYear(a.start) - dateToDecimalYear(b.start),
+        );
+        for (const e of sorted) {
+          if (e === event || descendants.has(e)) continue;
+          if (e.end === undefined) continue; // skip point events
+          result.push({ event: e, name: e.name, depth });
+          if (e.nested) walk(e.nested, depth + 1);
+        }
+      }
+      walk(events, 0);
+      return result;
+    },
+    getCurrentParent: (event) => findParent(events, event),
   });
 
   // --- Event import (shared by drop handler and menu) ---
