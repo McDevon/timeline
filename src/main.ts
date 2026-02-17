@@ -14,6 +14,7 @@ import { saveState, loadState } from './state';
 import { dateToDecimalYear } from './data/time';
 import { isStoreInitialized, setStoreInitialized, loadStoredEvents, saveStoredEvents, clearStoredEvents, clearStore } from './data/store';
 import { validateEvents } from './data/validate';
+import { loadSavedTheme, applyTheme } from './themes';
 
 function setupCanvas(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
   const dpr = window.devicePixelRatio || 1;
@@ -774,7 +775,12 @@ async function main() {
         location.reload();
       });
     },
+    onThemeChange: () => requestRedraw(),
   });
+
+  // Apply saved theme before first draw
+  const savedTheme = loadSavedTheme();
+  applyTheme(savedTheme, () => {});
 
   // Initial draw and resize handler
   draw();

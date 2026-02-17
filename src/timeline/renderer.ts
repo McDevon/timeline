@@ -26,7 +26,9 @@ export interface ReorderState {
   ghostY: number;
 }
 
-const COLORS = {
+export type CanvasColors = typeof colors;
+
+let colors = {
   background: "#1a1a2e",
   axis: "#e0e0e0",
   axisText: "#a0a0a0",
@@ -56,6 +58,10 @@ const COLORS = {
   selectionText: "rgba(255, 255, 255, 0.9)",
   selectionFill: "rgba(255, 255, 255, 0.05)",
 };
+
+export function setCanvasColors(newColors: CanvasColors) {
+  colors = newColors;
+}
 
 const LAYOUT = {
   paddingX: 60,
@@ -167,7 +173,7 @@ function drawAxis(
   const x1 = LAYOUT.paddingX;
   const x2 = canvasWidth - LAYOUT.paddingX;
 
-  ctx.strokeStyle = COLORS.axis;
+  ctx.strokeStyle = colors.axis;
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(x1, y);
@@ -178,7 +184,7 @@ function drawAxis(
   const firstTick = Math.ceil(viewport.start / interval) * interval;
   const spanYears = viewport.end - viewport.start;
 
-  ctx.fillStyle = COLORS.axisText;
+  ctx.fillStyle = colors.axisText;
   ctx.font = `${LAYOUT.smallFontSize}px monospace`;
   ctx.textAlign = "center";
   ctx.textBaseline = "top";
@@ -209,7 +215,7 @@ function drawTodayLine(
   const x = yearToX(today, viewport, canvasWidth);
 
   // Vertical line
-  ctx.strokeStyle = COLORS.todayLine;
+  ctx.strokeStyle = colors.todayLine;
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(x, LAYOUT.axisY - LAYOUT.tickHeight);
@@ -217,7 +223,7 @@ function drawTodayLine(
   ctx.stroke();
 
   // Date label above axis
-  ctx.fillStyle = COLORS.todayText;
+  ctx.fillStyle = colors.todayText;
   ctx.font = `${LAYOUT.smallFontSize}px monospace`;
   ctx.textAlign = "center";
   ctx.textBaseline = "bottom";
@@ -242,7 +248,7 @@ function drawCursorLine(
   const year = xToYear(cursorX, viewport, canvasWidth);
 
   // Vertical line
-  ctx.strokeStyle = COLORS.cursorLine;
+  ctx.strokeStyle = colors.cursorLine;
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(cursorX, LAYOUT.axisY - LAYOUT.tickHeight);
@@ -255,13 +261,13 @@ function drawCursorLine(
   const lines: { text: string; color: string }[] = [];
 
   if (cursorDetail) {
-    lines.push({ text: cursorDetail.label, color: COLORS.cursorText });
+    lines.push({ text: cursorDetail.label, color: colors.cursorText });
   }
 
   const dateStr = cursorDetail
     ? cursorDetail.date
     : formatDate(decimalYearToIso(year));
-  lines.push({ text: dateStr, color: COLORS.cursorText });
+  lines.push({ text: dateStr, color: colors.cursorText });
 
   if (!isRange) {
     const today = todayDecimalYear();
@@ -269,13 +275,13 @@ function drawCursorLine(
     const span = viewport.end - viewport.start;
     const nowMag = formatDecimalYearDelta(deltaNow, span);
     const nowLabel = deltaNow > 0 ? `${nowMag} ago` : `in ${nowMag}`;
-    lines.push({ text: nowLabel, color: COLORS.cursorText });
+    lines.push({ text: nowLabel, color: colors.cursorText });
 
     if (isSinglePoint) {
       const deltaSel = year - selection!.start;
       const selMag = formatDecimalYearDelta(deltaSel, span);
       const selLabel = deltaSel >= 0 ? `+${selMag}` : `-${selMag}`;
-      lines.push({ text: selLabel, color: COLORS.selectionText });
+      lines.push({ text: selLabel, color: colors.selectionText });
     }
   }
 
@@ -318,7 +324,7 @@ function drawSelectionBackground(
   );
   const top = LAYOUT.axisY - LAYOUT.tickHeight;
 
-  ctx.fillStyle = COLORS.selectionFill;
+  ctx.fillStyle = colors.selectionFill;
   ctx.fillRect(x1, top, x2 - x1, canvasHeight - top);
 }
 
@@ -332,7 +338,7 @@ function drawSelectionLine(
   if (year < viewport.start || year > viewport.end) return;
   const x = yearToX(year, viewport, canvasWidth);
 
-  ctx.strokeStyle = COLORS.selectionLine;
+  ctx.strokeStyle = colors.selectionLine;
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(x, LAYOUT.axisY - LAYOUT.tickHeight);
@@ -351,7 +357,7 @@ function drawSelectionForeground(
 ) {
   if (selection === null) return;
 
-  ctx.fillStyle = COLORS.selectionText;
+  ctx.fillStyle = colors.selectionText;
   ctx.font = `${LAYOUT.smallFontSize}px monospace`;
   ctx.textAlign = "center";
   ctx.textBaseline = "bottom";
@@ -472,26 +478,26 @@ function drawContainer(
 
   // Container background
   const fillColor = isSelected
-    ? COLORS.containerSelectedFill
+    ? colors.containerSelectedFill
     : isHovered
-      ? COLORS.containerHoverFill
+      ? colors.containerHoverFill
       : isSnap
-        ? COLORS.containerSnapFill
-        : COLORS.containerFill;
+        ? colors.containerSnapFill
+        : colors.containerFill;
   const strokeColor = isSelected
-    ? COLORS.containerSelectedBorder
+    ? colors.containerSelectedBorder
     : isHovered
-      ? COLORS.containerHoverBorder
+      ? colors.containerHoverBorder
       : isSnap
-        ? COLORS.containerSnapBorder
-        : COLORS.containerBorder;
+        ? colors.containerSnapBorder
+        : colors.containerBorder;
   const lineWidth = isSelected || isHovered ? 2 : 1;
 
   applyGradient(ctx, item, viewport, canvasWidth, x1, boxWidth, fillColor, strokeColor, lineWidth);
 
   if (item.isCollapsed) {
     // Collapsed: small font, vertically centered label, no children
-    ctx.fillStyle = COLORS.containerText;
+    ctx.fillStyle = colors.containerText;
     ctx.font = `${LAYOUT.smallFontSize}px sans-serif`;
     ctx.textBaseline = "middle";
     ctx.textAlign = "left";
@@ -508,7 +514,7 @@ function drawContainer(
     ctx.restore();
   } else {
     // Container label at top
-    ctx.fillStyle = COLORS.containerText;
+    ctx.fillStyle = colors.containerText;
     ctx.font = `${LAYOUT.fontSize}px sans-serif`;
     ctx.textBaseline = "middle";
     ctx.textAlign = "left";
@@ -627,26 +633,26 @@ function drawBar(
   const barWidth = Math.max(x2 - x1, 3);
 
   const fillColor = isSelected
-    ? COLORS.barSelectedFill
+    ? colors.barSelectedFill
     : isHovered
-      ? COLORS.barHoverFill
+      ? colors.barHoverFill
       : isSnap
-        ? COLORS.barSnapFill
-        : COLORS.barFill;
+        ? colors.barSnapFill
+        : colors.barFill;
   const strokeColor = isSelected
-    ? COLORS.barSelectedBorder
+    ? colors.barSelectedBorder
     : isHovered
-      ? COLORS.barHoverBorder
+      ? colors.barHoverBorder
       : isSnap
-        ? COLORS.barSnapBorder
-        : COLORS.barBorder;
+        ? colors.barSnapBorder
+        : colors.barBorder;
   const lineWidth = isSelected || isHovered ? 2 : 1;
 
   applyGradient(ctx, item, viewport, canvasWidth, x1, barWidth, fillColor, strokeColor, lineWidth);
 
   // Label — only render when bar is wide enough to show text
   if (barWidth > 10) {
-    ctx.fillStyle = COLORS.barText;
+    ctx.fillStyle = colors.barText;
     ctx.font = `${LAYOUT.smallFontSize}px sans-serif`;
     ctx.textBaseline = "middle";
     ctx.textAlign = "left";
@@ -699,20 +705,20 @@ function drawPointEvent(
   ctx.beginPath();
   ctx.arc(x, cy, radius, 0, Math.PI * 2);
   ctx.fillStyle = isSelected
-    ? COLORS.barSelectedFill
+    ? colors.barSelectedFill
     : isHovered
-      ? COLORS.barHoverFill
+      ? colors.barHoverFill
       : isSnap
-        ? COLORS.barSnapFill
-        : COLORS.barFill;
+        ? colors.barSnapFill
+        : colors.barFill;
   ctx.fill();
   ctx.strokeStyle = isSelected
-    ? COLORS.barSelectedBorder
+    ? colors.barSelectedBorder
     : isHovered
-      ? COLORS.barHoverBorder
+      ? colors.barHoverBorder
       : isSnap
-        ? COLORS.barSnapBorder
-        : COLORS.barBorder;
+        ? colors.barSnapBorder
+        : colors.barBorder;
   ctx.lineWidth = isSelected || isHovered ? 2 : 1;
   ctx.stroke();
 }
@@ -818,7 +824,7 @@ export function render(
   transition?: LayoutTransition,
   reorderState?: ReorderState,
 ) {
-  ctx.fillStyle = COLORS.background;
+  ctx.fillStyle = colors.background;
   ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
   drawAxis(ctx, viewport, canvasWidth);

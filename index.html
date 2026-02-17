@@ -5,6 +5,31 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Timeline</title>
   <style>
+    :root {
+      --tl-page-bg: #1a1a2e;
+      --tl-panel-bg: #16213e;
+      --tl-border: #533483;
+      --tl-border-accent: #7b52ab;
+      --tl-text: #e0e0e0;
+      --tl-text-muted: #b0b0b0;
+      --tl-text-approx: #9090b0;
+      --tl-text-subtle: #a0a0a0;
+      --tl-hover-bg: #1a3a5c;
+      --tl-active-bg: #0f2840;
+      --tl-list-highlight: rgba(255,255,255,0.05);
+      --tl-list-highlight-strong: rgba(255,255,255,0.1);
+      --tl-check-color: #7b52ab;
+      --tl-check-hidden-border: #3a2560;
+      --tl-scrollbar-thumb: #533483;
+      --tl-destructive-text: #e05050;
+      --tl-destructive-hover-bg: rgba(224,80,80,0.1);
+      --tl-destructive-bg: #3a1515;
+      --tl-destructive-border: #a03030;
+      --tl-destructive-hover-border: #c04040;
+      --tl-destructive-confirm-hover-bg: #4a1f1f;
+      --tl-drop-overlay-bg: rgba(15,52,96,0.6);
+      --tl-backdrop-bg: rgba(0,0,0,0.5);
+    }
     * {
       margin: 0;
       padding: 0;
@@ -14,7 +39,7 @@
       width: 100%;
       height: 100%;
       overflow: hidden;
-      background: #1a1a2e;
+      background: var(--tl-page-bg);
     }
     canvas {
       display: block;
@@ -22,10 +47,10 @@
     .timeline-tooltip {
       position: fixed;
       padding: 8px 12px;
-      background: #16213e;
-      border: 1px solid #533483;
+      background: var(--tl-panel-bg);
+      border: 1px solid var(--tl-border);
       border-radius: 6px;
-      color: #e0e0e0;
+      color: var(--tl-text);
       font-family: sans-serif;
       font-size: 13px;
       line-height: 1.4;
@@ -39,16 +64,16 @@
       opacity: 1;
     }
     .timeline-tooltip .tooltip-dates {
-      color: #b0b0b0;
+      color: var(--tl-text-muted);
       font-size: 12px;
     }
     .timeline-tooltip .tooltip-approx {
-      color: #9090b0;
+      color: var(--tl-text-approx);
       font-size: 12px;
       font-style: italic;
     }
     .timeline-tooltip .tooltip-info {
-      color: #a0a0a0;
+      color: var(--tl-text-subtle);
       font-size: 12px;
     }
     .zoom-controls {
@@ -63,10 +88,10 @@
     .zoom-btn {
       width: 36px;
       height: 36px;
-      border: 1px solid #533483;
+      border: 1px solid var(--tl-border);
       border-radius: 6px;
-      background: #16213e;
-      color: #e0e0e0;
+      background: var(--tl-panel-bg);
+      color: var(--tl-text);
       font-size: 20px;
       line-height: 1;
       cursor: pointer;
@@ -75,21 +100,21 @@
       justify-content: center;
     }
     .zoom-btn:hover {
-      background: #1a3a5c;
-      border-color: #7b52ab;
+      background: var(--tl-hover-bg);
+      border-color: var(--tl-border-accent);
     }
     .zoom-btn:active {
-      background: #0f2840;
+      background: var(--tl-active-bg);
     }
     .event-list-panel {
       position: fixed;
       bottom: 20px;
       left: 20px;
       width: 260px;
-      background: #16213e;
-      border: 1px solid #533483;
+      background: var(--tl-panel-bg);
+      border: 1px solid var(--tl-border);
       border-radius: 6px;
-      color: #e0e0e0;
+      color: var(--tl-text);
       font-family: sans-serif;
       font-size: 13px;
       z-index: 50;
@@ -102,10 +127,10 @@
       padding: 6px 10px;
       cursor: pointer;
       user-select: none;
-      border-bottom: 1px solid #533483;
+      border-bottom: 1px solid var(--tl-border);
     }
     .event-list-header:hover {
-      background: #1a3a5c;
+      background: var(--tl-hover-bg);
     }
     .event-list-title {
       font-size: 12px;
@@ -141,7 +166,7 @@
     }
     .event-list-row:hover,
     .event-list-row.highlighted {
-      background: rgba(255, 255, 255, 0.05);
+      background: var(--tl-list-highlight);
     }
     .event-list-row.hidden {
       opacity: 0.4;
@@ -151,7 +176,7 @@
       width: 16px;
       height: 16px;
       margin-top: 1px;
-      border: 1px solid #533483;
+      border: 1px solid var(--tl-border);
       border-radius: 3px;
       background: transparent;
       display: flex;
@@ -159,10 +184,10 @@
       justify-content: center;
       font-size: 11px;
       line-height: 1;
-      color: #7b52ab;
+      color: var(--tl-check-color);
     }
     .event-list-row.hidden .event-list-check {
-      border-color: #3a2560;
+      border-color: var(--tl-check-hidden-border);
       color: transparent;
     }
     .event-list-info {
@@ -175,7 +200,7 @@
       text-overflow: ellipsis;
     }
     .event-list-dates {
-      color: #b0b0b0;
+      color: var(--tl-text-muted);
       font-size: 11px;
       white-space: nowrap;
       overflow: hidden;
@@ -188,7 +213,7 @@
       background: transparent;
     }
     .event-list-body::-webkit-scrollbar-thumb {
-      background: #533483;
+      background: var(--tl-scrollbar-thumb);
       border-radius: 3px;
     }
     .info-log {
@@ -204,9 +229,9 @@
       z-index: 60;
     }
     .info-log-message {
-      background: #16213e;
-      border: 1px solid #533483;
-      color: #e0e0e0;
+      background: var(--tl-panel-bg);
+      border: 1px solid var(--tl-border);
+      color: var(--tl-text);
       padding: 8px 16px;
       border-radius: 6px;
       font-family: sans-serif;
@@ -225,11 +250,11 @@
     .drop-overlay {
       position: fixed;
       inset: 0;
-      background: rgba(15, 52, 96, 0.6);
+      background: var(--tl-drop-overlay-bg);
       display: flex;
       align-items: center;
       justify-content: center;
-      color: #e0e0e0;
+      color: var(--tl-text);
       font-family: sans-serif;
       font-size: 24px;
       font-weight: 600;
@@ -237,7 +262,7 @@
       pointer-events: none;
       opacity: 0;
       transition: opacity 0.15s ease-in-out;
-      border: 3px dashed #533483;
+      border: 3px dashed var(--tl-border);
     }
     .drop-overlay.visible {
       opacity: 1;
@@ -247,10 +272,10 @@
       bottom: 20px;
       left: 288px;
       width: 200px;
-      background: #16213e;
-      border: 1px solid #533483;
+      background: var(--tl-panel-bg);
+      border: 1px solid var(--tl-border);
       border-radius: 6px;
-      color: #e0e0e0;
+      color: var(--tl-text);
       font-family: sans-serif;
       font-size: 13px;
       z-index: 50;
@@ -263,10 +288,10 @@
       padding: 6px 10px;
       cursor: pointer;
       user-select: none;
-      border-bottom: 1px solid #533483;
+      border-bottom: 1px solid var(--tl-border);
     }
     .timeline-menu-header:hover {
-      background: #1a3a5c;
+      background: var(--tl-hover-bg);
     }
     .timeline-menu-title {
       font-size: 12px;
@@ -285,6 +310,8 @@
       border-bottom: none;
     }
     .timeline-menu-body {
+      max-height: 300px;
+      overflow: hidden;
       transition: max-height 0.2s ease;
     }
     .timeline-menu.collapsed .timeline-menu-body {
@@ -297,21 +324,21 @@
       user-select: none;
     }
     .timeline-menu-btn:hover {
-      background: rgba(255, 255, 255, 0.05);
+      background: var(--tl-list-highlight);
     }
     .timeline-menu-btn:active {
-      background: rgba(255, 255, 255, 0.1);
+      background: var(--tl-list-highlight-strong);
     }
     .timeline-menu-btn.destructive {
-      color: #e05050;
+      color: var(--tl-destructive-text);
     }
     .timeline-menu-btn.destructive:hover {
-      background: rgba(224, 80, 80, 0.1);
+      background: var(--tl-destructive-hover-bg);
     }
     .confirm-backdrop {
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, 0.5);
+      background: var(--tl-backdrop-bg);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -323,12 +350,12 @@
       opacity: 1;
     }
     .confirm-dialog {
-      background: #16213e;
-      border: 1px solid #533483;
+      background: var(--tl-panel-bg);
+      border: 1px solid var(--tl-border);
       border-radius: 8px;
       padding: 20px 24px;
       max-width: 360px;
-      color: #e0e0e0;
+      color: var(--tl-text);
       font-family: sans-serif;
       font-size: 14px;
     }
@@ -343,26 +370,63 @@
     }
     .confirm-btn {
       padding: 6px 16px;
-      border: 1px solid #533483;
+      border: 1px solid var(--tl-border);
       border-radius: 4px;
-      background: #1a1a2e;
-      color: #e0e0e0;
+      background: var(--tl-page-bg);
+      color: var(--tl-text);
       font-size: 13px;
       cursor: pointer;
       font-family: sans-serif;
     }
     .confirm-btn:hover {
-      background: #1a3a5c;
-      border-color: #7b52ab;
+      background: var(--tl-hover-bg);
+      border-color: var(--tl-border-accent);
     }
     .confirm-btn.destructive {
-      background: #3a1515;
-      border-color: #a03030;
-      color: #e05050;
+      background: var(--tl-destructive-bg);
+      border-color: var(--tl-destructive-border);
+      color: var(--tl-destructive-text);
     }
     .confirm-btn.destructive:hover {
-      background: #4a1f1f;
-      border-color: #c04040;
+      background: var(--tl-destructive-confirm-hover-bg);
+      border-color: var(--tl-destructive-hover-border);
+    }
+    .theme-flyout {
+      position: fixed;
+      background: var(--tl-panel-bg);
+      border: 1px solid var(--tl-border);
+      border-radius: 6px;
+      padding: 4px 0;
+      z-index: 60;
+      font-family: sans-serif;
+      font-size: 13px;
+      color: var(--tl-text);
+      min-width: 180px;
+    }
+    .theme-flyout-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .theme-flyout-row:hover {
+      background: var(--tl-list-highlight);
+    }
+    .theme-flyout-row.active {
+      background: var(--tl-list-highlight-strong);
+    }
+    .theme-swatches {
+      display: flex;
+      gap: 2px;
+      flex-shrink: 0;
+    }
+    .theme-swatch {
+      width: 14px;
+      height: 14px;
+      border-radius: 2px;
+      border: 1px solid rgba(128,128,128,0.3);
     }
   </style>
 </head>
