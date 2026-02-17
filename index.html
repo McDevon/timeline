@@ -108,10 +108,10 @@
     }
     .event-list-panel {
       position: fixed;
-      top: 20px;
       bottom: 20px;
       left: 20px;
       width: 300px;
+      max-height: calc(100vh - 40px);
       background: var(--tl-panel-bg);
       border: 1px solid var(--tl-border);
       border-radius: 6px;
@@ -151,16 +151,14 @@
     .event-list-panel.collapsed .event-list-header {
       border-bottom: none;
     }
-    .event-list-panel.collapsed {
-      top: auto;
-    }
     .event-list-body {
-      flex: 1;
       overflow-y: auto;
       min-height: 0;
+      max-height: calc(100vh - 80px);
+      transition: max-height 0.2s ease;
     }
     .event-list-panel.collapsed .event-list-body {
-      flex: 0;
+      max-height: 0;
       overflow: hidden;
     }
     .event-list-row {
