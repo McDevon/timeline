@@ -190,7 +190,7 @@ async function main() {
     requestRedraw();
   }
 
-  // Recursive position capture helper
+  // Position capture: record absolute Y for every item at all depths.
   function capturePositions(items: LayoutItem[], map: Map<TimelineEvent, number>) {
     for (const item of items) {
       map.set(item.event, item.y);
@@ -198,13 +198,25 @@ async function main() {
     }
   }
 
-  function computeOffsets(items: LayoutItem[], oldPositions: Map<TimelineEvent, number>, yOffsets: Map<TimelineEvent, number>) {
+  // Compute offsets relative to the parent's offset. The renderer applies
+  // ctx.translate on each level, so children inherit their parent's offset.
+  // Storing only the relative delta avoids double-counting.
+  function computeOffsets(
+    items: LayoutItem[],
+    oldPositions: Map<TimelineEvent, number>,
+    yOffsets: Map<TimelineEvent, number>,
+    parentOffset = 0,
+  ) {
     for (const item of items) {
       const oldY = oldPositions.get(item.event);
-      if (oldY !== undefined && oldY !== item.y) {
-        yOffsets.set(item.event, oldY - item.y);
+      const absoluteOffset = oldY !== undefined ? oldY - item.y : 0;
+      const relativeOffset = absoluteOffset - parentOffset;
+      if (relativeOffset !== 0) {
+        yOffsets.set(item.event, relativeOffset);
       }
-      if (item.children.length > 0) computeOffsets(item.children, oldPositions, yOffsets);
+      if (item.children.length > 0) {
+        computeOffsets(item.children, oldPositions, yOffsets, absoluteOffset);
+      }
     }
   }
 
