@@ -82,6 +82,27 @@ export class EventListPanel {
     this.selectedRow = null;
   }
 
+  updateEventName(event: TimelineEvent): void {
+    const row = this.rowMap.get(event);
+    if (!row) return;
+    const nameEl = row.querySelector('.event-list-name');
+    if (nameEl) nameEl.textContent = event.name;
+  }
+
+  removeEvent(event: TimelineEvent): void {
+    const row = this.rowMap.get(event);
+    if (row) {
+      // The row is inside an .event-list-item wrapper
+      const item = row.parentElement;
+      if (item) item.remove();
+      this.rowMap.delete(event);
+      if (this.highlightedRow === row) this.highlightedRow = null;
+      if (this.selectedRow === row) this.selectedRow = null;
+    }
+    this.childrenMap.delete(event);
+    this.expandedEvents.delete(event);
+  }
+
   selectEvent(event: TimelineEvent | null) {
     if (this.selectedRow) {
       this.selectedRow.classList.remove('selected');

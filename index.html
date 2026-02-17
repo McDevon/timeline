@@ -372,6 +372,114 @@
     .timeline-menu-btn.destructive:hover {
       background: var(--tl-destructive-hover-bg);
     }
+    .event-menu {
+      position: fixed;
+      bottom: 20px;
+      left: 536px;
+      width: 200px;
+      background: var(--tl-panel-bg);
+      border: 1px solid var(--tl-border);
+      border-radius: 6px;
+      color: var(--tl-text);
+      font-family: sans-serif;
+      font-size: 13px;
+      z-index: 50;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column-reverse;
+    }
+    .event-menu.hidden {
+      display: none;
+    }
+    .event-menu-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 10px;
+      cursor: pointer;
+      user-select: none;
+      border-top: 1px solid var(--tl-border);
+    }
+    .event-menu-header:hover {
+      background: var(--tl-hover-bg);
+    }
+    .event-menu-title {
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
+    }
+    .event-menu-chevron {
+      font-size: 14px;
+      flex-shrink: 0;
+      margin-left: 6px;
+      transition: transform 0.2s ease;
+    }
+    .event-menu.collapsed .event-menu-chevron {
+      transform: rotate(180deg);
+    }
+    .event-menu.collapsed .event-menu-header {
+      border-top: none;
+    }
+    .event-menu-body {
+      max-height: 300px;
+      overflow: hidden;
+      transition: max-height 0.2s ease;
+    }
+    .event-menu.collapsed .event-menu-body {
+      max-height: 0;
+      overflow: hidden;
+    }
+    .event-menu-field {
+      padding: 6px 10px;
+    }
+    .event-menu-field label {
+      font-size: 11px;
+      color: var(--tl-text-muted);
+      display: block;
+      margin-bottom: 2px;
+    }
+    .event-menu-field input,
+    .event-menu-field textarea {
+      width: 100%;
+      box-sizing: border-box;
+      background: var(--tl-page-bg);
+      border: 1px solid var(--tl-border);
+      border-radius: 4px;
+      color: var(--tl-text);
+      font-family: sans-serif;
+      font-size: 13px;
+      padding: 4px 6px;
+    }
+    .event-menu-field input:focus,
+    .event-menu-field textarea:focus {
+      outline: none;
+      border-color: var(--tl-border-accent);
+    }
+    .event-menu-field textarea {
+      resize: vertical;
+      min-height: 60px;
+    }
+    .event-menu-btn {
+      padding: 8px 10px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .event-menu-btn:hover {
+      background: var(--tl-list-highlight);
+    }
+    .event-menu-btn:active {
+      background: var(--tl-list-highlight-strong);
+    }
+    .event-menu-btn.destructive {
+      color: var(--tl-destructive-text);
+    }
+    .event-menu-btn.destructive:hover {
+      background: var(--tl-destructive-hover-bg);
+    }
     .confirm-backdrop {
       position: fixed;
       inset: 0;

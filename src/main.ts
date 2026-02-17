@@ -9,6 +9,7 @@ import { SnapState } from './timeline/snap';
 import { EventListPanel } from './ui/eventList';
 import { InfoLog } from './ui/infoLog';
 import { TimelineMenu } from './ui/timelineMenu';
+import { EventMenu } from './ui/eventMenu';
 import { showConfirmDialog } from './ui/confirmDialog';
 import { saveState, loadState } from './state';
 import { dateToDecimalYear } from './data/time';
@@ -276,6 +277,7 @@ async function main() {
       if (selectedItem && selectedItem.event !== event && isDescendantOf(selectedItem, event)) {
         selectedItem = null;
         eventListPanel?.selectEvent(null);
+        eventMenu.hide();
       }
     }
 
@@ -516,7 +518,11 @@ async function main() {
     () => layout,
     () => hoveredItem,
     setHoveredItem,
-    (item: LayoutItem | null) => { selectedItem = item; eventListPanel?.selectEvent(item?.event ?? null); },
+    (item: LayoutItem | null) => {
+      selectedItem = item;
+      eventListPanel?.selectEvent(item?.event ?? null);
+      if (item) eventMenu.show(item.event); else eventMenu.hide();
+    },
     (x: number) => { cursorX = x; },
     () => selection,
     (sel: TimelineSelection | null) => { selection = sel; },
@@ -567,6 +573,7 @@ async function main() {
     selection = preClickSelection;
     selectedItem = preClickSelectedItem;
     eventListPanel?.selectEvent(selectedItem?.event ?? null);
+    if (selectedItem) eventMenu.show(selectedItem.event); else eventMenu.hide();
 
     if (dblClickItem && hit.event === dblClickItem.event && dblClickPrevViewport) {
       animateZoom(dblClickPrevViewport);
@@ -628,6 +635,7 @@ async function main() {
       if (selectedItem && isDescendantOf(selectedItem, event)) {
         selectedItem = null;
         eventListPanel?.selectEvent(null);
+        eventMenu.hide();
       }
       if (dblClickItem && isDescendantOf(dblClickItem, event)) {
         dblClickPrevViewport = null;
@@ -651,6 +659,7 @@ async function main() {
     const item = findLayoutItem(event, layout);
     selectedItem = item;
     eventListPanel?.selectEvent(event);
+    eventMenu.show(event);
 
     if (item) {
       const rect = canvas.getBoundingClientRect();
@@ -681,6 +690,47 @@ async function main() {
   }
 
   eventListPanel = new EventListPanel(events, onToggleEvent, onHoverEvent, onSelectEvent, hiddenEvents);
+
+  // --- Event editing menu ---
+  function removeEvent(arr: TimelineEvent[], target: TimelineEvent): boolean {
+    for (let i = 0; i < arr.length; i++) {
+      if (arr[i] === target) {
+        arr.splice(i, 1);
+        return true;
+      }
+      if (arr[i].nested && removeEvent(arr[i].nested!, target)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  const eventMenu = new EventMenu({
+    onRename: (event, name) => {
+      event.name = name;
+      eventListPanel?.updateEventName(event);
+      relayout();
+      requestRedraw();
+      saveStoredEvents(events);
+    },
+    onEditInfo: (event, info) => {
+      event.info = info || undefined;
+      saveStoredEvents(events);
+    },
+    onDelete: (event) => {
+      removeEvent(events, event);
+      hiddenEvents.delete(event);
+      collapsedEvents.delete(event);
+      selectedItem = null;
+      eventMenu.hide();
+      eventListPanel?.selectEvent(null);
+      eventListPanel?.removeEvent(event);
+      relayout();
+      requestRedraw();
+      saveStoredEvents(events);
+      infoLog.show(`Deleted "${event.name}"`);
+    },
+  });
 
   // --- Event import (shared by drop handler and menu) ---
   function importEventsFromFile(file: File) {
@@ -827,6 +877,7 @@ async function main() {
         eventListPanel?.clear();
         hoveredItem = null;
         selectedItem = null;
+        eventMenu.hide();
         dblClickPrevViewport = null;
         dblClickItem = null;
         relayout();
