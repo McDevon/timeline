@@ -689,7 +689,27 @@ async function main() {
     requestRedraw();
   }
 
-  eventListPanel = new EventListPanel(events, onToggleEvent, onHoverEvent, onSelectEvent, hiddenEvents);
+  function onDblClickEvent(event: TimelineEvent) {
+    if (event.end === undefined) return; // point events have no range to zoom into
+    const item = findLayoutItem(event, layout);
+    if (!item) return;
+
+    if (dblClickItem && event === dblClickItem.event && dblClickPrevViewport) {
+      animateZoom(dblClickPrevViewport);
+      dblClickPrevViewport = null;
+      dblClickItem = null;
+    } else {
+      dblClickPrevViewport = { ...(animTo ?? viewport) };
+      dblClickItem = item;
+      const padding = (item.nominalEndYear - item.nominalStartYear) * 0.1;
+      animateZoom({
+        start: item.nominalStartYear - padding,
+        end: item.nominalEndYear + padding,
+      });
+    }
+  }
+
+  eventListPanel = new EventListPanel(events, onToggleEvent, onHoverEvent, onSelectEvent, hiddenEvents, onDblClickEvent);
 
   // --- Event editing helpers ---
   function findParent(list: TimelineEvent[], target: TimelineEvent): TimelineEvent | null {

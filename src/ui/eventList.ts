@@ -15,6 +15,7 @@ export class EventListPanel {
     onHover: (event: TimelineEvent | null) => void,
     onSelect: (event: TimelineEvent) => void,
     hiddenEvents?: Set<TimelineEvent>,
+    private onDblClick?: (event: TimelineEvent) => void,
   ) {
     this.el = document.createElement('div');
     this.el.className = 'event-list-panel collapsed';
@@ -237,6 +238,9 @@ export class EventListPanel {
 
     // Click → select on timeline
     row.addEventListener('click', () => { onSelect(event); });
+
+    // Double-click → zoom to event
+    row.addEventListener('dblclick', () => { this.onDblClick?.(event); });
 
     // Hover sync
     row.addEventListener('mouseenter', () => { onHover(event); });
