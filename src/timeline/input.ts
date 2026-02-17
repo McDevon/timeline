@@ -384,6 +384,8 @@ export function setupInput(
     const mode = dragMode;
     dragMode = 'none';
 
+    if (mode === 'none') return; // mousedown wasn't on the canvas
+
     if (mode === 'reordering') {
       onReorderEnd(reorderItem!);
       reorderItem = null;
