@@ -1,5 +1,5 @@
 import { loadEvents } from './data/loader';
-import { render, computeFullRange, LAYOUT, LayoutTransition, ReorderState } from './timeline/renderer';
+import { render, computeFullRange, computeMaxLayoutY, LAYOUT, LayoutTransition, ReorderState } from './timeline/renderer';
 import { computeLayout, LayoutItem } from './timeline/layout';
 import { Viewport, zoomViewport } from './timeline/viewport';
 import { hitTest } from './timeline/hitTest';
@@ -70,10 +70,22 @@ async function main() {
 
   function relayout() {
     layout = computeLayout(events, LAYOUT.eventsStartY, collapsedEvents, eventOrders, hiddenEvents);
+    // Clamp scroll if layout shrank
+    const max = computeMaxScrollY();
+    if (scrollY > max) scrollY = max;
   }
 
   // Initialize viewport — use saved or compute full range
   let viewport: Viewport = saved?.viewport ?? computeFullRange(events);
+
+  // Vertical scroll state
+  let scrollY = 0;
+
+  function computeMaxScrollY(): number {
+    const maxY = computeMaxLayoutY(layout);
+    const canvasHeight = canvas.getBoundingClientRect().height;
+    return Math.max(0, maxY - canvasHeight + 20);
+  }
   let hoveredItem: LayoutItem | null = null;
   let eventListPanel: EventListPanel | null = null;
 
@@ -164,7 +176,7 @@ async function main() {
 
     const ctx = setupCanvas(canvas);
     const rect = canvas.getBoundingClientRect();
-    render(ctx, rect.width, rect.height, layout, viewport, hoveredItem, selectedItem, cursorX, selection, snapState, transition, reorderState ?? undefined);
+    render(ctx, rect.width, rect.height, layout, viewport, hoveredItem, selectedItem, cursorX, selection, snapState, scrollY, transition, reorderState ?? undefined);
   }
 
   // Debounced state persistence
@@ -512,6 +524,9 @@ async function main() {
     onReorderMove,
     onReorderEnd,
     onReorderCancel,
+    () => scrollY,
+    (y: number) => { scrollY = y; },
+    computeMaxScrollY,
     requestRedraw,
   );
 
@@ -543,7 +558,7 @@ async function main() {
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    const hit = hitTest(x, y, layout, viewport, canvas.clientWidth);
+    const hit = hitTest(x, y, layout, viewport, canvas.clientWidth, scrollY);
 
     if (!hit || hit.event.end === undefined) return;
 
@@ -797,7 +812,11 @@ async function main() {
 
   // Initial draw and resize handler
   draw();
-  window.addEventListener('resize', () => requestRedraw());
+  window.addEventListener('resize', () => {
+    const max = computeMaxScrollY();
+    if (scrollY > max) scrollY = max;
+    requestRedraw();
+  });
 }
 
 main();

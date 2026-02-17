@@ -12,10 +12,13 @@ export function hitTest(
   layout: LayoutItem[],
   viewport: Viewport,
   canvasWidth: number,
+  scrollY = 0,
 ): LayoutItem | null {
+  // Convert screen Y to layout Y
+  const layoutY = py + scrollY;
   // Iterate in reverse so items drawn on top are hit first
   for (let i = layout.length - 1; i >= 0; i--) {
-    const result = hitTestItem(px, py, layout[i], viewport, canvasWidth);
+    const result = hitTestItem(px, layoutY, layout[i], viewport, canvasWidth);
     if (result) return result;
   }
   return null;

@@ -32,6 +32,9 @@ export function setupInput(
   onReorderMove: (item: LayoutItem, cursorY: number) => void,
   onReorderEnd: (item: LayoutItem) => void,
   onReorderCancel: () => void,
+  getScrollY: () => number,
+  setScrollY: (y: number) => void,
+  getMaxScrollY: () => number,
   requestRedraw: () => void,
 ): InputHandlers {
   const tooltip = new Tooltip();
@@ -192,7 +195,7 @@ export function setupInput(
     if (cursorCanvasX < 0) return;
     const layout = getLayout();
     const viewport = getViewport();
-    const hit = hitTest(cursorCanvasX, cursorCanvasY, layout, viewport, canvas.clientWidth);
+    const hit = hitTest(cursorCanvasX, cursorCanvasY, layout, viewport, canvas.clientWidth, getScrollY());
     const prev = getHovered();
     if (hit !== prev) {
       setHovered(hit);
@@ -217,9 +220,21 @@ export function setupInput(
       const cursorX = e.clientX - rect.left;
       setViewport(zoomViewport(viewport, cursorX, canvas.clientWidth, e.deltaY));
     } else {
-      // Pan
-      const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
-      setViewport(panViewport(viewport, delta, canvas.clientWidth));
+      const maxScroll = getMaxScrollY();
+      if (maxScroll > 0 && !e.shiftKey) {
+        // Content overflows: deltaX → horizontal pan, deltaY → vertical scroll
+        if (e.deltaX !== 0) {
+          setViewport(panViewport(viewport, e.deltaX, canvas.clientWidth));
+        }
+        if (e.deltaY !== 0) {
+          const newScrollY = Math.max(0, Math.min(maxScroll, getScrollY() + e.deltaY));
+          setScrollY(newScrollY);
+        }
+      } else {
+        // Content fits or shift held: all delta → horizontal pan
+        const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+        setViewport(panViewport(viewport, delta, canvas.clientWidth));
+      }
     }
 
     updateCursorLine(cursorCanvasX, cursorCanvasY);
@@ -292,7 +307,7 @@ export function setupInput(
       dragMode = 'panning';
       dragDecided = false;
       viewportAtDragStart = { ...getViewport() };
-      const hit = hitTest(x, y, getLayout(), getViewport(), canvas.clientWidth);
+      const hit = hitTest(x, y, getLayout(), getViewport(), canvas.clientWidth, getScrollY());
       reorderItem = hit;
       updateCursorLine(-1, LAYOUT.eventsStartY);
       canvas.style.cursor = 'grabbing';
@@ -324,7 +339,7 @@ export function setupInput(
     if (dragMode === 'reordering') {
       const rect = canvas.getBoundingClientRect();
       const canvasY = e.clientY - rect.top;
-      onReorderMove(reorderItem!, canvasY);
+      onReorderMove(reorderItem!, canvasY + getScrollY());
       scheduleRedraw();
       return;
     }
@@ -347,7 +362,7 @@ export function setupInput(
           tooltip.hide();
           canvas.style.cursor = 'ns-resize';
           const rect = canvas.getBoundingClientRect();
-          onReorderMove(reorderItem, e.clientY - rect.top);
+          onReorderMove(reorderItem, e.clientY - rect.top + getScrollY());
           scheduleRedraw();
           return;
         }
@@ -438,7 +453,7 @@ export function setupInput(
       const y = e.clientY - rect.top;
       const layout = getLayout();
       const viewport = getViewport();
-      const hit = hitTest(x, y, layout, viewport, canvas.clientWidth);
+      const hit = hitTest(x, y, layout, viewport, canvas.clientWidth, getScrollY());
 
       // Ctrl/Cmd+click on a container toggles collapse
       if (modifierHeld && hit && hit.isContainer) {

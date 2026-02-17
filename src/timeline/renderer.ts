@@ -810,6 +810,16 @@ function findLayoutItemByEvent(event: TimelineEvent, items: LayoutItem[]): Layou
   return null;
 }
 
+/** Compute the maximum Y extent of a layout tree (for scroll bounds). */
+export function computeMaxLayoutY(layout: LayoutItem[]): number {
+  let maxY = 0;
+  for (const item of layout) {
+    const bottom = item.y + item.height;
+    if (bottom > maxY) maxY = bottom;
+  }
+  return maxY;
+}
+
 export function render(
   ctx: CanvasRenderingContext2D,
   canvasWidth: number,
@@ -821,14 +831,18 @@ export function render(
   cursorX: number,
   selection: TimelineSelection | null,
   snapState: SnapState,
+  scrollY: number,
   transition?: LayoutTransition,
   reorderState?: ReorderState,
 ) {
   ctx.fillStyle = colors.background;
   ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-  drawAxis(ctx, viewport, canvasWidth);
   drawSelectionBackground(ctx, selection, viewport, canvasWidth, canvasHeight);
+
+  // Enter scroll space for events
+  ctx.save();
+  ctx.translate(0, -scrollY);
 
   // Draw fading-out items (old layout, decreasing alpha)
   if (transition && transition.fadingOut.length > 0) {
@@ -864,6 +878,18 @@ export function render(
 
   currentDraggedEvent = null;
 
+  // Exit scroll space
+  ctx.restore();
+
+  // Axis overlay: semi-transparent background over header area
+  ctx.save();
+  ctx.globalAlpha = 0.9;
+  ctx.fillStyle = colors.background;
+  ctx.fillRect(0, 0, canvasWidth, LAYOUT.eventsStartY);
+  ctx.restore();
+
+  // Axis and overlays drawn in screen space (not scrolled)
+  drawAxis(ctx, viewport, canvasWidth);
   drawTodayLine(ctx, viewport, canvasWidth, canvasHeight);
   drawSelectionForeground(
     ctx,
