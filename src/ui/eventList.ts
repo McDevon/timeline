@@ -105,17 +105,21 @@ export class EventListPanel {
 
     const row = document.createElement('div');
     row.className = 'event-list-row';
-    row.style.paddingLeft = `${10 + depth * 16}px`;
     if (depth > 0) {
       row.style.background = `rgba(255,255,255,${depth * 0.02})`;
     }
 
     const hasChildren = event.nested !== undefined && event.nested.length > 0;
 
-    // Arrow (left)
+    // Arrow (left) — covers indentation area for a larger click target
     const arrow = document.createElement('div');
     arrow.className = 'event-list-arrow' + (hasChildren ? '' : ' placeholder');
-    arrow.textContent = '\u25B6';
+    arrow.style.paddingLeft = `${10 + depth * 16}px`;
+    arrow.style.paddingRight = '4px';
+    const arrowIcon = document.createElement('span');
+    arrowIcon.className = 'event-list-arrow-icon';
+    arrowIcon.textContent = '\u25B6';
+    arrow.appendChild(arrowIcon);
 
     // Info (center, flex:1)
     const info = document.createElement('div');
@@ -178,7 +182,7 @@ export class EventListPanel {
       // Arrow click → expand/collapse children in list
       arrow.addEventListener('click', (e) => {
         e.stopPropagation();
-        this.toggleExpand(event, arrow, childrenContainer);
+        this.toggleExpand(event, arrowIcon, childrenContainer);
       });
     }
 
@@ -187,7 +191,7 @@ export class EventListPanel {
 
   private toggleExpand(
     event: TimelineEvent,
-    arrow: HTMLDivElement,
+    icon: HTMLElement,
     container: HTMLDivElement,
   ): void {
     const isExpanded = this.expandedEvents.has(event);
@@ -195,7 +199,7 @@ export class EventListPanel {
     if (isExpanded) {
       // Collapse: animate from scrollHeight to 0
       this.expandedEvents.delete(event);
-      arrow.classList.remove('expanded');
+      icon.classList.remove('expanded');
       container.style.maxHeight = container.scrollHeight + 'px';
       // Force reflow so the browser registers the starting value
       void container.offsetHeight;
@@ -203,7 +207,7 @@ export class EventListPanel {
     } else {
       // Expand: animate from 0 to scrollHeight, then set to 'none'
       this.expandedEvents.add(event);
-      arrow.classList.add('expanded');
+      icon.classList.add('expanded');
       container.style.maxHeight = container.scrollHeight + 'px';
 
       const onEnd = () => {

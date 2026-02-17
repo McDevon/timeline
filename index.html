@@ -170,23 +170,23 @@
     }
     .event-list-arrow {
       flex-shrink: 0;
-      width: 16px;
-      height: 16px;
-      margin-top: 1px;
+      align-self: stretch;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 10px;
-      color: var(--tl-text-muted);
       cursor: pointer;
-      transition: transform 0.2s ease;
       user-select: none;
-    }
-    .event-list-arrow.expanded {
-      transform: rotate(90deg);
     }
     .event-list-arrow.placeholder {
       visibility: hidden;
+    }
+    .event-list-arrow-icon {
+      font-size: 10px;
+      color: var(--tl-text-muted);
+      transition: transform 0.2s ease;
+    }
+    .event-list-arrow-icon.expanded {
+      transform: rotate(90deg);
     }
     .event-list-children {
       overflow: hidden;
