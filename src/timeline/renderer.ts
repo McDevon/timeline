@@ -495,6 +495,11 @@ function drawContainer(
 
   applyGradient(ctx, item, viewport, canvasWidth, x1, boxWidth, fillColor, strokeColor, lineWidth);
 
+  // Draw overflow shadows for children extending beyond container
+  if (!item.isCollapsed) {
+    drawOverflowShadow(ctx, item, viewport, canvasWidth, fillColor);
+  }
+
   if (item.isCollapsed) {
     // Collapsed: small font, vertically centered label, no children
     ctx.fillStyle = colors.containerText;
@@ -542,6 +547,71 @@ function drawContainer(
         snapHighlightYears,
         transition,
       );
+    }
+  }
+}
+
+/** Parse an rgba/rgb/hex color into [r, g, b, a] components. */
+function parseColor(color: string): [number, number, number, number] {
+  if (color.startsWith('#')) {
+    const r = parseInt(color.slice(1, 3), 16);
+    const g = parseInt(color.slice(3, 5), 16);
+    const b = parseInt(color.slice(5, 7), 16);
+    return [r, g, b, 1];
+  }
+  const match = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+  if (match) {
+    return [
+      parseInt(match[1], 10),
+      parseInt(match[2], 10),
+      parseInt(match[3], 10),
+      match[4] !== undefined ? parseFloat(match[4]) : 1,
+    ];
+  }
+  return [0, 0, 0, 0];
+}
+
+function drawOverflowShadow(
+  ctx: CanvasRenderingContext2D,
+  item: LayoutItem,
+  viewport: Viewport,
+  canvasWidth: number,
+  fillColor: string,
+) {
+  if (item.overflowStart === undefined && item.overflowEnd === undefined) return;
+
+  const [r, g, b, a] = parseColor(fillColor);
+  const peakAlpha = Math.max(a * 0.8, 0.18);
+  const edgeAlpha = peakAlpha * 0.35;
+  const radius = LAYOUT.containerRadius;
+
+  // Left overflow shadow
+  if (item.overflowStart !== undefined) {
+    const shadowLeft = yearToX(item.overflowStart, viewport, canvasWidth);
+    const shadowRight = yearToX(item.startYear, viewport, canvasWidth);
+    const w = shadowRight - shadowLeft;
+    if (w > 1) {
+      const grad = ctx.createLinearGradient(shadowLeft, 0, shadowRight, 0);
+      grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${edgeAlpha})`);
+      grad.addColorStop(1, `rgba(${r}, ${g}, ${b}, ${peakAlpha})`);
+      ctx.fillStyle = grad;
+      drawRoundedRect(ctx, shadowLeft, item.y, w, item.height, radius, 0);
+      ctx.fill();
+    }
+  }
+
+  // Right overflow shadow
+  if (item.overflowEnd !== undefined) {
+    const shadowLeft = yearToX(item.endYear, viewport, canvasWidth);
+    const shadowRight = yearToX(item.overflowEnd, viewport, canvasWidth);
+    const w = shadowRight - shadowLeft;
+    if (w > 1) {
+      const grad = ctx.createLinearGradient(shadowLeft, 0, shadowRight, 0);
+      grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${peakAlpha})`);
+      grad.addColorStop(1, `rgba(${r}, ${g}, ${b}, ${edgeAlpha})`);
+      ctx.fillStyle = grad;
+      drawRoundedRect(ctx, shadowLeft, item.y, w, item.height, 0, radius);
+      ctx.fill();
     }
   }
 }
@@ -736,7 +806,9 @@ function drawLayoutItem(
   snapHighlightYears: Set<number>,
   transition?: LayoutTransition,
 ) {
-  if (!isVisible(item.startYear, item.endYear, viewport)) return;
+  const visStart = item.overflowStart ?? item.startYear;
+  const visEnd = item.overflowEnd ?? item.endYear;
+  if (!isVisible(visStart, visEnd, viewport)) return;
 
   // Apply transition offset and fade-in
   const yOffset = transition?.yOffsets.get(item.event);

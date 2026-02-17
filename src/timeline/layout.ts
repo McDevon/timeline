@@ -32,6 +32,8 @@ export interface LayoutItem {
   isCollapsed: boolean;
   isPoint: boolean;
   children: LayoutItem[];
+  overflowStart?: number;
+  overflowEnd?: number;
 }
 
 /** Internal: an event placed at a relative Y within its level. */
@@ -49,6 +51,8 @@ interface PlacedItem {
   isCollapsed: boolean;
   isPoint: boolean;
   placedChildren: PlacedItem[];
+  overflowStart?: number;
+  overflowEnd?: number;
 }
 
 /**
@@ -240,6 +244,8 @@ function placeLevel(
       isCollapsed: false,
       isPoint: false,
       placedChildren,
+      overflowStart: overlapStart < base.startYear ? overlapStart : undefined,
+      overflowEnd: overlapEnd > base.endYear ? overlapEnd : undefined,
     };
   });
 
@@ -283,6 +289,8 @@ function placeLevel(
       isCollapsed: item.isCollapsed,
       isPoint: item.isPoint,
       placedChildren: item.placedChildren,
+      overflowStart: 'overflowStart' in item ? (item as { overflowStart?: number }).overflowStart : undefined,
+      overflowEnd: 'overflowEnd' in item ? (item as { overflowEnd?: number }).overflowEnd : undefined,
     };
 
     placedMap.set(item.event, placedItem);
@@ -344,6 +352,8 @@ function toLayoutItems(placed: PlacedItem[], offsetY: number): LayoutItem[] {
       isCollapsed: false,
       isPoint: false,
       children,
+      overflowStart: item.overflowStart,
+      overflowEnd: item.overflowEnd,
     };
   });
 }
