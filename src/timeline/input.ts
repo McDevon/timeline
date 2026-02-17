@@ -209,27 +209,61 @@ export function setupInput(
     }
   }
 
+  // Scroll direction lock: accumulate deltas until threshold, then lock axis
+  const SCROLL_LOCK_THRESHOLD = 8;
+  let scrollLock: 'none' | 'horizontal' | 'vertical' = 'none';
+  let scrollAccumX = 0;
+  let scrollAccumY = 0;
+  let scrollLockTimer = 0;
+
+  function resetScrollLock() {
+    scrollLock = 'none';
+    scrollAccumX = 0;
+    scrollAccumY = 0;
+  }
+
   function onWheel(e: WheelEvent) {
     e.preventDefault();
     modifierHeld = e.ctrlKey || e.metaKey;
     const viewport = getViewport();
 
+    // Reset lock after gesture idle
+    clearTimeout(scrollLockTimer);
+    scrollLockTimer = window.setTimeout(resetScrollLock, 150);
+
     if (e.ctrlKey || e.metaKey) {
       // Zoom — Ctrl+wheel or trackpad pinch
+      resetScrollLock();
       const rect = canvas.getBoundingClientRect();
       const cursorX = e.clientX - rect.left;
       setViewport(zoomViewport(viewport, cursorX, canvas.clientWidth, e.deltaY));
     } else {
       const maxScroll = getMaxScrollY();
       if (maxScroll > 0 && !e.shiftKey) {
-        // Content overflows: deltaX → horizontal pan, deltaY → vertical scroll
-        if (e.deltaX !== 0) {
-          setViewport(panViewport(viewport, e.deltaX, canvas.clientWidth));
+        // Content overflows: lock direction after threshold
+        if (scrollLock === 'none') {
+          scrollAccumX += Math.abs(e.deltaX);
+          scrollAccumY += Math.abs(e.deltaY);
+          if (scrollAccumX >= SCROLL_LOCK_THRESHOLD || scrollAccumY >= SCROLL_LOCK_THRESHOLD) {
+            scrollLock = scrollAccumX >= scrollAccumY ? 'horizontal' : 'vertical';
+          }
+        } else {
+          // Break lock when primary direction changes (new gesture)
+          const primaryVertical = Math.abs(e.deltaY) > Math.abs(e.deltaX);
+          if ((scrollLock === 'horizontal' && primaryVertical) ||
+              (scrollLock === 'vertical' && !primaryVertical)) {
+            resetScrollLock();
+          }
         }
-        if (e.deltaY !== 0) {
-          const newScrollY = Math.max(0, Math.min(maxScroll, getScrollY() + e.deltaY));
+        if (scrollLock === 'horizontal') {
+          const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+          setViewport(panViewport(viewport, delta, canvas.clientWidth));
+        } else if (scrollLock === 'vertical') {
+          const delta = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+          const newScrollY = Math.max(0, Math.min(maxScroll, getScrollY() + delta));
           setScrollY(newScrollY);
         }
+        // Before lock decided: don't scroll in either direction (accumulating)
       } else {
         // Content fits or shift held: all delta → horizontal pan
         const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
