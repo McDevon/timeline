@@ -1,0 +1,54 @@
+name: Deploy to Hetzner
+
+on:
+  push:
+    branches:
+      - production
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build site
+        run: pnpm build
+
+      - name: Deploy via SFTP batch
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SFTP_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p ${{ secrets.SFTP_PORT }} ${{ secrets.SFTP_HOST }} >> ~/.ssh/known_hosts
+
+          # Create SFTP batch commands
+          cd dist
+
+          # First, create all directories
+          find . -type d | while read dir; do
+            if [ "$dir" != "." ]; then
+              echo "-mkdir ${{ secrets.SFTP_TARGET_DIR }}/$dir"
+            fi
+          done > /tmp/sftp_commands.txt
+
+          # Then, upload all files
+          find . -type f | while read file; do
+            echo "put \"$file\" \"${{ secrets.SFTP_TARGET_DIR }}/$file\""
+          done >> /tmp/sftp_commands.txt
+
+          # Execute batch
+          sftp -b /tmp/sftp_commands.txt -i ~/.ssh/deploy_key -P ${{ secrets.SFTP_PORT }} ${{ secrets.SFTP_USERNAME }}@${{ secrets.SFTP_HOST }}
