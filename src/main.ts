@@ -10,6 +10,7 @@ import { EventListPanel } from './ui/eventList';
 import { InfoLog } from './ui/infoLog';
 import { TimelineMenu } from './ui/timelineMenu';
 import { EventMenu } from './ui/eventMenu';
+import { ContextMenu } from './ui/contextMenu';
 import { showConfirmDialog } from './ui/confirmDialog';
 import { showHelpDialog } from './ui/helpDialog';
 import { saveState, loadState, eventToPath, pathToEvent } from './state';
@@ -789,7 +790,82 @@ async function main() {
     }
   }
 
-  eventListPanel = new EventListPanel(events, onToggleEvent, onHoverEvent, onSelectEvent, hiddenEvents, onDblClickEvent);
+  function getParentCandidates(event: TimelineEvent) {
+    const descendants = collectDescendants(event);
+    const result: { event: TimelineEvent; name: string; depth: number }[] = [];
+
+    function walk(list: TimelineEvent[], depth: number) {
+      const sorted = [...list].sort(
+        (a, b) => dateToDecimalYear(a.start) - dateToDecimalYear(b.start),
+      );
+      for (const e of sorted) {
+        if (e === event || descendants.has(e)) continue;
+        if (e.end === undefined) continue;
+        result.push({ event: e, name: e.name, depth });
+        if (e.nested) walk(e.nested, depth + 1);
+      }
+    }
+    walk(events, 0);
+    return result;
+  }
+
+  const contextMenu = new ContextMenu({
+    onEdit: (event) => {
+      onSelectEvent(event);
+    },
+    onChangeParent: (event, newParent) => {
+      removeEvent(events, event);
+      if (newParent === null) {
+        events.push(event);
+      } else {
+        if (!newParent.nested) newParent.nested = [];
+        newParent.nested.push(event);
+      }
+      relayout();
+      requestRedraw();
+      eventListPanel?.rebuild(events, onToggleEvent, onHoverEvent, onSelectEvent, hiddenEvents, onContextMenu);
+      saveStoredEvents(events);
+      undoManager.push(snapshot());
+      infoLog.show(`Moved "${event.name}" to ${newParent ? `"${newParent.name}"` : 'top level'}`);
+    },
+    onHoverEvent: (event) => {
+      onHoverEvent(event);
+    },
+    onExport: (event) => {
+      const json = JSON.stringify(event, null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = toSnakeCase(event.name) + '.json';
+      a.click();
+      URL.revokeObjectURL(url);
+      const count = countEvents(event);
+      infoLog.show(`Exported "${event.name}"${count > 1 ? ` with ${count - 1} sub-events` : ''}`);
+    },
+    onDelete: (event) => {
+      removeEvent(events, event);
+      hiddenEvents.delete(event);
+      collapsedEvents.delete(event);
+      selectedItem = null;
+      eventMenu.hide();
+      eventListPanel?.selectEvent(null);
+      eventListPanel?.removeEvent(event);
+      relayout();
+      requestRedraw();
+      saveStoredEvents(events);
+      undoManager.push(snapshot());
+      infoLog.show(`Deleted "${event.name}"`);
+    },
+    getParentCandidates,
+    getCurrentParent: (event) => findParent(events, event),
+  });
+
+  function onContextMenu(event: TimelineEvent, x: number, y: number) {
+    contextMenu.show(event, x, y);
+  }
+
+  eventListPanel = new EventListPanel(events, onToggleEvent, onHoverEvent, onSelectEvent, hiddenEvents, onDblClickEvent, onContextMenu);
 
   // --- Event editing helpers ---
   function findParent(list: TimelineEvent[], target: TimelineEvent): TimelineEvent | null {
@@ -910,7 +986,7 @@ async function main() {
       // Update UI
       relayout();
       requestRedraw();
-      eventListPanel?.rebuild(events, onToggleEvent, onHoverEvent, onSelectEvent, hiddenEvents);
+      eventListPanel?.rebuild(events, onToggleEvent, onHoverEvent, onSelectEvent, hiddenEvents, onContextMenu);
       saveStoredEvents(events);
       undoManager.push(snapshot());
       infoLog.show(`Moved "${event.name}" to ${newParent ? `"${newParent.name}"` : 'top level'}`);
@@ -944,24 +1020,7 @@ async function main() {
     hasChildren: (event) => {
       return event.nested !== undefined && event.nested.length > 0;
     },
-    getParentCandidates: (event) => {
-      const descendants = collectDescendants(event);
-      const result: { event: TimelineEvent; name: string; depth: number }[] = [];
-
-      function walk(list: TimelineEvent[], depth: number) {
-        const sorted = [...list].sort(
-          (a, b) => dateToDecimalYear(a.start) - dateToDecimalYear(b.start),
-        );
-        for (const e of sorted) {
-          if (e === event || descendants.has(e)) continue;
-          if (e.end === undefined) continue; // skip point events
-          result.push({ event: e, name: e.name, depth });
-          if (e.nested) walk(e.nested, depth + 1);
-        }
-      }
-      walk(events, 0);
-      return result;
-    },
+    getParentCandidates,
     getCurrentParent: (event) => findParent(events, event),
   });
 
@@ -1030,7 +1089,7 @@ async function main() {
     relayout();
     requestRedraw();
     saveStoredEvents(events);
-    eventListPanel?.rebuild(events, onToggleEvent, onHoverEvent, onSelectEvent, hiddenEvents);
+    eventListPanel?.rebuild(events, onToggleEvent, onHoverEvent, onSelectEvent, hiddenEvents, onContextMenu);
 
     // 6. Select and edit
     const item = findLayoutItem(newEvent, layout);
@@ -1267,7 +1326,7 @@ async function main() {
     inputHandlers.restoreSelectionOverrides(null, null);
 
     // Rebuild event list and redraw
-    eventListPanel?.rebuild(events, onToggleEvent, onHoverEvent, onSelectEvent, hiddenEvents);
+    eventListPanel?.rebuild(events, onToggleEvent, onHoverEvent, onSelectEvent, hiddenEvents, onContextMenu);
     saveStoredEvents(events);
     requestRedraw();
   }

@@ -20,6 +20,7 @@ export class EventListPanel {
     onSelect: (event: TimelineEvent) => void,
     hiddenEvents?: Set<TimelineEvent>,
     private onDblClick?: (event: TimelineEvent) => void,
+    private onContextMenu?: (event: TimelineEvent, x: number, y: number) => void,
   ) {
     this.el = document.createElement('div');
     this.el.className = 'event-list-panel collapsed';
@@ -135,7 +136,9 @@ export class EventListPanel {
     onHover: (event: TimelineEvent | null) => void,
     onSelect: (event: TimelineEvent) => void,
     hiddenEvents?: Set<TimelineEvent>,
+    onContextMenu?: (event: TimelineEvent, x: number, y: number) => void,
   ): void {
+    if (onContextMenu !== undefined) this.onContextMenu = onContextMenu;
     // Save expanded & selected state
     const expanded = new Set(this.expandedEvents);
     const prevSelected = this.selectedRow
@@ -394,6 +397,13 @@ export class EventListPanel {
     // Hover sync
     row.addEventListener('mouseenter', () => { onHover(event); });
     row.addEventListener('mouseleave', () => { onHover(null); });
+
+    // Right-click context menu
+    row.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.onContextMenu?.(event, e.clientX, e.clientY);
+    });
 
     this.rowMap.set(event, row);
 
