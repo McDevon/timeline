@@ -1,0 +1,848 @@
+[
+  {
+    "start": "1970",
+    "startApprox": ["1950", "1970"],
+    "end": "1996",
+    "endApprox": ["2379", "2410"],
+    "name": "Important Individuals",
+    "nested": [
+      {
+        "start": "2233-03-22",
+        "end": "2371",
+        "name": "James T. Kirk",
+        "info": "Captain of the USS Enterprise NCC-1701 and NCC-1701-A. The most decorated starship captain in Starfleet history. Led the famous five-year mission. Died on Veridian III.",
+        "nested": [
+          {
+            "start": "2265",
+            "name": "Takes command of Enterprise",
+            "info": "Kirk assumes command of the USS Enterprise NCC-1701 at age 32, one of the youngest captains in Starfleet history"
+          },
+          {
+            "start": "2293",
+            "name": "Lost in the Nexus",
+            "info": "During the Enterprise-B's maiden voyage, Kirk is swept into the Nexus energy ribbon and presumed dead"
+          },
+          {
+            "start": "2371",
+            "name": "Death on Veridian III",
+            "info": "Picard pulls Kirk from the Nexus to help stop Soran. Kirk dies saving millions of lives."
+          }
+        ]
+      },
+      {
+        "start": "2305-07-13",
+        "end": "2379",
+        "name": "Jean-Luc Picard",
+        "info": "Captain of the Enterprise-D and Enterprise-E. One of Starfleet's most distinguished officers. Known for his diplomatic skill, moral leadership, and expertise in archaeology.",
+        "endApprox": ["2379", "2410"],
+        "nested": [
+          {
+            "start": "2333",
+            "name": "Takes command of USS Stargazer",
+            "info": "Picard assumes command of the USS Stargazer at a young age after the captain is killed in battle"
+          },
+          {
+            "start": "2355",
+            "name": "Battle of Maxia",
+            "info": "The Stargazer is attacked by an unknown vessel (later identified as Ferengi). Picard invents the 'Picard Maneuver' to defeat it, but is forced to abandon the Stargazer."
+          },
+          {
+            "start": "2364",
+            "name": "Takes command of Enterprise-D",
+            "info": "Picard assumes command of the Galaxy-class Enterprise-D, beginning a legendary career as its captain"
+          }
+        ]
+      },
+      {
+        "start": "2222",
+        "end": "2294",
+        "name": "Montgomery Scott",
+        "info": "Chief Engineer of the Enterprise under Kirk. Famed miracle worker. Survived in a transporter buffer for 75 years aboard the USS Jenolan before being recovered in 2369.",
+        "startApprox": ["2220", "2224"]
+      },
+      {
+        "start": "2227",
+        "end": "2364",
+        "name": "Leonard McCoy",
+        "info": "Chief Medical Officer of the Enterprise under Kirk. Rose to the rank of Admiral. Still alive at age 137 when he inspected the Enterprise-D at its launch in 2364.",
+        "endApprox": ["2364", "2400"]
+      },
+      {
+        "start": "2230-01-06",
+        "end": "2379",
+        "name": "Spock",
+        "info": "Half-Vulcan, half-Human. Science Officer and First Officer of the Enterprise under Kirk. Ambassador who worked toward Vulcan-Romulan reunification. One of the most consequential figures in Federation history.",
+        "endApprox": ["2379", "2400"],
+        "nested": [
+          {
+            "start": "2285",
+            "name": "Spock's death and resurrection",
+            "info": "Spock sacrifices himself to repair the Enterprise's warp drive, dying of radiation exposure. His body, sent to the Genesis Planet, is regenerated. His katra (soul) is reunited with his body on Vulcan."
+          },
+          {
+            "start": "2368",
+            "end": "2379",
+            "name": "Reunification mission on Romulus",
+            "info": "Spock works secretly on Romulus with an underground movement seeking peaceful reunification of the Vulcan and Romulan peoples"
+          }
+        ]
+      },
+      {
+        "start": "2332",
+        "end": "2375",
+        "name": "Benjamin Sisko",
+        "info": "Commander, then Captain, of Deep Space Nine. The Emissary of the Bajoran Prophets. Led the Federation through the Dominion War. Ascended to the Celestial Temple in 2375.",
+        "endApprox": ["2375", "2400"],
+        "nested": [
+          {
+            "start": "2367",
+            "name": "Wife Jennifer killed at Wolf 359",
+            "info": "Sisko's wife Jennifer is killed during the Battle of Wolf 359, shaping his deep resentment toward Picard"
+          },
+          {
+            "start": "2369",
+            "name": "Takes command of DS9, discovers wormhole",
+            "info": "Sisko takes command of Deep Space Nine and discovers the Bajoran Wormhole, becoming the Emissary of the Prophets"
+          }
+        ]
+      },
+      {
+        "start": "2335-05-20",
+        "end": "2378",
+        "name": "Kathryn Janeway",
+        "info": "Captain of USS Voyager. Led her crew through seven years stranded in the Delta Quadrant, encountering the Borg, Species 8472, and dozens of new species, before bringing them home.",
+        "endApprox": ["2378", "2410"],
+        "nested": [
+          {
+            "start": "2371",
+            "name": "Takes command of Voyager",
+            "info": "Janeway launches Voyager on a mission to track a Maquis ship in the Badlands, leading to both crews being stranded in the Delta Quadrant"
+          }
+        ]
+      },
+      {
+        "start": "2338",
+        "end": "2379",
+        "name": "Data",
+        "info": "Soong-type android built by Dr. Noonien Soong. Operations officer and second officer of the Enterprise-D and Enterprise-E. Spent his life striving to understand humanity. Sacrificed himself to save the Enterprise-E.",
+        "startApprox": ["2335", "2338"],
+        "nested": [
+          {
+            "start": "2338",
+            "name": "Discovered by Starfleet on Omicron Theta",
+            "info": "Starfleet personnel find Data, the sole survivor on the devastated colony of Omicron Theta, his memories wiped after the Crystalline Entity destroyed the colony"
+          },
+          {
+            "start": "2365",
+            "name": "Rights as a sentient being established",
+            "info": "Captain Phillipa Louvois rules that Data is a sentient being with rights, not Starfleet property, after Commander Maddox attempts to disassemble him"
+          },
+          {
+            "start": "2379",
+            "name": "Self-sacrifice aboard the Scimitar",
+            "info": "Data beams Picard off the Scimitar and destroys the ship's thalaron weapon, sacrificing himself"
+          }
+        ]
+      },
+      {
+        "start": "2340",
+        "end": "2379",
+        "name": "Worf",
+        "info": "Klingon raised by human parents after the Khitomer Massacre. First Klingon to serve in Starfleet. Served as security chief on Enterprise-D and strategic operations officer on DS9.",
+        "endApprox": ["2379", "2410"],
+        "nested": [
+          {
+            "start": "2346",
+            "name": "Orphaned at Khitomer Massacre",
+            "info": "Worf's parents are killed in the Romulan attack on Khitomer. Six-year-old Worf is rescued and adopted by Sergey and Helena Rozhenko."
+          },
+          {
+            "start": "2364",
+            "name": "Assigned to Enterprise-D",
+            "info": "Worf is assigned to the Enterprise-D as a bridge officer, later becoming chief of security"
+          },
+          {
+            "start": "2372",
+            "name": "Transfers to Deep Space Nine",
+            "info": "Worf transfers to DS9 as strategic operations officer during the growing Dominion crisis"
+          }
+        ]
+      },
+      {
+        "start": "1970",
+        "end": "2285",
+        "name": "Khan Noonien Singh",
+        "info": "Genetically engineered Augment superhuman. Ruled a quarter of Earth during the Eugenics Wars. Exiled to Ceti Alpha V by Kirk. Died activating the Genesis Device in 2285.",
+        "nested": [
+          {
+            "start": "1992",
+            "end": "1996",
+            "name": "Reign as ruler of Earth",
+            "info": "Khan rules more than a quarter of Earth's population from his base in Asia during the Eugenics Wars"
+          },
+          {
+            "start": "1996",
+            "end": "2267",
+            "name": "Suspended animation aboard SS Botany Bay",
+            "info": "Khan and his followers drift in space in cryogenic suspension for over 270 years"
+          },
+          {
+            "start": "2267",
+            "end": "2285",
+            "name": "Exile on Ceti Alpha V",
+            "info": "After failing to seize the Enterprise, Khan is exiled to Ceti Alpha V. The neighboring planet explodes, devastating the ecosystem. Khan's wife and many followers die."
+          }
+        ]
+      },
+      {
+        "start": "2112-08-04",
+        "end": "2245",
+        "name": "Jonathan Archer",
+        "info": "Captain of Enterprise NX-01, Earth's first Warp 5 starship. Led humanity's first deep-space missions. Instrumental in founding the United Federation of Planets. Later served as Federation President.",
+        "startApprox": ["2110", "2114"]
+      }
+    ]
+  },
+  {
+    "start": "1992",
+    "end": "1996",
+    "name": "Eugenics Wars",
+    "info": "Global conflict involving genetically engineered 'supermen' who seized power across much of Earth. Khan Noonien Singh ruled more than a quarter of the world's population. Ended with the defeat of the Augments.",
+    "nested": [
+      {
+        "start": "1992",
+        "name": "Rise of Khan Noonien Singh",
+        "info": "Khan ascends to power, becoming absolute ruler of more than one-quarter of Earth's population from his base in Asia"
+      },
+      {
+        "start": "1996",
+        "name": "Khan flees Earth aboard SS Botany Bay",
+        "info": "Following his defeat, Khan and approximately 80 followers escape in the sleeper ship SS Botany Bay, entering suspended animation"
+      }
+    ]
+  },
+  {
+    "start": "2026",
+    "end": "2053",
+    "name": "World War III",
+    "info": "Devastating global nuclear conflict that killed some 600 million people (roughly 30% of humanity) and rendered much of Earth uninhabitable. Most major cities were destroyed.",
+    "nested": [
+      {
+        "start": "2053",
+        "name": "End of World War III",
+        "info": "Hostilities finally cease, leaving Earth devastated with few functioning governments"
+      }
+    ]
+  },
+  {
+    "start": "2063-04-05",
+    "name": "First warp flight and First Contact",
+    "info": "Zefram Cochrane launches the Phoenix from Bozeman, Montana, achieving humanity's first warp flight. The Vulcan survey ship T'Plana-Hath detects the warp signature and makes first contact with humans."
+  },
+  {
+    "start": "2150",
+    "name": "United Earth government completed",
+    "info": "The last holdout nations join the unified Earth government, completing the political unification of the planet"
+  },
+  {
+    "start": "2151",
+    "end": "2155",
+    "name": "Enterprise NX-01 missions",
+    "info": "Humanity's first Warp 5 starship, under Captain Jonathan Archer, explores the galaxy and makes numerous first contacts. Covers the events of Star Trek: Enterprise.",
+    "nested": [
+      {
+        "start": "2151-04-16",
+        "name": "Enterprise NX-01 launched",
+        "info": "Earth's first Warp 5-capable starship launched under Captain Jonathan Archer, beginning humanity's deep space exploration"
+      },
+      {
+        "start": "2151",
+        "end": "2155",
+        "name": "Temporal Cold War",
+        "info": "Ongoing conflict between various factions from different time periods, manipulating events in the 22nd century. The Suliban Cabal acts as agents for a mysterious figure from the 28th century.",
+        "nested": [
+          {
+            "start": "2151",
+            "name": "First Suliban encounter",
+            "info": "Enterprise encounters the Suliban Cabal during its first mission, discovering they are being directed by a figure from the future"
+          },
+          {
+            "start": "2154",
+            "name": "Temporal Cold War resolution",
+            "info": "The Temporal Cold War effectively ends when temporal agent Daniels helps Archer prevent the timeline from being altered"
+          }
+        ]
+      },
+      {
+        "start": "2153-03",
+        "end": "2154-02",
+        "name": "Xindi conflict",
+        "info": "After the Xindi launch a devastating probe attack on Earth killing 7 million people, Enterprise enters the Delphic Expanse to prevent a larger weapon from destroying Earth.",
+        "nested": [
+          {
+            "start": "2153-03",
+            "name": "Xindi attack on Earth",
+            "info": "A Xindi prototype weapon fires a beam from Florida to Venezuela, killing 7 million people. The attack was instigated by the Sphere-Builders from the future."
+          },
+          {
+            "start": "2153-04",
+            "name": "Enterprise enters the Delphic Expanse",
+            "info": "Enterprise is refitted and enters the dangerous Delphic Expanse to find and stop the Xindi superweapon"
+          },
+          {
+            "start": "2154-02",
+            "name": "Xindi weapon destroyed",
+            "info": "Archer destroys the Xindi weapon in Earth orbit. The Xindi Council fractures as they learn the Sphere-Builders manipulated them."
+          }
+        ]
+      },
+      {
+        "start": "2154",
+        "name": "Mirror Universe: USS Defiant incident",
+        "info": "In the Mirror Universe, the Tholians capture the USS Defiant (NCC-1764) from the 23rd century prime universe. Mirror-Archer seizes the ship."
+      },
+      {
+        "start": "2155",
+        "name": "Coalition of Planets formed",
+        "info": "Earth, Vulcan, Andoria, and Tellar begin formal diplomatic negotiations, forming the Coalition of Planets as a precursor to the Federation"
+      }
+    ]
+  },
+  {
+    "start": "2156",
+    "end": "2160",
+    "name": "Earth-Romulan War",
+    "info": "War between United Earth and its allies against the Romulan Star Empire. The Romulans sought to prevent humanity from becoming a major galactic power. Fought entirely via ship-to-ship combat with no face-to-face contact.",
+    "nested": [
+      {
+        "start": "2160",
+        "name": "Battle of Cheron",
+        "info": "Decisive allied victory that ends the war. Human, Vulcan, Andorian, and Tellarite forces defeat the Romulans."
+      },
+      {
+        "start": "2160",
+        "name": "Establishment of the Romulan Neutral Zone",
+        "info": "The peace treaty creates a Neutral Zone between Federation and Romulan space. Any incursion is considered an act of war."
+      }
+    ]
+  },
+  {
+    "start": "2161",
+    "name": "Founding of the United Federation of Planets",
+    "info": "Earth, Vulcan, Andoria, and Tellar sign the Federation Charter in San Francisco, establishing the United Federation of Planets. Jonathan Archer plays a key role in the founding."
+  },
+  {
+    "start": "2161",
+    "name": "Enterprise NX-01 decommissioned",
+    "info": "After ten years of service under Captain Archer, Enterprise is retired. The ship helped pave the way for the Federation's founding."
+  },
+  {
+    "start": "2245",
+    "end": "2285",
+    "name": "USS Enterprise NCC-1701",
+    "info": "Constitution-class heavy cruiser, the most famous starship in Federation history. Served under Captains Robert April, Christopher Pike, and James T. Kirk.",
+    "nested": [
+      {
+        "start": "2245",
+        "name": "Enterprise launched",
+        "info": "USS Enterprise NCC-1701 launched from San Francisco Fleet Yards under Captain Robert April"
+      },
+      {
+        "start": "2265",
+        "end": "2270",
+        "name": "Kirk's five-year mission",
+        "info": "Captain James T. Kirk commands the Enterprise on its historic five-year mission of deep space exploration, making first contact with numerous species.",
+        "nested": [
+          {
+            "start": "2266",
+            "name": "First contact with the Romulans",
+            "info": "Enterprise encounters a Romulan Bird-of-Prey, marking the first visual contact between the Federation and Romulans since the Earth-Romulan War over a century earlier"
+          },
+          {
+            "start": "2267-02",
+            "name": "Khan discovered aboard SS Botany Bay",
+            "info": "Enterprise discovers Khan Noonien Singh and his followers in suspended animation. After Khan attempts to seize the ship, he and his people are exiled to Ceti Alpha V."
+          },
+          {
+            "start": "2267",
+            "name": "Organian Peace Treaty",
+            "info": "Powerful Organian beings impose a peace treaty on the Federation and Klingon Empire, preventing open war. Disputed planets will be awarded to whichever side develops them most efficiently."
+          },
+          {
+            "start": "2267",
+            "name": "Mirror Universe encounter",
+            "info": "Kirk, McCoy, Uhura, and Scotty are accidentally transported to the Mirror Universe, where the Federation is replaced by the brutal Terran Empire"
+          },
+          {
+            "start": "2268",
+            "name": "First contact with the Romulans' cloaking device",
+            "info": "Enterprise undertakes a covert mission to steal a Romulan cloaking device, revealing a new Romulan-Klingon alliance"
+          }
+        ]
+      },
+      {
+        "start": "2273",
+        "name": "V'Ger incident",
+        "info": "A massive, incredibly powerful entity called V'Ger approaches Earth, destroying everything in its path. Admiral Kirk takes command of the refitted Enterprise and discovers V'Ger is the ancient Voyager 6 probe, evolved into a living machine. (Star Trek: The Motion Picture)"
+      },
+      {
+        "start": "2285",
+        "name": "Battle of the Mutara Nebula",
+        "info": "Khan Noonien Singh, having escaped Ceti Alpha V aboard the hijacked USS Reliant, battles Kirk in the Mutara Nebula. Khan detonates the Genesis Device. Spock sacrifices himself to save the Enterprise. (Star Trek II: The Wrath of Khan)"
+      },
+      {
+        "start": "2285",
+        "name": "Enterprise destroyed over Genesis Planet",
+        "info": "Kirk activates the Enterprise's self-destruct sequence to prevent a Klingon boarding party from capturing the ship. The crew escapes to the Genesis Planet, where Spock's body has been regenerated. (Star Trek III: The Search for Spock)"
+      }
+    ]
+  },
+  {
+    "start": "2286",
+    "end": "2293",
+    "name": "USS Enterprise NCC-1701-A",
+    "info": "Refit Constitution-class starship, assigned to Captain Kirk after his demotion from Admiral for stealing the original Enterprise. Served seven years before decommissioning.",
+    "nested": [
+      {
+        "start": "2286",
+        "name": "Whale Probe crisis",
+        "info": "An alien probe disables Earth's power systems while trying to communicate with humpback whales, which are extinct in the 23rd century. Kirk's crew travels back to 1986 to bring back two whales, saving Earth. (Star Trek IV: The Voyage Home)"
+      },
+      {
+        "start": "2287",
+        "name": "Sybok's quest for Sha Ka Ree",
+        "info": "Spock's half-brother Sybok hijacks the Enterprise-A to journey to the center of the galaxy seeking 'God.' (Star Trek V: The Final Frontier)"
+      },
+      {
+        "start": "2293",
+        "name": "Praxis explosion",
+        "info": "The Klingon moon Praxis explodes due to over-mining, threatening the ozone layer of Qo'noS. The ecological disaster forces the Klingon Empire to seek peace with the Federation."
+      },
+      {
+        "start": "2293",
+        "name": "Khitomer Conference and Accords",
+        "info": "Despite a conspiracy to sabotage the peace process, Kirk and the Enterprise crew expose the plotters. The First Khitomer Accords are signed, ending decades of hostility between the Federation and Klingon Empire. (Star Trek VI: The Undiscovered Country)"
+      },
+      {
+        "start": "2293",
+        "name": "Enterprise-A decommissioned",
+        "info": "The Enterprise-A is decommissioned following the Khitomer Conference. Kirk and his crew stand down after decades of service."
+      }
+    ]
+  },
+  {
+    "start": "2293",
+    "end": "2329",
+    "name": "USS Enterprise NCC-1701-B",
+    "info": "Excelsior-class starship launched in 2293 under Captain John Harriman. Explored and charted 142 star systems during its service.",
+    "nested": [
+      {
+        "start": "2293",
+        "name": "Enterprise-B maiden voyage and Kirk lost",
+        "info": "During its maiden voyage, the Enterprise-B encounters the Nexus energy ribbon while rescuing El-Aurian refugees. Captain Kirk is swept into the Nexus and presumed dead. (Star Trek Generations prologue)"
+      }
+    ]
+  },
+  {
+    "start": "2311",
+    "name": "Treaty of Algeron",
+    "info": "Treaty signed between the Federation and Romulan Star Empire following the Tomed Incident. Reinforces the Romulan Neutral Zone and prohibits the Federation from developing or using cloaking device technology."
+  },
+  {
+    "start": "2328",
+    "end": "2369",
+    "name": "Cardassian Occupation of Bajor",
+    "info": "The Cardassian Union occupies Bajor for over 40 years, subjecting the Bajoran people to forced labor, strip mining, and genocide. The Bajoran Resistance fights back using guerrilla tactics.",
+    "nested": [
+      {
+        "start": "2328",
+        "name": "Cardassian annexation of Bajor begins",
+        "info": "The Cardassian Union begins its occupation of the Bajoran homeworld"
+      },
+      {
+        "start": "2346",
+        "name": "Cardassians build Terok Nor",
+        "info": "The Cardassians construct an ore processing space station in orbit of Bajor, later known as Deep Space Nine"
+      },
+      {
+        "start": "2369",
+        "name": "Cardassian withdrawal from Bajor",
+        "info": "After decades of Bajoran resistance, the Cardassians finally withdraw from Bajor. The Bajoran Provisional Government requests Federation assistance."
+      }
+    ]
+  },
+  {
+    "start": "2332",
+    "end": "2344",
+    "name": "USS Enterprise NCC-1701-C",
+    "info": "Ambassador-class starship commanded by Captain Rachel Garrett. Its heroic sacrifice defending a Klingon outpost cemented the Federation-Klingon alliance.",
+    "nested": [
+      {
+        "start": "2344",
+        "name": "Battle of Narendra III",
+        "info": "Enterprise-C responds to a distress call from the Klingon outpost on Narendra III, which is under attack by four Romulan Warbirds. The Enterprise fights valiantly but is destroyed. This sacrifice cements the Federation-Klingon alliance."
+      }
+    ]
+  },
+  {
+    "start": "2340",
+    "end": "2370",
+    "name": "Federation-Cardassian War",
+    "info": "Decades-long border conflict between the Federation and the Cardassian Union, fought over disputed territory along their shared border. Ended in a stalemate leading to armistice and treaty.",
+    "nested": [
+      {
+        "start": "2347",
+        "name": "Setlik III massacre",
+        "info": "Cardassian forces attack the Federation colony on Setlik III, believing it to be a staging ground for a military attack. Chief Miles O'Brien earns the nickname 'Hero of Setlik III.'"
+      },
+      {
+        "start": "2367",
+        "name": "Federation-Cardassian Armistice",
+        "info": "An armistice is signed between the Federation and Cardassian Union, ending major hostilities after decades of conflict"
+      },
+      {
+        "start": "2370",
+        "name": "Federation-Cardassian Treaty",
+        "info": "Final peace treaty establishing the Federation-Cardassian border and creating a Demilitarized Zone. Several colonies end up on the wrong side of the border."
+      }
+    ]
+  },
+  {
+    "start": "2346",
+    "name": "Khitomer Massacre",
+    "info": "Romulans attack the Klingon colony on Khitomer, killing 4,000 colonists including Worf's parents. The attack was enabled by a Klingon traitor, Ja'rod of the House of Duras. Young Worf is found and adopted by the Rozhenko family."
+  },
+  {
+    "start": "2363",
+    "end": "2371",
+    "name": "USS Enterprise NCC-1701-D",
+    "info": "Galaxy-class exploration vessel and Federation flagship. Commanded by Captain Jean-Luc Picard. Setting for Star Trek: The Next Generation.",
+    "nested": [
+      {
+        "start": "2363",
+        "name": "Enterprise-D launched",
+        "info": "Galaxy-class USS Enterprise-D launched from Utopia Planitia Fleet Yards, Mars, under Captain Jean-Luc Picard"
+      },
+      {
+        "start": "2364",
+        "name": "Encounter at Farpoint",
+        "info": "Enterprise-D's first mission. The crew encounters the omnipotent being Q, who puts humanity on trial. (TNG Season 1 premiere)"
+      },
+      {
+        "start": "2365",
+        "name": "First contact with the Borg",
+        "info": "Q hurls the Enterprise-D to System J-25 where they encounter the Borg for the first time. Eighteen crew members are killed before Q returns them to Federation space. Guinan warns the Borg will now come for Earth."
+      },
+      {
+        "start": "2366",
+        "end": "2367",
+        "name": "Borg Incursion of 2366-2367",
+        "info": "A Borg cube invades Federation space. Captain Picard is assimilated and designated Locutus of Borg.",
+        "nested": [
+          {
+            "start": "2366",
+            "name": "Picard assimilated by the Borg",
+            "info": "Captain Picard is captured and assimilated, becoming Locutus. His knowledge of Starfleet tactics is used against the Federation."
+          },
+          {
+            "start": "2367-01",
+            "name": "Battle of Wolf 359",
+            "info": "A fleet of 40 Federation starships engages the Borg cube at Wolf 359, 7.8 light-years from Earth. Using Picard's knowledge, the Borg destroy 39 of the 40 ships, killing over 11,000 personnel. Commander Sisko's wife Jennifer is among the dead."
+          },
+          {
+            "start": "2367-01",
+            "name": "Borg cube destroyed at Earth",
+            "info": "Enterprise crew rescues Picard from the Borg. Data uses Picard's residual link to the Collective to implant a 'sleep' command, destroying the cube."
+          }
+        ]
+      },
+      {
+        "start": "2367",
+        "end": "2368",
+        "name": "Klingon Civil War",
+        "info": "Civil war over succession to the Chancellorship of the Klingon High Council. Gowron, supported by the Federation, fights the Duras family, secretly backed by the Romulans.",
+        "nested": [
+          {
+            "start": "2367",
+            "name": "Gowron installed as Chancellor",
+            "info": "Gowron becomes Chancellor of the Klingon High Council after Worf kills Duras in personal combat"
+          },
+          {
+            "start": "2368",
+            "name": "Civil War ends",
+            "info": "Picard leads a Federation blockade that exposes Romulan support for the Duras family, causing them to withdraw. Gowron's forces win decisively."
+          }
+        ]
+      },
+      {
+        "start": "2368",
+        "name": "Spock's unification mission on Romulus",
+        "info": "Ambassador Spock is discovered on Romulus, working secretly with an underground movement seeking reunification of the Vulcan and Romulan peoples"
+      },
+      {
+        "start": "2369",
+        "name": "Scotty recovered from USS Jenolan",
+        "info": "Captain Montgomery Scott is found alive in a transporter buffer loop aboard the crashed USS Jenolan, having survived for 75 years since 2294"
+      },
+      {
+        "start": "2370",
+        "name": "Maquis insurgency begins",
+        "info": "Federation colonists in the Demilitarized Zone, facing Cardassian persecution, form the Maquis resistance movement. They conduct guerrilla operations against Cardassian targets."
+      },
+      {
+        "start": "2371",
+        "name": "Enterprise-D destroyed over Veridian III",
+        "info": "The Duras sisters obtain the Enterprise's shield frequency and inflict critical damage. A warp core breach destroys the stardrive section; the saucer crash-lands on Veridian III. (Star Trek Generations)"
+      }
+    ]
+  },
+  {
+    "start": "2369",
+    "end": "2375",
+    "name": "Deep Space Nine era",
+    "info": "Commander (later Captain) Benjamin Sisko takes command of the former Cardassian station Terok Nor, renamed Deep Space Nine, in orbit of Bajor. Covers the events of Star Trek: Deep Space Nine.",
+    "nested": [
+      {
+        "start": "2369",
+        "name": "Discovery of the Bajoran Wormhole",
+        "info": "Commander Sisko and Lt. Dax discover a stable wormhole near Bajor connecting the Alpha and Gamma Quadrants. The wormhole is home to non-linear beings worshipped by Bajorans as the Prophets. Sisko is recognized as the Emissary."
+      },
+      {
+        "start": "2370",
+        "name": "First contact with the Dominion",
+        "info": "Federation vessels exploring the Gamma Quadrant encounter the Dominion, a powerful interstellar state ruled by the shape-shifting Founders through their Vorta administrators and Jem'Hadar soldiers"
+      },
+      {
+        "start": "2371",
+        "name": "Dominion infiltration discovered",
+        "info": "Changeling infiltrators from the Dominion are discovered to have replaced key figures in the Alpha Quadrant, sowing paranoia and distrust"
+      },
+      {
+        "start": "2372",
+        "end": "2373",
+        "name": "Federation-Klingon War (2372-73)",
+        "info": "Chancellor Gowron, influenced by a Changeling infiltrator, launches an invasion of Cardassia and then turns on the Federation. The Khitomer Accords are temporarily dissolved.",
+        "nested": [
+          {
+            "start": "2372",
+            "name": "Klingon invasion of Cardassia",
+            "info": "Gowron invades the Cardassian Union, believing the civilian government has been replaced by Changelings. The Federation opposes the invasion."
+          },
+          {
+            "start": "2373",
+            "name": "Khitomer Accords restored",
+            "info": "The Klingon-Federation alliance is restored when the Changeling impersonating General Martok is exposed. The Empire rejoins the fight against the Dominion."
+          }
+        ]
+      },
+      {
+        "start": "2373",
+        "end": "2375",
+        "name": "Dominion War",
+        "info": "The largest and most devastating conflict in Alpha Quadrant history. The Dominion, allied with the Cardassian Union, fights the Federation Alliance (Federation, Klingon Empire, and later the Romulan Star Empire).",
+        "nested": [
+          {
+            "start": "2373",
+            "name": "Cardassian Union joins the Dominion",
+            "info": "Gul Dukat negotiates Cardassia's entry into the Dominion, bringing Jem'Hadar forces into the Alpha Quadrant"
+          },
+          {
+            "start": "2373",
+            "name": "Battle of Deep Space Nine",
+            "info": "Opening battle of the war. Sisko mines the wormhole to prevent Dominion reinforcements, then evacuates the station as Dominion forces attack. Starfleet and Klingon forces attack the Torros III shipyards."
+          },
+          {
+            "start": "2374",
+            "name": "Battle of Tyra",
+            "info": "Devastating Federation defeat in the Tyra system. Only 14 of 112 Federation ships survive. Allied morale reaches its lowest point."
+          },
+          {
+            "start": "2374",
+            "name": "Operation Return",
+            "info": "Combined Starfleet-Klingon task force breaks through Dominion lines and recaptures Deep Space Nine. The Prophets intervene to prevent a massive Dominion fleet from exiting the wormhole."
+          },
+          {
+            "start": "2374",
+            "name": "Romulans enter the war",
+            "info": "Following the assassination of a Romulan senator (engineered by Garak with Sisko's reluctant complicity), the Romulan Star Empire joins the Federation Alliance against the Dominion"
+          },
+          {
+            "start": "2374",
+            "name": "First Battle of Chin'toka",
+            "info": "The Federation Alliance launches its first offensive into Cardassian space, capturing the Chin'toka system in a hard-fought victory"
+          },
+          {
+            "start": "2375",
+            "name": "Breen attack on Earth",
+            "info": "The Breen Confederacy joins the Dominion and launches a devastating surprise attack on Starfleet Headquarters in San Francisco"
+          },
+          {
+            "start": "2375",
+            "name": "Second Battle of Chin'toka",
+            "info": "Breen energy-dampening weapons devastate the Allied fleet at Chin'toka. Only the Klingon ship IKS Ki'tang survives out of 312 Allied vessels. The worst Allied defeat of the war."
+          },
+          {
+            "start": "2375",
+            "name": "Cardassian Rebellion",
+            "info": "Cardassian military forces, led by Legate Damar, revolt against Dominion occupation after the Dominion destroys Lakarian City, killing 2 million Cardassians"
+          },
+          {
+            "start": "2375",
+            "name": "Battle of Cardassia",
+            "info": "Final battle of the Dominion War. Allied forces invade the Cardassian system. The Female Changeling orders the genocide of the Cardassian population. Odo links with her and cures the Changeling disease, persuading her to surrender. Over 800 million Cardassians die in the conflict."
+          },
+          {
+            "start": "2375",
+            "name": "Treaty of Bajor",
+            "info": "The Dominion signs an unconditional surrender. Dominion forces withdraw to the Gamma Quadrant. The war ends."
+          }
+        ]
+      },
+      {
+        "start": "2375",
+        "name": "Sisko joins the Prophets",
+        "info": "After defeating the Pah-wraith Dukat in the Fire Caves of Bajor, Sisko is taken by the Prophets into the Celestial Temple. He promises Kasidy he will return."
+      }
+    ]
+  },
+  {
+    "start": "2370",
+    "end": "2375",
+    "name": "USS Defiant NX-74205",
+    "info": "Defiant-class escort/warship, originally designed to fight the Borg. Assigned to Deep Space Nine in 2370. Destroyed at the Second Battle of Chin'toka in 2375. A replacement USS Defiant was subsequently assigned.",
+    "nested": [
+      {
+        "start": "2370",
+        "name": "Defiant assigned to DS9",
+        "info": "The prototype Defiant-class warship is assigned to Deep Space Nine to deal with the growing Dominion threat. Commander Sisko takes command."
+      },
+      {
+        "start": "2375",
+        "name": "Defiant destroyed at Chin'toka",
+        "info": "Breen energy-dampening weapons disable and destroy the USS Defiant during the Second Battle of Chin'toka"
+      }
+    ]
+  },
+  {
+    "start": "2371",
+    "end": "2378",
+    "name": "USS Voyager NCC-74656",
+    "info": "Intrepid-class starship under Captain Kathryn Janeway. Stranded in the Delta Quadrant 70,000 light-years from Earth while pursuing a Maquis ship. Spent seven years finding its way home. Covers the events of Star Trek: Voyager.",
+    "nested": [
+      {
+        "start": "2371",
+        "name": "Voyager stranded in the Delta Quadrant",
+        "info": "The Caretaker, a powerful alien entity, transports Voyager and a Maquis raider to the Delta Quadrant. Janeway destroys the Caretaker's array to protect the Ocampa, stranding both crews 75 years from home."
+      },
+      {
+        "start": "2373",
+        "name": "Voyager encounters the Borg",
+        "info": "Voyager enters Borg space and forms a temporary alliance with the Borg against Species 8472, a powerful extradimensional species. Seven of Nine, a liberated Borg drone, joins the crew."
+      },
+      {
+        "start": "2374",
+        "name": "Voyager contacts Starfleet via Hirogen relay",
+        "info": "Voyager establishes brief communication with Starfleet Command through an ancient Hirogen communications network"
+      },
+      {
+        "start": "2377",
+        "name": "Pathfinder Project contact established",
+        "info": "Regular communication with Starfleet is finally achieved through the MIDAS array and Pathfinder Project, led by Lt. Barclay"
+      },
+      {
+        "start": "2378",
+        "name": "Voyager returns to Earth",
+        "info": "With the help of future Admiral Janeway, Voyager uses a Borg transwarp hub to travel directly to the Alpha Quadrant, destroying the hub behind them and arriving home after seven years"
+      }
+    ]
+  },
+  {
+    "start": "2151-04-12",
+    "end": "2161",
+    "name": "USS Enterprise NX-01",
+    "info": "The first human-built starship equipped with a Warp 5 engine, marking humanity's debut in deep space exploration and pioneering the path to the United Federation of Planets."
+  },
+  {
+    "start": "2372",
+    "end": "2379",
+    "name": "USS Enterprise NCC-1701-E",
+    "info": "Sovereign-class starship and Federation flagship. Commanded by Captain Picard. The setting for Star Trek: First Contact, Insurrection, and Nemesis.",
+    "nested": [
+      {
+        "start": "2373",
+        "name": "Battle of Sector 001",
+        "info": "A Borg cube invades Federation space and is engaged by a Federation fleet near Earth. Picard's Enterprise arrives and coordinates the fleet's attack, exploiting his residual Borg knowledge to destroy the cube. A Borg sphere travels back to 2063 to prevent first contact; Enterprise follows. (Star Trek: First Contact)"
+      },
+      {
+        "start": "2375",
+        "name": "Ba'ku incident",
+        "info": "Picard defies Starfleet orders to protect the Ba'ku people from forced relocation by the Son'a, who want to harvest their planet's regenerative radiation. (Star Trek: Insurrection)"
+      },
+      {
+        "start": "2379",
+        "name": "Battle in the Bassen Rift",
+        "info": "Enterprise engages the Reman warbird Scimitar, commanded by Shinzon (a clone of Picard). Data sacrifices himself to destroy the Scimitar's thalaron weapon, saving the Enterprise and Earth. (Star Trek: Nemesis)"
+      }
+    ]
+  },
+  {
+    "start": "2371",
+    "name": "Kirk dies on Veridian III",
+    "info": "Kirk, pulled from the Nexus by Picard, helps stop Dr. Soran from destroying the Veridian star. Kirk is killed when a bridge collapses on him. He is buried on Veridian III. (Star Trek Generations)"
+  },
+  {
+    "start": "2379",
+    "name": "Data's sacrifice",
+    "info": "Lt. Commander Data sacrifices himself to destroy the Reman thalaron weapon aboard the Scimitar, saving the Enterprise-E and ultimately Earth. He beams Picard to safety moments before the explosion. (Star Trek: Nemesis)"
+  },
+  {
+    "start": "2032",
+    "name": "Zefram Cochrane born",
+    "info": "Inventor of Earth's warp drive. His first warp flight in 2063 led to first contact with the Vulcans and changed the course of human history.",
+    "startApprox": ["2030", "2035"]
+  },
+  {
+    "start": "2161",
+    "end": "2379",
+    "name": "United Federation of Planets",
+    "info": "Interstellar federal republic composed of planetary governments spanning over 8,000 light-years. Founded on principles of universal liberty, rights, and equality. Headquartered in San Francisco, Earth.",
+    "endApprox": ["2379", "2500"],
+    "nested": [
+      {
+        "start": "2161",
+        "name": "Federation Charter signed",
+        "info": "Earth, Vulcan, Andoria, and Tellar sign the Federation Charter in San Francisco"
+      },
+      {
+        "start": "2267",
+        "name": "Federation spans a thousand planets",
+        "info": "By this date, the Federation is described as being 'on a thousand planets and spreading out'"
+      },
+      {
+        "start": "2293",
+        "name": "First Khitomer Accords",
+        "info": "Historic peace treaty with the Klingon Empire following the Praxis disaster. Marks the beginning of lasting peace."
+      },
+      {
+        "start": "2311",
+        "name": "Treaty of Algeron signed",
+        "info": "Peace treaty with the Romulan Star Empire following the Tomed Incident. Prohibits Federation cloaking technology."
+      },
+      {
+        "start": "2367",
+        "name": "Second Khitomer Accords",
+        "info": "Updated alliance treaty between the Federation and Klingon Empire, deepening their strategic partnership"
+      },
+      {
+        "start": "2370",
+        "name": "Federation-Cardassian Treaty signed",
+        "info": "Peace treaty establishing borders and a Demilitarized Zone with the Cardassian Union"
+      },
+      {
+        "start": "2375",
+        "name": "Treaty of Bajor",
+        "info": "Dominion unconditional surrender. End of the largest conflict in Alpha Quadrant history."
+      }
+    ]
+  }
+]
