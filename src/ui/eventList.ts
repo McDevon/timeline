@@ -8,6 +8,10 @@ export class EventListPanel {
   private expandedEvents = new Set<TimelineEvent>();
   private highlightedRow: HTMLDivElement | null = null;
   private selectedRow: HTMLDivElement | null = null;
+  private filterInput: HTMLInputElement;
+  private filterClearBtn: HTMLDivElement;
+  private preFilterExpanded: Set<TimelineEvent> | null = null;
+  private allEvents: TimelineEvent[] = [];
 
   constructor(
     events: TimelineEvent[],
@@ -29,7 +33,26 @@ export class EventListPanel {
     });
     this.el.appendChild(header);
 
+    // Filter row
+    const filterRow = document.createElement('div');
+    filterRow.className = 'event-list-filter';
+    this.filterInput = document.createElement('input');
+    this.filterInput.type = 'text';
+    this.filterInput.placeholder = 'Filter events\u2026';
+    this.filterInput.addEventListener('input', () => this.applyFilter());
+    this.filterClearBtn = document.createElement('div');
+    this.filterClearBtn.className = 'event-list-filter-clear';
+    this.filterClearBtn.textContent = '\u00D7';
+    this.filterClearBtn.addEventListener('click', () => {
+      this.filterInput.value = '';
+      this.applyFilter();
+    });
+    filterRow.appendChild(this.filterInput);
+    filterRow.appendChild(this.filterClearBtn);
+    this.el.appendChild(filterRow);
+
     // Body
+    this.allEvents = events;
     const body = document.createElement('div');
     body.className = 'event-list-body';
 
@@ -71,6 +94,7 @@ export class EventListPanel {
         body.appendChild(item);
       }
     }
+    if (this.filterInput.value) this.applyFilter();
   }
 
   clear(): void {
@@ -102,6 +126,7 @@ export class EventListPanel {
     }
     this.childrenMap.delete(event);
     this.expandedEvents.delete(event);
+    if (this.filterInput.value) this.applyFilter();
   }
 
   rebuild(
@@ -118,6 +143,7 @@ export class EventListPanel {
       : null;
 
     this.clear();
+    this.allEvents = events;
     const body = this.el.querySelector('.event-list-body');
     if (!body) return;
 
@@ -142,6 +168,9 @@ export class EventListPanel {
     if (prevSelected) {
       this.selectEvent(prevSelected);
     }
+
+    // Re-apply filter
+    if (this.filterInput.value) this.applyFilter();
   }
 
   selectEvent(event: TimelineEvent | null) {
@@ -168,6 +197,126 @@ export class EventListPanel {
       if (row) {
         row.classList.add('highlighted');
         this.highlightedRow = row;
+      }
+    }
+  }
+
+  /** Expand all ancestor containers of a row so it becomes visible in the list. */
+  private expandAncestors(row: HTMLDivElement): void {
+    let el: HTMLElement | null = row.parentElement; // item wrapper
+    while (el) {
+      el = el.parentElement; // children container or body
+      if (!el || el.classList.contains('event-list-body')) break;
+      if (el.classList.contains('event-list-children')) {
+        // Find the parent event that owns this children container
+        for (const [event, container] of this.childrenMap) {
+          if (container === el) {
+            const parentRow = this.rowMap.get(event);
+            const icon = parentRow?.querySelector('.event-list-arrow-icon');
+            this.expandedEvents.add(event);
+            if (icon) icon.classList.add('expanded');
+            container.style.maxHeight = 'none';
+            break;
+          }
+        }
+        el = el.parentElement; // move to parent item wrapper
+      }
+    }
+  }
+
+  private applyFilter(): void {
+    const text = this.filterInput.value.trim().toLowerCase();
+
+    if (!text) {
+      // Clear filter: remove all filter classes, restore expand state
+      this.filterClearBtn.style.display = 'none';
+      for (const row of this.rowMap.values()) {
+        row.classList.remove('filter-ancestor');
+        const item = row.parentElement;
+        if (item) item.classList.remove('filtered-out');
+      }
+      // Restore pre-filter expand state
+      if (this.preFilterExpanded !== null) {
+        for (const [event, container] of this.childrenMap) {
+          const row = this.rowMap.get(event);
+          const icon = row?.querySelector('.event-list-arrow-icon');
+          if (this.preFilterExpanded.has(event)) {
+            this.expandedEvents.add(event);
+            if (icon) icon.classList.add('expanded');
+            container.style.maxHeight = 'none';
+          } else {
+            this.expandedEvents.delete(event);
+            if (icon) icon.classList.remove('expanded');
+            container.style.maxHeight = '0';
+          }
+        }
+        this.preFilterExpanded = null;
+
+        // Ensure selected item remains visible: expand its ancestors and scroll
+        if (this.selectedRow) {
+          this.expandAncestors(this.selectedRow);
+          this.selectedRow.scrollIntoView({ block: 'nearest' });
+        }
+      }
+      return;
+    }
+
+    // Save expand state on first filter keystroke
+    if (this.preFilterExpanded === null) {
+      this.preFilterExpanded = new Set(this.expandedEvents);
+    }
+    this.filterClearBtn.style.display = 'flex';
+
+    // Determine which events match or have matching descendants
+    const matchSet = new Set<TimelineEvent>();     // self-matches
+    const ancestorSet = new Set<TimelineEvent>();   // has matching descendant
+
+    const walk = (events: TimelineEvent[]): boolean => {
+      let anyMatch = false;
+      for (const event of events) {
+        const selfMatch = event.name.toLowerCase().includes(text);
+        let descendantMatch = false;
+        if (event.nested && event.nested.length > 0) {
+          descendantMatch = walk(event.nested);
+        }
+        if (selfMatch) {
+          matchSet.add(event);
+          anyMatch = true;
+        }
+        if (descendantMatch) {
+          ancestorSet.add(event);
+          anyMatch = true;
+        }
+      }
+      return anyMatch;
+    };
+    walk(this.allEvents);
+
+    // Apply visibility and styling
+    for (const [event, row] of this.rowMap) {
+      const item = row.parentElement;
+      if (!item) continue;
+
+      const isMatch = matchSet.has(event);
+      const isAncestor = ancestorSet.has(event);
+
+      if (isMatch || isAncestor) {
+        item.classList.remove('filtered-out');
+        row.classList.toggle('filter-ancestor', !isMatch && isAncestor);
+
+        // Auto-expand ancestors to reveal matching descendants
+        if (isAncestor) {
+          const container = this.childrenMap.get(event);
+          const icon = row.querySelector('.event-list-arrow-icon');
+          if (container) {
+            this.expandedEvents.add(event);
+            if (icon) icon.classList.add('expanded');
+            container.style.maxHeight = 'none';
+          }
+        }
+      } else {
+        item.classList.add('filtered-out');
+        row.classList.remove('filter-ancestor');
       }
     }
   }

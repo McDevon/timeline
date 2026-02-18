@@ -9,6 +9,8 @@ import { todayDecimalYear, todayIsoDate, formatDate } from '../data/time';
 
 export interface InputHandlers {
   destroy(): void;
+  getSelectionOverrides(): { anchor: SnapDetail | null; extend: SnapDetail | null };
+  restoreSelectionOverrides(anchor: SnapDetail | null, extend: SnapDetail | null): void;
 }
 
 const CLICK_THRESHOLD = 3; // pixels — movement under this is a click, not a drag
@@ -665,6 +667,14 @@ export function setupInput(
       canvas.removeEventListener('touchmove', onTouchMove);
       window.removeEventListener('keydown', onKeyDown);
       tooltip.hide();
+    },
+    getSelectionOverrides() {
+      return { anchor: selAnchorOverride, extend: selExtendOverride };
+    },
+    restoreSelectionOverrides(anchor: SnapDetail | null, extend: SnapDetail | null) {
+      selAnchorOverride = anchor;
+      selExtendOverride = extend;
+      updateSnapHighlights();
     },
   };
 }

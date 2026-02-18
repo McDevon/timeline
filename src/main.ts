@@ -5,7 +5,7 @@ import { Viewport, zoomViewport } from './timeline/viewport';
 import { hitTest } from './timeline/hitTest';
 import { TimelineEvent, TimelineSelection } from './types';
 import { setupInput } from './timeline/input';
-import { SnapState } from './timeline/snap';
+import { SnapDetail, SnapState } from './timeline/snap';
 import { EventListPanel } from './ui/eventList';
 import { InfoLog } from './ui/infoLog';
 import { TimelineMenu } from './ui/timelineMenu';
@@ -124,6 +124,7 @@ async function main() {
   let dblClickItem: LayoutItem | null = null;
   let preClickSelection: TimelineSelection | null = null;
   let preClickSelectedItem: LayoutItem | null = null;
+  let preClickSnapOverrides: { anchor: SnapDetail | null; extend: SnapDetail | null } = { anchor: null, extend: null };
   let lastMouseDownTime = 0;
 
   // rAF-batched rendering
@@ -560,7 +561,7 @@ async function main() {
   }
 
   // Wire up input
-  setupInput(
+  const inputHandlers = setupInput(
     canvas,
     () => viewport,
     (v: Viewport) => {
@@ -621,6 +622,7 @@ async function main() {
     if (now - lastMouseDownTime > 500) {
       preClickSelection = selection ? { ...selection } : null;
       preClickSelectedItem = selectedItem;
+      preClickSnapOverrides = inputHandlers.getSelectionOverrides();
     }
     lastMouseDownTime = now;
   });
@@ -632,11 +634,12 @@ async function main() {
     const y = e.clientY - rect.top;
     const hit = hitTest(x, y, layout, viewport, canvas.clientWidth, scrollY);
 
-    if (!hit || hit.event.end === undefined) return;
+    if (!hit || hit.event.end === undefined || e.ctrlKey || e.metaKey) return;
 
     // Restore selection state from before the double-click
     selection = preClickSelection;
     selectedItem = preClickSelectedItem;
+    inputHandlers.restoreSelectionOverrides(preClickSnapOverrides.anchor, preClickSnapOverrides.extend);
     eventListPanel?.selectEvent(selectedItem?.event ?? null);
     if (selectedItem) eventMenu.show(selectedItem.event); else eventMenu.hide();
 
