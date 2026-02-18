@@ -921,6 +921,7 @@ export function render(
   selection: TimelineSelection | null,
   snapState: SnapState,
   scrollY: number,
+  showTodayLine?: boolean,
   transition?: LayoutTransition,
   reorderState?: ReorderState,
 ) {
@@ -979,7 +980,7 @@ export function render(
 
   // Axis and overlays drawn in screen space (not scrolled)
   drawAxis(ctx, viewport, canvasWidth);
-  drawTodayLine(ctx, viewport, canvasWidth, canvasHeight);
+  if (showTodayLine !== false) drawTodayLine(ctx, viewport, canvasWidth, canvasHeight);
   drawSelectionForeground(
     ctx,
     selection,

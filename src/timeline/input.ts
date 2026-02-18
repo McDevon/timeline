@@ -38,6 +38,7 @@ export function setupInput(
   setScrollY: (y: number) => void,
   getMaxScrollY: () => number,
   requestRedraw: () => void,
+  getShowTodayLine?: () => boolean,
 ): InputHandlers {
   const tooltip = new Tooltip();
 
@@ -81,7 +82,9 @@ export function setupInput(
       cachedNowYear = todayDecimalYear();
       cachedNowIso = todayIsoDate();
       eventSnapTargets = collectSnapTargets(layout);
-      eventSnapTargets.push(cachedNowYear);
+      if (!getShowTodayLine || getShowTodayLine()) {
+        eventSnapTargets.push(cachedNowYear);
+      }
       eventSnapTargets.sort((a, b) => a - b);
       cachedViewportStart = NaN; // force merge rebuild
     }
@@ -506,7 +509,7 @@ export function setupInput(
             end: Math.max(existing.anchor, year),
             anchor: existing.anchor,
           });
-        } else if (e.shiftKey) {
+        } else if (e.shiftKey && (!getShowTodayLine || getShowTodayLine())) {
           // Shift-click with no selection: range from now to clicked year
           ensureSnapCaches(); // ensure cachedNowYear is set
           const now = cachedNowYear;
@@ -567,7 +570,7 @@ export function setupInput(
               end: Math.max(existing.anchor, selYear),
               anchor: existing.anchor,
             });
-          } else if (e.shiftKey) {
+          } else if (e.shiftKey && (!getShowTodayLine || getShowTodayLine())) {
             ensureSnapCaches();
             const now = cachedNowYear;
             selAnchorOverride = null;

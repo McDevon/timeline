@@ -10,6 +10,7 @@ interface SerializedState {
   hiddenEventPaths: EventPath[];
   collapsedEventPaths: EventPath[];
   eventOrders?: Record<string, string[]>;
+  showTodayLine?: boolean;
 }
 
 const STORAGE_KEY = 'timeline-state';
@@ -48,6 +49,7 @@ export function saveState(
   collapsedEvents: Set<TimelineEvent>,
   allEvents: TimelineEvent[],
   eventOrders?: Map<string, string[]>,
+  showTodayLine?: boolean,
 ): void {
   const hiddenEventPaths: EventPath[] = [];
   for (const e of hiddenEvents) {
@@ -73,6 +75,7 @@ export function saveState(
     hiddenEventPaths,
     collapsedEventPaths,
     eventOrders: serializedOrders,
+    showTodayLine,
   };
 
   try {
@@ -90,6 +93,7 @@ export function loadState(
   hiddenEvents: Set<TimelineEvent>;
   collapsedEvents: Set<TimelineEvent>;
   eventOrders: Map<string, string[]>;
+  showTodayLine: boolean;
 } | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -123,6 +127,7 @@ export function loadState(
       hiddenEvents,
       collapsedEvents,
       eventOrders,
+      showTodayLine: state.showTodayLine ?? true,
     };
   } catch {
     return null;

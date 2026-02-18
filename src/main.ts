@@ -130,6 +130,7 @@ async function main() {
   let cursorX = -1;
   let selection: TimelineSelection | null = saved?.selection ?? null;
   let snapState: SnapState = { highlightYears: new Set(), cursorDetail: null, selStartDetail: null, selEndDetail: null };
+  let showTodayLine: boolean = saved?.showTodayLine ?? true;
   let dblClickPrevViewport: Viewport | null = null;
   let dblClickItem: LayoutItem | null = null;
   let preClickSelection: TimelineSelection | null = null;
@@ -211,7 +212,7 @@ async function main() {
 
     const ctx = setupCanvas(canvas);
     const rect = canvas.getBoundingClientRect();
-    render(ctx, rect.width, rect.height, layout, viewport, hoveredItem, selectedItem, cursorX, selection, snapState, scrollY, transition, reorderState ?? undefined);
+    render(ctx, rect.width, rect.height, layout, viewport, hoveredItem, selectedItem, cursorX, selection, snapState, scrollY, showTodayLine, transition, reorderState ?? undefined);
   }
 
   // Debounced state persistence
@@ -219,7 +220,7 @@ async function main() {
   function scheduleSave() {
     clearTimeout(saveTimer);
     saveTimer = window.setTimeout(() => {
-      saveState(viewport, selection, hiddenEvents, collapsedEvents, events, eventOrders);
+      saveState(viewport, selection, hiddenEvents, collapsedEvents, events, eventOrders, showTodayLine);
     }, 500);
   }
 
@@ -605,6 +606,7 @@ async function main() {
     (y: number) => { scrollY = y; },
     computeMaxScrollY,
     requestRedraw,
+    () => showTodayLine,
   );
 
   // Info button
@@ -1265,8 +1267,12 @@ async function main() {
         location.reload();
       });
     },
+    onToggleTodayLine: (show) => {
+      showTodayLine = show;
+      requestRedraw();
+    },
     onThemeChange: () => requestRedraw(),
-  });
+  }, showTodayLine);
 
   // --- Undo/redo ---
   undoManager.init(snapshot());
