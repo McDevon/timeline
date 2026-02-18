@@ -828,7 +828,15 @@ function drawLayoutItem(
     ctx.globalAlpha = 0.3;
   }
 
-  if (item.isContainer) {
+  const isSelected = selectedItem === item;
+  const isHovered = !isSelected && hoveredItem === item;
+  const isSnap =
+    !isSelected &&
+    !isHovered &&
+    (snapHighlightYears.has(item.nominalStartYear) ||
+      snapHighlightYears.has(item.nominalEndYear));
+
+  if (item.isContainer && (item.isCollapsed || item.children.length > 0)) {
     drawContainer(
       ctx,
       item,
@@ -839,27 +847,18 @@ function drawLayoutItem(
       snapHighlightYears,
       transition,
     );
+  } else if (item.isPoint) {
+    drawPointEvent(
+      ctx,
+      item,
+      viewport,
+      canvasWidth,
+      isHovered,
+      isSelected,
+      isSnap,
+    );
   } else {
-    const isSelected = selectedItem === item;
-    const isHovered = !isSelected && hoveredItem === item;
-    const isSnap =
-      !isSelected &&
-      !isHovered &&
-      (snapHighlightYears.has(item.nominalStartYear) ||
-        snapHighlightYears.has(item.nominalEndYear));
-    if (item.isPoint) {
-      drawPointEvent(
-        ctx,
-        item,
-        viewport,
-        canvasWidth,
-        isHovered,
-        isSelected,
-        isSnap,
-      );
-    } else {
-      drawBar(ctx, item, viewport, canvasWidth, isHovered, isSelected, isSnap);
-    }
+    drawBar(ctx, item, viewport, canvasWidth, isHovered, isSelected, isSnap);
   }
 
   if (isDragged) {

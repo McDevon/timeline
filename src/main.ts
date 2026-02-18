@@ -11,6 +11,7 @@ import { InfoLog } from './ui/infoLog';
 import { TimelineMenu } from './ui/timelineMenu';
 import { EventMenu } from './ui/eventMenu';
 import { showConfirmDialog } from './ui/confirmDialog';
+import { showHelpDialog } from './ui/helpDialog';
 import { saveState, loadState } from './state';
 import { dateToDecimalYear, decimalYearToIso } from './data/time';
 import { isStoreInitialized, setStoreInitialized, loadStoredEvents, saveStoredEvents, clearStoredEvents, clearStore } from './data/store';
@@ -592,6 +593,14 @@ async function main() {
     computeMaxScrollY,
     requestRedraw,
   );
+
+  // Info button
+  const infoBtn = document.createElement('button');
+  infoBtn.className = 'info-btn';
+  infoBtn.textContent = 'i';
+  infoBtn.title = 'Keyboard & mouse shortcuts';
+  infoBtn.addEventListener('click', () => showHelpDialog());
+  document.body.appendChild(infoBtn);
 
   // Zoom buttons
   const ZOOM_DELTA = 120; // equivalent to one scroll wheel tick

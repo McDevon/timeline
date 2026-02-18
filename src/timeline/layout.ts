@@ -193,25 +193,37 @@ function placeLevel(
       approxEndRange,
     };
 
-    // Point events and leaf events without children
-    if (isPoint || !event.nested || event.nested.length === 0) {
+    // Point events: never collapsible
+    if (isPoint) {
       return {
         ...base,
         height: barHeight,
         isContainer: false,
         isCollapsed: false,
-        isPoint,
+        isPoint: true,
         placedChildren: [] as PlacedItem[],
       };
     }
 
-    // Collapsed container: thin bar, no children
+    // Collapsed container or collapsed childless range: thin bar, no children
     if (collapsedEvents?.has(event)) {
       return {
         ...base,
         height: LAYOUT.collapsedBarHeight,
         isContainer: true,
         isCollapsed: true,
+        isPoint: false,
+        placedChildren: [] as PlacedItem[],
+      };
+    }
+
+    // Childless range events: collapsible but rendered as a simple bar when expanded
+    if (!event.nested || event.nested.length === 0) {
+      return {
+        ...base,
+        height: barHeight,
+        isContainer: true,
+        isCollapsed: false,
         isPoint: false,
         placedChildren: [] as PlacedItem[],
       };
