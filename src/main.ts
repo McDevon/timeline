@@ -12,7 +12,8 @@ import { TimelineMenu } from './ui/timelineMenu';
 import { EventMenu } from './ui/eventMenu';
 import { showConfirmDialog } from './ui/confirmDialog';
 import { showHelpDialog } from './ui/helpDialog';
-import { saveState, loadState } from './state';
+import { saveState, loadState, eventToPath, pathToEvent } from './state';
+import { UndoManager, UndoableState, captureSnapshot, resolvePathSet, getEventId } from './undo';
 import { dateToDecimalYear, decimalYearToIso } from './data/time';
 import { isStoreInitialized, setStoreInitialized, loadStoredEvents, saveStoredEvents, clearStoredEvents, clearStore } from './data/store';
 import { validateEvents } from './data/validate';
@@ -85,6 +86,14 @@ async function main() {
     // Clamp scroll if layout shrank
     const max = computeMaxScrollY();
     if (scrollY > max) scrollY = max;
+  }
+
+  // Undo/redo
+  const undoManager = new UndoManager();
+  let skipCoalesce = false;
+
+  function snapshot() {
+    return captureSnapshot(events, hiddenEvents, collapsedEvents, eventOrders);
   }
 
   // Initialize viewport — use saved or compute full range
@@ -339,6 +348,7 @@ async function main() {
       }
     }
 
+    undoManager.push(snapshot());
     requestRedraw();
   }
 
@@ -545,6 +555,7 @@ async function main() {
     reorderState = null;
     reorderOriginalOrders = null;
     reorderLastIndex = -1;
+    undoManager.push(snapshot());
     requestRedraw();
   }
 
@@ -711,6 +722,7 @@ async function main() {
       }
     }
 
+    undoManager.push(snapshot());
     requestRedraw();
   }
 
@@ -823,10 +835,12 @@ async function main() {
       relayout();
       requestRedraw();
       saveStoredEvents(events);
+      if (!skipCoalesce) undoManager.pushCoalesced(`rename:${getEventId(event)}`, snapshot());
     },
     onEditInfo: (event, info) => {
       event.info = info || undefined;
       saveStoredEvents(events);
+      if (!skipCoalesce) undoManager.pushCoalesced(`info:${getEventId(event)}`, snapshot());
     },
     onChangeStart: (event, start) => {
       event.start = start;
@@ -835,6 +849,7 @@ async function main() {
       reselectEvent(event, prevScroll);
       requestRedraw();
       saveStoredEvents(events);
+      if (!skipCoalesce) undoManager.pushCoalesced(`start:${getEventId(event)}`, snapshot());
     },
     onChangeEnd: (event, end) => {
       if (end === undefined) {
@@ -848,6 +863,7 @@ async function main() {
       reselectEvent(event, prevScroll);
       requestRedraw();
       saveStoredEvents(events);
+      if (!skipCoalesce) undoManager.pushCoalesced(`end:${getEventId(event)}`, snapshot());
     },
     onChangeStartApprox: (event, approx) => {
       if (approx === undefined) delete event.startApprox;
@@ -857,6 +873,7 @@ async function main() {
       reselectEvent(event, prevScroll);
       requestRedraw();
       saveStoredEvents(events);
+      if (!skipCoalesce) undoManager.pushCoalesced(`startApprox:${getEventId(event)}`, snapshot());
     },
     onChangeEndApprox: (event, approx) => {
       if (approx === undefined) delete event.endApprox;
@@ -866,6 +883,14 @@ async function main() {
       reselectEvent(event, prevScroll);
       requestRedraw();
       saveStoredEvents(events);
+      if (!skipCoalesce) undoManager.pushCoalesced(`endApprox:${getEventId(event)}`, snapshot());
+    },
+    onTypeChange: () => {
+      skipCoalesce = true;
+      queueMicrotask(() => {
+        skipCoalesce = false;
+        undoManager.push(snapshot());
+      });
     },
     onHoverEvent: (event) => {
       onHoverEvent(event);
@@ -887,6 +912,7 @@ async function main() {
       requestRedraw();
       eventListPanel?.rebuild(events, onToggleEvent, onHoverEvent, onSelectEvent, hiddenEvents);
       saveStoredEvents(events);
+      undoManager.push(snapshot());
       infoLog.show(`Moved "${event.name}" to ${newParent ? `"${newParent.name}"` : 'top level'}`);
     },
     onDelete: (event) => {
@@ -900,6 +926,7 @@ async function main() {
       relayout();
       requestRedraw();
       saveStoredEvents(events);
+      undoManager.push(snapshot());
       infoLog.show(`Deleted "${event.name}"`);
     },
     onExport: (event) => {
@@ -1011,6 +1038,8 @@ async function main() {
     eventListPanel?.selectEvent(newEvent);
     eventMenu.show(newEvent);
     eventMenu.focusName();
+
+    undoManager.push(snapshot());
   });
 
   // --- Event import (shared by drop handler and menu) ---
@@ -1054,6 +1083,9 @@ async function main() {
       // Add to main events array and persist
       events.push(...newEvents);
       await saveStoredEvents(events);
+
+      // Snapshot after import for undo
+      undoManager.push(snapshot());
 
       // Recompute layout with fade-in animation for new events
       relayout();
@@ -1162,6 +1194,7 @@ async function main() {
         dblClickPrevViewport = null;
         dblClickItem = null;
         relayout();
+        undoManager.init(snapshot());
         requestRedraw();
         infoLog.show('All events deleted');
       });
@@ -1174,6 +1207,101 @@ async function main() {
       });
     },
     onThemeChange: () => requestRedraw(),
+  });
+
+  // --- Undo/redo ---
+  undoManager.init(snapshot());
+
+  function restoreFromSnapshot(state: UndoableState): void {
+    // Capture selected event identity before replacing state
+    const selectedPath = selectedItem
+      ? eventToPath(selectedItem.event, events)
+      : null;
+
+    // Cancel in-progress animations
+    animFrom = null;
+    animTo = null;
+    scrollTo = null;
+    layoutTransition = null;
+    reorderState = null;
+    reorderOriginalOrders = null;
+
+    // Replace events array
+    events.length = 0;
+    events.push(...structuredClone(state.events));
+
+    // Rebuild hidden/collapsed sets from paths
+    hiddenEvents.clear();
+    for (const e of resolvePathSet(state.hiddenPaths, events)) hiddenEvents.add(e);
+
+    collapsedEvents.clear();
+    for (const e of resolvePathSet(state.collapsedPaths, events)) collapsedEvents.add(e);
+
+    // Replace event orders
+    eventOrders.clear();
+    for (const [k, v] of state.eventOrders) eventOrders.set(k, [...v]);
+
+    // Recompute layout
+    relayout();
+
+    // Attempt to re-select by path
+    if (selectedPath) {
+      const event = pathToEvent(selectedPath, events);
+      if (event) {
+        const item = findLayoutItem(event, layout);
+        selectedItem = item;
+        eventListPanel?.selectEvent(event);
+        eventMenu.show(event);
+      } else {
+        selectedItem = null;
+        eventListPanel?.selectEvent(null);
+        eventMenu.hide();
+      }
+    } else {
+      selectedItem = null;
+      eventListPanel?.selectEvent(null);
+      eventMenu.hide();
+    }
+
+    hoveredItem = null;
+    inputHandlers.restoreSelectionOverrides(null, null);
+
+    // Rebuild event list and redraw
+    eventListPanel?.rebuild(events, onToggleEvent, onHoverEvent, onSelectEvent, hiddenEvents);
+    saveStoredEvents(events);
+    requestRedraw();
+  }
+
+  window.addEventListener('keydown', (e) => {
+    // Skip when form elements are focused (let browser handle native undo)
+    const tag = document.activeElement?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+    // Skip during active reorder drag
+    if (reorderState !== null) return;
+
+    // Undo: Cmd+Z or Ctrl+Z
+    if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === 'z') {
+      e.preventDefault();
+      const state = undoManager.undo();
+      if (state) {
+        restoreFromSnapshot(state);
+        infoLog.show('Undo');
+      }
+      return;
+    }
+
+    // Redo: Cmd+Shift+Z, Ctrl+Shift+Z, or Ctrl+Y
+    if (((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'z') ||
+        (e.ctrlKey && !e.metaKey && e.key === 'y')) {
+      e.preventDefault();
+      const state = undoManager.redo();
+      if (state) {
+        restoreFromSnapshot(state);
+        infoLog.show('Redo');
+      }
+      return;
+    }
   });
 
   // Apply saved theme before first draw

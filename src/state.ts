@@ -15,7 +15,7 @@ interface SerializedState {
 const STORAGE_KEY = 'timeline-state';
 
 /** Walk the event tree to build a name path from root to target. */
-function eventToPath(target: TimelineEvent, events: TimelineEvent[]): EventPath | null {
+export function eventToPath(target: TimelineEvent, events: TimelineEvent[]): EventPath | null {
   function walk(list: TimelineEvent[], path: string[]): EventPath | null {
     for (const e of list) {
       if (e === target) return [...path, e.name];
@@ -30,7 +30,7 @@ function eventToPath(target: TimelineEvent, events: TimelineEvent[]): EventPath 
 }
 
 /** Resolve a name path back to an event reference. Returns null if any step fails. */
-function pathToEvent(path: EventPath, events: TimelineEvent[]): TimelineEvent | null {
+export function pathToEvent(path: EventPath, events: TimelineEvent[]): TimelineEvent | null {
   let current = events;
   for (let i = 0; i < path.length; i++) {
     const found = current.find(e => e.name === path[i]);
