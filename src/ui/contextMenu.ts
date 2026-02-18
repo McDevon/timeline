@@ -15,6 +15,7 @@ export interface ContextMenuCallbacks {
 export class ContextMenu {
   private el: HTMLDivElement | null = null;
   private flyout: HTMLDivElement | null = null;
+  private flyoutAnchor: HTMLDivElement | null = null;
   private onClickOutside: ((e: MouseEvent) => void) | null = null;
   private onKeyDown: ((e: KeyboardEvent) => void) | null = null;
 
@@ -179,15 +180,16 @@ export class ContextMenu {
 
     document.body.appendChild(flyout);
     this.flyout = flyout;
+    this.flyoutAnchor = anchor;
 
-    this.repositionFlyout(anchor);
+    this.repositionFlyout();
   }
 
-  private repositionFlyout(anchor: HTMLDivElement): void {
-    if (!this.flyout || !this.el) return;
+  private repositionFlyout(): void {
+    if (!this.flyout || !this.el || !this.flyoutAnchor) return;
 
     const flyout = this.flyout;
-    const anchorRect = anchor.getBoundingClientRect();
+    const anchorRect = this.flyoutAnchor.getBoundingClientRect();
     const menuRect = this.el.getBoundingClientRect();
 
     // Remove max-height to measure natural size
@@ -298,6 +300,11 @@ export class ContextMenu {
             childContainer.style.maxHeight = childContainer.scrollHeight + "px";
             void childContainer.offsetHeight;
             childContainer.style.maxHeight = "0";
+            const onEnd = () => {
+              childContainer.removeEventListener("transitionend", onEnd);
+              this.repositionFlyout();
+            };
+            childContainer.addEventListener("transitionend", onEnd);
           } else {
             arrow.classList.add("expanded");
             childContainer.style.maxHeight = childContainer.scrollHeight + "px";
@@ -306,6 +313,7 @@ export class ContextMenu {
               if (arrow.classList.contains("expanded")) {
                 childContainer.style.maxHeight = "none";
               }
+              this.repositionFlyout();
             };
             childContainer.addEventListener("transitionend", onEnd);
           }
@@ -328,6 +336,7 @@ export class ContextMenu {
     if (this.flyout) {
       this.flyout.remove();
       this.flyout = null;
+      this.flyoutAnchor = null;
     }
   }
 }

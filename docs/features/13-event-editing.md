@@ -15,7 +15,7 @@ The menu follows the same collapsible pattern as other panels: title bar at bott
 1. **Name field** — text input, pre-filled with event name. Editing updates in real-time. Empty names rejected.
 2. **Info field** — textarea for event description. Persists immediately.
 3. **Type selector** — three pill buttons: Point, Range, Ongoing. Switching changes event structure. Point blocked if event has children.
-4. **Start section** — date input (year + era + optional month + optional day) with optional approximate toggle.
+4. **Start section** — date input (year + era + optional month + optional day) with optional uncertainty range toggle.
 5. **End section** — same as start; hidden for Point, shows "ongoing" label for Ongoing.
 6. **Parent section** — hover-triggered flyout to reparent the event. Shows a collapsible event tree.
 7. **Delete button** — destructive action with confirmation dialog.
@@ -28,7 +28,7 @@ Reusable `DateInput` class with two rows:
 
 Supports variable precision: year-only, year-month, or full date. BCE dates shown as positive year with BCE era toggle.
 
-## Approximate Dates
+## Uncertainty Ranges
 
 `ApproxInput` wraps a checkbox and two `DateInput` components (earliest/latest). Maps to `startApprox`/`endApprox` tuple fields. Default ±1 year from nominal when enabled.
 

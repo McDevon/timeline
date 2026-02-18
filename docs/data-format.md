@@ -32,7 +32,7 @@ Dates are ISO date strings with variable precision:
 
 **Internal representation**: Dates are converted to decimal years for rendering math. `"1471-07-01"` becomes approximately `1471.5`. This conversion is handled by `src/data/time.ts` and is transparent to the data format.
 
-### Uncertain/Approximate Dates
+### Uncertainty Ranges
 
 Events can specify uncertainty ranges for their start and/or end dates using the `startApprox` and `endApprox` fields. Each is a two-element array `[earliest, latest]` of ISO date strings.
 

@@ -17,7 +17,7 @@ export class ApproxInput {
     toggle.className = 'approx-toggle';
     this.checkbox = document.createElement('input');
     this.checkbox.type = 'checkbox';
-    const label = document.createTextNode(' Approximate');
+    const label = document.createTextNode(' Uncertainty range');
     toggle.appendChild(this.checkbox);
     toggle.appendChild(label);
     this.el.appendChild(toggle);

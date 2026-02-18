@@ -25,7 +25,7 @@ All data-mutating actions push to the undo stack:
 
 - Adding events (new event button, import)
 - Deleting events
-- Editing event properties (name, info, dates, approximate ranges, type switch)
+- Editing event properties (name, info, dates, uncertainty ranges, type switch)
 - Reparenting events
 - Reordering events (drag)
 - Toggling visibility (hide/show)
