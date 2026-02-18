@@ -61,13 +61,14 @@ export class EventMenu {
 
   constructor(private callbacks: EventMenuCallbacks) {
     this.el = document.createElement('div');
-    this.el.className = 'event-menu collapsed hidden';
+    this.el.className = 'event-menu collapsed disabled';
 
     // Header
     const header = document.createElement('div');
     header.className = 'event-menu-header';
     this.titleSpan = document.createElement('span');
     this.titleSpan.className = 'event-menu-title';
+    this.titleSpan.textContent = 'Nothing selected';
     const chevron = document.createElement('span');
     chevron.className = 'event-menu-chevron';
     chevron.textContent = '\u25BC';
@@ -276,17 +277,18 @@ export class EventMenu {
     // Close any open flyout
     this.hideParentFlyout();
 
-    this.el.classList.remove('hidden');
+    this.el.classList.remove('disabled');
   }
 
   hide(): void {
     this.hideParentFlyout();
-    this.el.classList.add('hidden');
+    this.el.classList.add('disabled', 'collapsed');
+    this.titleSpan.textContent = 'Nothing selected';
     this.currentEvent = null;
   }
 
   isVisible(): boolean {
-    return !this.el.classList.contains('hidden');
+    return !this.el.classList.contains('disabled');
   }
 
   focusName(): void {

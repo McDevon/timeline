@@ -304,7 +304,7 @@
     .timeline-menu {
       position: fixed;
       bottom: 20px;
-      left: 328px;
+      right: 64px;
       width: 200px;
       background: var(--tl-panel-bg);
       border: 1px solid var(--tl-border);
@@ -374,7 +374,7 @@
     .event-menu {
       position: fixed;
       bottom: 20px;
-      left: 536px;
+      left: 328px;
       width: 200px;
       background: var(--tl-panel-bg);
       border: 1px solid var(--tl-border);
@@ -387,8 +387,9 @@
       display: flex;
       flex-direction: column-reverse;
     }
-    .event-menu.hidden {
-      display: none;
+    .event-menu.disabled {
+      opacity: 0.5;
+      pointer-events: none;
     }
     .event-menu-header {
       display: flex;

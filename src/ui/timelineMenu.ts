@@ -119,23 +119,24 @@ export class TimelineMenu {
     document.body.appendChild(flyout);
     this.flyout = flyout;
 
-    // Position the flyout to the right of the anchor
+    // Position the flyout to the left of the menu (since menu is on the right edge)
     const anchorRect = anchor.getBoundingClientRect();
     const menuRect = this.el.getBoundingClientRect();
-    let left = menuRect.right + 4;
     const top = anchorRect.top;
 
-    // Fall back to left side if it would overflow
     flyout.style.top = `${top}px`;
+    flyout.style.left = '0px'; // temporary, to measure width
+    const flyoutWidth = flyout.getBoundingClientRect().width;
+
+    let left = menuRect.left - flyoutWidth - 4;
+    // Fall back to right side if it would overflow left
+    if (left < 8) {
+      left = menuRect.right + 4;
+    }
     flyout.style.left = `${left}px`;
 
-    const flyoutRect = flyout.getBoundingClientRect();
-    if (flyoutRect.right > window.innerWidth - 8) {
-      left = menuRect.left - flyoutRect.width - 4;
-      flyout.style.left = `${left}px`;
-    }
-
     // Clamp vertical position if it overflows bottom
+    const flyoutRect = flyout.getBoundingClientRect();
     if (flyoutRect.bottom > window.innerHeight - 8) {
       flyout.style.top = `${window.innerHeight - 8 - flyoutRect.height}px`;
     }

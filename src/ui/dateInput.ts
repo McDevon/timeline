@@ -7,7 +7,6 @@ export class DateInput {
   private eraSelect: HTMLSelectElement;
   private monthSelect: HTMLSelectElement;
   private daySelect: HTMLSelectElement;
-  private dayRow: HTMLDivElement;
   private suppressChange = false;
 
   constructor(private onChange: (isoDate: string) => void) {
@@ -48,7 +47,6 @@ export class DateInput {
 
     this.daySelect = document.createElement('select');
     this.daySelect.className = 'date-input-day';
-    this.dayRow = row2;
     this.updateDayOptions();
     this.daySelect.addEventListener('change', () => this.emitChange());
     row2.appendChild(this.monthSelect);
@@ -68,8 +66,8 @@ export class DateInput {
     this.monthSelect.value = parsed.month !== null ? String(parsed.month) : '';
     this.updateDayOptions();
     this.daySelect.value = parsed.day !== null ? String(parsed.day) : '';
-    // Show/hide day row based on month
-    this.dayRow.style.display = parsed.month !== null ? '' : 'none';
+    // Show/hide day select based on month
+    this.daySelect.style.display = parsed.month !== null ? '' : 'none';
     this.suppressChange = false;
   }
 
@@ -84,11 +82,11 @@ export class DateInput {
   private updateDayOptions(): void {
     const monthVal = this.monthSelect.value;
     if (!monthVal) {
-      this.dayRow.style.display = 'none';
+      this.daySelect.style.display = 'none';
       this.daySelect.value = '';
       return;
     }
-    this.dayRow.style.display = '';
+    this.daySelect.style.display = '';
 
     const monthIdx = parseInt(monthVal, 10) - 1;
     const maxDay = DAYS_IN_MONTH[monthIdx];

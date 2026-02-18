@@ -334,7 +334,6 @@ async function main() {
         selectedItem = null;
         eventListPanel?.selectEvent(null);
         eventMenu.hide();
-        updateNewEventBtnPosition();
       }
     }
 
@@ -579,7 +578,6 @@ async function main() {
       selectedItem = item;
       eventListPanel?.selectEvent(item?.event ?? null);
       if (item) eventMenu.show(item.event); else eventMenu.hide();
-      updateNewEventBtnPosition();
     },
     (x: number) => { cursorX = x; },
     () => selection,
@@ -632,7 +630,6 @@ async function main() {
     selectedItem = preClickSelectedItem;
     eventListPanel?.selectEvent(selectedItem?.event ?? null);
     if (selectedItem) eventMenu.show(selectedItem.event); else eventMenu.hide();
-    updateNewEventBtnPosition();
 
     if (dblClickItem && hit.event === dblClickItem.event && dblClickPrevViewport) {
       animateZoom(dblClickPrevViewport);
@@ -695,7 +692,6 @@ async function main() {
         selectedItem = null;
         eventListPanel?.selectEvent(null);
         eventMenu.hide();
-        updateNewEventBtnPosition();
       }
       if (dblClickItem && isDescendantOf(dblClickItem, event)) {
         dblClickPrevViewport = null;
@@ -720,7 +716,6 @@ async function main() {
     selectedItem = item;
     eventListPanel?.selectEvent(event);
     eventMenu.show(event);
-    updateNewEventBtnPosition();
 
     if (item) {
       const rect = canvas.getBoundingClientRect();
@@ -888,7 +883,6 @@ async function main() {
       collapsedEvents.delete(event);
       selectedItem = null;
       eventMenu.hide();
-      updateNewEventBtnPosition();
       eventListPanel?.selectEvent(null);
       eventListPanel?.removeEvent(event);
       relayout();
@@ -939,11 +933,7 @@ async function main() {
   newEventBtn.title = 'New event';
   document.body.appendChild(newEventBtn);
 
-  function updateNewEventBtnPosition() {
-    const left = eventMenu.isVisible() ? 744 : 536;
-    newEventBtn.style.left = `${left}px`;
-  }
-  updateNewEventBtnPosition();
+  newEventBtn.style.left = '536px';
 
   newEventBtn.addEventListener('click', () => {
     // 1. Determine parent
@@ -1009,7 +999,6 @@ async function main() {
     eventListPanel?.selectEvent(newEvent);
     eventMenu.show(newEvent);
     eventMenu.focusName();
-    updateNewEventBtnPosition();
   });
 
   // --- Event import (shared by drop handler and menu) ---
@@ -1158,7 +1147,6 @@ async function main() {
         hoveredItem = null;
         selectedItem = null;
         eventMenu.hide();
-        updateNewEventBtnPosition();
         dblClickPrevViewport = null;
         dblClickItem = null;
         relayout();
