@@ -4,7 +4,7 @@ Timeline is a tool to visualise historical timeframes and events, and their rela
 
 ## Examples
 
-Important events in the Roman and Byzantine empires
+Important events in the Roman Empire and the Eastern Roman Empire
 
 ![Example timeline](example1.png)
 
