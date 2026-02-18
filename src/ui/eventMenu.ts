@@ -1,4 +1,5 @@
 import { TimelineEvent } from "../types";
+import { dateToDecimalYear, todayDecimalYear, todayIsoDate } from "../data/time";
 import { showConfirmDialog } from "./confirmDialog";
 import { DateInput } from "./dateInput";
 import { ApproxInput } from "./approxInput";
@@ -137,6 +138,22 @@ export class EventMenu {
     this.startDateInput = new DateInput((iso) => {
       if (!this.currentEvent) return;
       callbacks.onChangeStart(this.currentEvent, iso);
+      // Clamp end date if start moved past it
+      if (
+        this.currentType === "range" &&
+        this.currentEvent.end &&
+        this.currentEvent.end !== "ongoing"
+      ) {
+        if (dateToDecimalYear(iso) > dateToDecimalYear(this.currentEvent.end)) {
+          callbacks.onChangeEnd(this.currentEvent, iso);
+          this.endDateInput.setValue(iso);
+          if (this.currentEvent.endApprox) {
+            callbacks.onChangeEndApprox(this.currentEvent, undefined);
+            this.endApproxInput.setValue(undefined, iso);
+          }
+        }
+      }
+      this.updateTypeButtons();
     });
     body.appendChild(this.startDateInput.getElement());
 
@@ -166,6 +183,15 @@ export class EventMenu {
     this.endDateInput = new DateInput((iso) => {
       if (!this.currentEvent) return;
       callbacks.onChangeEnd(this.currentEvent, iso);
+      // Clamp start date if end moved before it
+      if (dateToDecimalYear(iso) < dateToDecimalYear(this.currentEvent.start)) {
+        callbacks.onChangeStart(this.currentEvent, iso);
+        this.startDateInput.setValue(iso);
+        if (this.currentEvent.startApprox) {
+          callbacks.onChangeStartApprox(this.currentEvent, undefined);
+          this.startApproxInput.setValue(undefined, iso);
+        }
+      }
     });
     this.endDateContainer.appendChild(this.endDateInput.getElement());
 
@@ -320,11 +346,7 @@ export class EventMenu {
       const blocked =
         type === "point" && hasKids && this.currentType !== "point";
       btn.classList.toggle("disabled", blocked);
-      if (blocked) {
-        btn.title = "Point events cannot have children";
-      } else {
-        btn.title = "";
-      }
+      btn.title = blocked ? "Point events cannot have children" : "";
     }
   }
 
@@ -657,6 +679,16 @@ export class EventMenu {
     } else if (newType === "ongoing") {
       this.callbacks.onChangeEnd(this.currentEvent, "ongoing");
       this.callbacks.onChangeEndApprox(this.currentEvent, undefined);
+      // Clamp start to today if event hasn't started yet
+      if (dateToDecimalYear(this.currentEvent.start) > todayDecimalYear()) {
+        const today = todayIsoDate();
+        this.callbacks.onChangeStart(this.currentEvent, today);
+        this.startDateInput.setValue(today);
+        if (this.currentEvent.startApprox) {
+          this.callbacks.onChangeStartApprox(this.currentEvent, undefined);
+          this.startApproxInput.setValue(undefined, today);
+        }
+      }
     } else {
       // Switching to range — restore stash or use default
       if (this.stashedEnd) {
