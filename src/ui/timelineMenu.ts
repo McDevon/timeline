@@ -38,7 +38,7 @@ export class TimelineMenu {
 
     body.appendChild(this.createButton('Import events', false, callbacks.onImport));
     body.appendChild(this.createButton('Export events', false, callbacks.onExport));
-    body.appendChild(this.createCheckbox('Show now line', initialShowTodayLine, callbacks.onToggleTodayLine));
+    body.appendChild(this.createCheckbox('Show today indicator', initialShowTodayLine, callbacks.onToggleTodayLine));
     body.appendChild(this.createThemeButton(callbacks));
     body.appendChild(this.createButton('Delete all events', true, callbacks.onDeleteAll));
     body.appendChild(this.createButton('Reload default events', true, callbacks.onReloadDefaults));
