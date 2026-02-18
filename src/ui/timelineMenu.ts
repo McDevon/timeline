@@ -3,6 +3,7 @@ import { themes, Theme, applyTheme, loadSavedTheme } from '../themes';
 export interface TimelineMenuCallbacks {
   onImport: () => void;
   onExport: () => void;
+  onToggleTodayLine: (show: boolean) => void;
   onDeleteAll: () => void;
   onReloadDefaults: () => void;
   onThemeChange: () => void;
@@ -14,7 +15,7 @@ export class TimelineMenu {
   private hideTimer = 0;
   private currentThemeId: string;
 
-  constructor(callbacks: TimelineMenuCallbacks) {
+  constructor(callbacks: TimelineMenuCallbacks, initialShowTodayLine: boolean) {
     this.currentThemeId = loadSavedTheme().id;
 
     this.el = document.createElement('div');
@@ -37,12 +38,22 @@ export class TimelineMenu {
 
     body.appendChild(this.createButton('Import events', false, callbacks.onImport));
     body.appendChild(this.createButton('Export events', false, callbacks.onExport));
+    body.appendChild(this.createCheckbox('Show now line', initialShowTodayLine, callbacks.onToggleTodayLine));
     body.appendChild(this.createThemeButton(callbacks));
     body.appendChild(this.createButton('Delete all events', true, callbacks.onDeleteAll));
     body.appendChild(this.createButton('Reload default events', true, callbacks.onReloadDefaults));
 
     this.el.appendChild(body);
     document.body.appendChild(this.el);
+
+    // Close when clicking outside the menu and its flyout
+    document.addEventListener('mousedown', (e) => {
+      if (this.el.classList.contains('collapsed')) return;
+      if (this.el.contains(e.target as Node)) return;
+      if (this.flyout?.contains(e.target as Node)) return;
+      this.el.classList.add('collapsed');
+      this.hideFlyout();
+    });
   }
 
   private createButton(label: string, destructive: boolean, onClick: () => void): HTMLDivElement {
@@ -51,6 +62,25 @@ export class TimelineMenu {
     btn.textContent = label;
     btn.addEventListener('click', onClick);
     return btn;
+  }
+
+  private createCheckbox(label: string, checked: boolean, onChange: (checked: boolean) => void): HTMLDivElement {
+    const row = document.createElement('div');
+    row.className = 'timeline-menu-btn';
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = checked;
+    checkbox.style.margin = '0 6px 0 0';
+    checkbox.style.accentColor = 'var(--tl-check-color)';
+    const labelSpan = document.createElement('span');
+    labelSpan.textContent = label;
+    row.appendChild(checkbox);
+    row.appendChild(labelSpan);
+    row.addEventListener('click', (e) => {
+      if (e.target !== checkbox) checkbox.checked = !checkbox.checked;
+      onChange(checkbox.checked);
+    });
+    return row;
   }
 
   private createThemeButton(callbacks: TimelineMenuCallbacks): HTMLDivElement {
