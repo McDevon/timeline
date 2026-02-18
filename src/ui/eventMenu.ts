@@ -329,6 +329,10 @@ export class EventMenu {
     return !this.el.classList.contains("disabled");
   }
 
+  expand(): void {
+    this.el.classList.remove("collapsed");
+  }
+
   focusName(): void {
     this.el.classList.remove("collapsed");
     this.nameInput.focus();

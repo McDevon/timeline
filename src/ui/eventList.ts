@@ -391,8 +391,8 @@ export class EventListPanel {
     // Click → select on timeline
     row.addEventListener('click', () => { onSelect(event); });
 
-    // Double-click → zoom to event
-    row.addEventListener('dblclick', () => { this.onDblClick?.(event); });
+    // Double-click → zoom to event (but not when double-clicking the checkbox)
+    row.addEventListener('dblclick', (e) => { if (e.target !== check) this.onDblClick?.(event); });
 
     // Hover sync
     row.addEventListener('mouseenter', () => { onHover(event); });

@@ -437,8 +437,10 @@
       flex-direction: column-reverse;
     }
     .event-menu.disabled {
-      opacity: 0.5;
       pointer-events: none;
+      background: var(--tl-panel-bg-muted, var(--tl-panel-bg));
+      border-color: var(--tl-border-muted, var(--tl-border));
+      color: var(--tl-text-muted);
     }
     .event-menu-header {
       display: flex;

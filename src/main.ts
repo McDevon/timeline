@@ -607,6 +607,7 @@ async function main() {
     computeMaxScrollY,
     requestRedraw,
     () => showTodayLine,
+    onContextMenu,
   );
 
   // Info button
@@ -814,6 +815,7 @@ async function main() {
   const contextMenu = new ContextMenu({
     onEdit: (event) => {
       onSelectEvent(event);
+      eventMenu.expand();
     },
     onChangeParent: (event, newParent) => {
       removeEvent(events, event);

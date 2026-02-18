@@ -39,6 +39,7 @@ export function setupInput(
   getMaxScrollY: () => number,
   requestRedraw: () => void,
   getShowTodayLine?: () => boolean,
+  onContextMenu?: (event: import('../types').TimelineEvent, x: number, y: number) => void,
 ): InputHandlers {
   const tooltip = new Tooltip();
 
@@ -647,6 +648,19 @@ export function setupInput(
     }
   }
 
+  function onCanvasContextMenu(e: MouseEvent) {
+    if (!onContextMenu) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    if (y < LAYOUT.eventsStartY) return; // axis area — use default
+    const hit = hitTest(x, y, getLayout(), getViewport(), canvas.clientWidth, getScrollY());
+    if (hit) {
+      e.preventDefault();
+      onContextMenu(hit.event, e.clientX, e.clientY);
+    }
+  }
+
   // Attach listeners
   canvas.addEventListener('wheel', onWheel, { passive: false });
   canvas.addEventListener('mousedown', onMouseDown);
@@ -656,6 +670,7 @@ export function setupInput(
   canvas.addEventListener('touchstart', onTouchStart, { passive: true });
   canvas.addEventListener('touchmove', onTouchMove, { passive: false });
   window.addEventListener('keydown', onKeyDown);
+  canvas.addEventListener('contextmenu', onCanvasContextMenu);
 
   canvas.style.cursor = 'grab';
 
@@ -669,6 +684,7 @@ export function setupInput(
       canvas.removeEventListener('touchstart', onTouchStart);
       canvas.removeEventListener('touchmove', onTouchMove);
       window.removeEventListener('keydown', onKeyDown);
+      canvas.removeEventListener('contextmenu', onCanvasContextMenu);
       tooltip.hide();
     },
     getSelectionOverrides() {
