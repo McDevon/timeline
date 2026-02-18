@@ -1,7 +1,7 @@
 import { loadEvents } from './data/loader';
 import { render, computeFullRange, computeMaxLayoutY, LAYOUT, LayoutTransition, ReorderState } from './timeline/renderer';
 import { computeLayout, LayoutItem } from './timeline/layout';
-import { Viewport, zoomViewport } from './timeline/viewport';
+import { Viewport, zoomViewport, xToYear } from './timeline/viewport';
 import { hitTest } from './timeline/hitTest';
 import { TimelineEvent, TimelineSelection } from './types';
 import { setupInput } from './timeline/input';
@@ -749,13 +749,24 @@ async function main() {
       const rect = canvas.getBoundingClientRect();
 
       // Horizontal: pan viewport if event is not visible
+      // Account for UI panels overlaying the left side of the canvas:
+      // - events list panel (always)
+      // - event menu (only when expanded)
       const vp = animTo ?? viewport;
-      const eventOutLeft = item.endYear < vp.start;
+      const canvasWidth = canvas.clientWidth;
+      const occludedRight = eventMenu.isExpanded()
+        ? eventMenu.getRightEdge() - rect.left
+        : (eventListPanel?.getRightEdge() ?? 0) - rect.left;
+      const visibleLeftYear = xToYear(occludedRight, vp, canvasWidth);
+      const eventOutLeft = item.endYear < visibleLeftYear;
       const eventOutRight = item.startYear > vp.end;
       if (eventOutLeft || eventOutRight) {
-        const span = vp.end - vp.start;
+        const visibleSpan = vp.end - visibleLeftYear;
         const eventMid = (item.startYear + item.endYear) / 2;
-        animateZoom({ start: eventMid - span / 2, end: eventMid + span / 2 });
+        // Center the event within the unoccluded portion of the canvas
+        const visibleCenter = visibleLeftYear + visibleSpan / 2;
+        const offset = eventMid - visibleCenter;
+        animateZoom({ start: vp.start + offset, end: vp.end + offset });
       }
 
       // Vertical: scroll if event is not visible

@@ -329,8 +329,17 @@ export class EventMenu {
     return !this.el.classList.contains("disabled");
   }
 
+  isExpanded(): boolean {
+    return this.isVisible() && !this.el.classList.contains("collapsed");
+  }
+
   expand(): void {
     this.el.classList.remove("collapsed");
+  }
+
+  /** Right edge of the menu in viewport pixels (for occlusion checks). */
+  getRightEdge(): number {
+    return this.el.getBoundingClientRect().right;
   }
 
   focusName(): void {

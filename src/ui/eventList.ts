@@ -190,6 +190,11 @@ export class EventListPanel {
     }
   }
 
+  /** Right edge of the panel in viewport pixels (for occlusion checks). */
+  getRightEdge(): number {
+    return this.el.getBoundingClientRect().right;
+  }
+
   highlightEvent(event: TimelineEvent | null) {
     if (this.highlightedRow) {
       this.highlightedRow.classList.remove('highlighted');
