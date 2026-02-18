@@ -34,7 +34,10 @@
       {
         "start": "2000-09",
         "name": "Largest ozone hole recorded",
-        "startApprox": ["2000-09", "2000-10"],
+        "startApprox": [
+          "2000-09",
+          "2000-10"
+        ],
         "info": "Antarctic ozone hole reaches record 29.9 million km², roughly three times the area of the United States"
       },
       {
@@ -45,19 +48,28 @@
       {
         "start": "2040",
         "name": "Projected global ozone recovery",
-        "startApprox": ["2035", "2050"],
+        "startApprox": [
+          "2035",
+          "2050"
+        ],
         "info": "Ozone layer outside polar regions expected to recover to 1980 levels"
       },
       {
         "start": "2045",
         "name": "Projected Arctic ozone recovery",
-        "startApprox": ["2040", "2055"],
+        "startApprox": [
+          "2040",
+          "2055"
+        ],
         "info": "Arctic stratospheric ozone expected to return to 1980 levels"
       },
       {
         "start": "2066",
         "name": "Projected Antarctic ozone recovery",
-        "startApprox": ["2060", "2075"],
+        "startApprox": [
+          "2060",
+          "2075"
+        ],
         "info": "Antarctic ozone hole expected to fully close, completing the decades-long recovery"
       }
     ]
@@ -109,7 +121,10 @@
           {
             "start": "1988",
             "name": "CO₂ passes 350 ppm",
-            "startApprox": ["1987", "1989"],
+            "startApprox": [
+              "1987",
+              "1989"
+            ],
             "info": "Atmospheric CO₂ crosses 350 ppm, the level later identified by scientists as the safe upper limit"
           },
           {
@@ -125,7 +140,10 @@
           {
             "start": "2016",
             "name": "Global temperature crosses +1.0°C",
-            "startApprox": ["2015", "2017"],
+            "startApprox": [
+              "2015",
+              "2017"
+            ],
             "info": "Annual global mean temperature first exceeds 1.0°C above the 1850–1900 pre-industrial baseline"
           },
           {
@@ -147,7 +165,10 @@
           {
             "start": "2045",
             "name": "Projected +2.0°C global warming",
-            "startApprox": ["2035", "2060"],
+            "startApprox": [
+              "2035",
+              "2060"
+            ],
             "info": "Under current policies, the world is projected to cross 2.0°C of warming above pre-industrial levels"
           }
         ]
@@ -269,7 +290,10 @@
         "name": "Sea Level Rise",
         "start": "1900",
         "end": "ongoing",
-        "startApprox": ["1880", "1920"],
+        "startApprox": [
+          "1900",
+          "1920"
+        ],
         "info": "Global mean sea level has risen ~20 cm since 1900 and the rate is accelerating as ice sheets and glaciers melt",
         "nested": [
           {
@@ -281,7 +305,10 @@
           {
             "start": "2100",
             "name": "Projected sea level +0.3–1.0 m",
-            "startApprox": ["2080", "2150"],
+            "startApprox": [
+              "2080",
+              "2150"
+            ],
             "info": "IPCC projects 0.3–1.0 m of sea level rise by 2100 depending on emissions scenario; could exceed 2 m under high-end ice sheet instability"
           }
         ]
@@ -290,7 +317,10 @@
         "name": "Climate Tipping Points",
         "start": "2020",
         "end": "ongoing",
-        "startApprox": ["2010", "2025"],
+        "startApprox": [
+          "2010",
+          "2025"
+        ],
         "info": "Critical Earth system thresholds that, once crossed, trigger self-reinforcing changes irreversible on human timescales",
         "nested": [
           {
@@ -302,41 +332,59 @@
           {
             "start": "2040",
             "name": "Projected ice-free Arctic summer",
-            "startApprox": ["2030", "2050"],
+            "startApprox": [
+              "2030",
+              "2050"
+            ],
             "info": "First summer with less than 1 million km² of Arctic sea ice, exposing dark ocean that absorbs more heat"
           },
           {
             "start": "2004",
             "end": "ongoing",
             "name": "AMOC weakening detected",
-            "startApprox": ["2000", "2010"],
+            "startApprox": [
+              "2000",
+              "2010"
+            ],
             "info": "Atlantic Meridional Overturning Circulation has weakened ~15% since the mid-20th century; full collapse would radically alter Northern Hemisphere climate"
           },
           {
             "start": "2050",
             "name": "Projected AMOC collapse risk",
-            "startApprox": ["2025", "2095"],
+            "startApprox": [
+              "2025",
+              "2095"
+            ],
             "info": "Studies suggest the Atlantic circulation could collapse between the 2030s and 2090s under continued warming"
           },
           {
             "start": "2000",
             "end": "ongoing",
             "name": "Permafrost thaw acceleration",
-            "startApprox": ["1990", "2010"],
+            "startApprox": [
+              "1990",
+              "2010"
+            ],
             "info": "Arctic permafrost contains ~1,500 billion tonnes of carbon; thawing releases methane and CO₂ in a self-reinforcing feedback loop"
           },
           {
             "start": "2000",
             "end": "ongoing",
             "name": "Greenland ice sheet mass loss",
-            "startApprox": ["1990", "2005"],
+            "startApprox": [
+              "1990",
+              "2005"
+            ],
             "info": "Greenland is losing ice at an accelerating rate; complete loss would raise sea levels by 7.2 metres over millennia"
           },
           {
             "start": "2000",
             "end": "ongoing",
             "name": "West Antarctic Ice Sheet destabilization",
-            "startApprox": ["1990", "2010"],
+            "startApprox": [
+              "1990",
+              "2010"
+            ],
             "info": "Marine ice sheet instability may have been triggered; could contribute 3–5 m of sea level rise over centuries"
           }
         ]
@@ -347,7 +395,10 @@
     "name": "Sixth Mass Extinction",
     "start": "1900",
     "end": "ongoing",
-    "startApprox": ["1870", "1950"],
+    "startApprox": [
+      "1870",
+      "1950"
+    ],
     "info": "Earth is experiencing its sixth mass extinction, the first caused by a single species; current extinction rates are 100–1,000 times the natural background rate",
     "nested": [
       {
@@ -379,7 +430,10 @@
       {
         "start": "2006",
         "name": "Baiji dolphin declared extinct",
-        "startApprox": ["2004", "2007"],
+        "startApprox": [
+          "2004",
+          "2007"
+        ],
         "info": "An extensive Yangtze River survey fails to find a single Baiji; the first cetacean driven to extinction by human activity"
       },
       {
@@ -412,7 +466,10 @@
       {
         "start": "2050",
         "name": "Projected Amazon rainforest dieback",
-        "startApprox": ["2040", "2070"],
+        "startApprox": [
+          "2040",
+          "2070"
+        ],
         "info": "At current deforestation rates and warming, the Amazon could cross a tipping point and transition from rainforest to savanna"
       }
     ]
@@ -421,28 +478,40 @@
     "name": "Ocean Crises",
     "start": "1950",
     "end": "ongoing",
-    "startApprox": ["1900", "1960"],
+    "startApprox": [
+      "1900",
+      "1960"
+    ],
     "info": "The world's oceans face acidification, plastic pollution, dead zones, and ecosystem collapse on an unprecedented scale",
     "nested": [
       {
         "start": "1850",
         "end": "ongoing",
         "name": "Ocean acidification",
-        "startApprox": ["1800", "1870"],
+        "startApprox": [
+          "1800",
+          "1870"
+        ],
         "info": "Oceans have absorbed ~30% of human CO₂ emissions, dropping pH by 0.1 units — a 26% increase in acidity, faster than any change in 300 million years"
       },
       {
         "start": "1950",
         "end": "ongoing",
         "name": "Ocean dead zones expansion",
-        "startApprox": ["1940", "1960"],
+        "startApprox": [
+          "1940",
+          "1960"
+        ],
         "info": "Oxygen-depleted dead zones have quadrupled since the 1950s; over 700 identified globally by 2024, driven by nutrient runoff and warming"
       },
       {
         "start": "1950",
         "end": "ongoing",
         "name": "Great Pacific Garbage Patch forming",
-        "startApprox": ["1945", "1960"],
+        "startApprox": [
+          "1945",
+          "1960"
+        ],
         "info": "Plastic debris accumulates in the North Pacific subtropical gyre; by the 2020s it covers 1.6 million km² — three times the size of France"
       },
       {
@@ -458,7 +527,10 @@
       {
         "start": "2050",
         "name": "Projected: more plastic than fish",
-        "startApprox": ["2040", "2060"],
+        "startApprox": [
+          "2040",
+          "2060"
+        ],
         "info": "Ellen MacArthur Foundation projects that by weight, the ocean could contain more plastic than fish if current trends continue"
       }
     ]
@@ -523,7 +595,10 @@
           {
             "start": "1998",
             "name": "PFAS contamination exposed",
-            "startApprox": ["1998", "2001"],
+            "startApprox": [
+              "1998",
+              "2001"
+            ],
             "info": "Attorney Rob Bilott begins uncovering evidence that DuPont knowingly contaminated water supplies near its Parkersburg, West Virginia plant"
           },
           {
@@ -639,42 +714,66 @@
     "name": "Projected Futures Under Current Trajectory",
     "start": "2030",
     "end": "2100",
-    "startApprox": ["2025", "2035"],
-    "endApprox": ["2100", "2200"],
+    "startApprox": [
+      "2025",
+      "2035"
+    ],
+    "endApprox": [
+      "2100",
+      "2200"
+    ],
     "info": "What the science projects if current emission trajectories and ecological destruction continue",
     "nested": [
       {
         "start": "2030",
         "end": "2050",
         "name": "Coral reefs effectively eliminated",
-        "startApprox": ["2025", "2035"],
-        "endApprox": ["2040", "2060"],
+        "startApprox": [
+          "2025",
+          "2035"
+        ],
+        "endApprox": [
+          "2040",
+          "2060"
+        ],
         "info": "At +1.5°C, 70–90% of coral reefs die; at +2°C, 99% are lost, collapsing marine food webs that support 500 million people"
       },
       {
         "start": "2030",
         "end": "ongoing",
         "name": "Climate migration acceleration",
-        "startApprox": ["2025", "2040"],
+        "startApprox": [
+          "2025",
+          "2040"
+        ],
         "info": "World Bank projects 216 million internal climate migrants by 2050 across six regions due to drought, floods, and sea level rise"
       },
       {
         "start": "2040",
         "end": "ongoing",
         "name": "Global crop yield decline",
-        "startApprox": ["2030", "2050"],
+        "startApprox": [
+          "2030",
+          "2050"
+        ],
         "info": "Projected 10–25% decline in global crop yields per degree of warming; 3.5 billion people face food insecurity by mid-century"
       },
       {
         "start": "2050",
         "name": "1 billion in unlivable heat zones",
-        "startApprox": ["2040", "2070"],
+        "startApprox": [
+          "2040",
+          "2070"
+        ],
         "info": "Regions regularly exceeding wet-bulb temperatures of 35°C — the limit of human survivability — could be home to over 1 billion people"
       },
       {
         "start": "2100",
         "name": "Projected 3–6°C warming (worst case)",
-        "startApprox": ["2080", "2120"],
+        "startApprox": [
+          "2080",
+          "2120"
+        ],
         "info": "Without drastic emission cuts, global temperatures could reach 3–6°C above pre-industrial levels — a transformation of Earth's climate unseen in millions of years"
       }
     ]
