@@ -1,0 +1,682 @@
+[
+  {
+    "name": "Ozone Layer Crisis & Recovery",
+    "start": "1974",
+    "end": "ongoing",
+    "info": "Human-made chemicals nearly destroyed Earth's protective ozone layer before international action halted the damage",
+    "nested": [
+      {
+        "start": "1974-06",
+        "name": "CFC–ozone link discovered",
+        "info": "Mario Molina and F. Sherwood Rowland publish paper in Nature showing CFCs destroy stratospheric ozone"
+      },
+      {
+        "start": "1985-03-22",
+        "name": "Vienna Convention adopted",
+        "info": "First international treaty on ozone protection; framework for future protocols"
+      },
+      {
+        "start": "1985-05",
+        "name": "Antarctic ozone hole discovered",
+        "info": "Farman, Gardiner & Shanklin publish satellite and ground data revealing massive seasonal ozone depletion over Antarctica"
+      },
+      {
+        "start": "1987-09-16",
+        "name": "Montreal Protocol signed",
+        "info": "Landmark treaty phasing out production of ozone-depleting substances; eventually ratified by every UN member state"
+      },
+      {
+        "start": "1989-01-01",
+        "end": "ongoing",
+        "name": "Montreal Protocol in force",
+        "info": "Global CFC phase-out begins; considered the most successful environmental treaty in history"
+      },
+      {
+        "start": "2000-09",
+        "name": "Largest ozone hole recorded",
+        "startApprox": ["2000-09", "2000-10"],
+        "info": "Antarctic ozone hole reaches record 29.9 million km², roughly three times the area of the United States"
+      },
+      {
+        "start": "2016-10-15",
+        "name": "Kigali Amendment adopted",
+        "info": "Extends Montreal Protocol to phase down hydrofluorocarbons (HFCs), potent greenhouse gases used as CFC replacements"
+      },
+      {
+        "start": "2040",
+        "name": "Projected global ozone recovery",
+        "startApprox": ["2035", "2050"],
+        "info": "Ozone layer outside polar regions expected to recover to 1980 levels"
+      },
+      {
+        "start": "2045",
+        "name": "Projected Arctic ozone recovery",
+        "startApprox": ["2040", "2055"],
+        "info": "Arctic stratospheric ozone expected to return to 1980 levels"
+      },
+      {
+        "start": "2066",
+        "name": "Projected Antarctic ozone recovery",
+        "startApprox": ["2060", "2075"],
+        "info": "Antarctic ozone hole expected to fully close, completing the decades-long recovery"
+      }
+    ]
+  },
+  {
+    "name": "Climate Change",
+    "start": "1896",
+    "end": "ongoing",
+    "info": "The defining crisis of the modern era: rising greenhouse gas concentrations are destabilizing Earth's climate system",
+    "nested": [
+      {
+        "name": "Scientific Understanding",
+        "start": "1896",
+        "end": "ongoing",
+        "info": "Over a century of research establishing the science of anthropogenic climate change",
+        "nested": [
+          {
+            "start": "1896",
+            "name": "Arrhenius greenhouse calculation",
+            "info": "Svante Arrhenius first calculates that doubling atmospheric CO₂ would raise global temperatures by 5–6°C"
+          },
+          {
+            "start": "1938",
+            "name": "Callendar links CO₂ to warming",
+            "info": "Guy Stewart Callendar presents evidence that rising CO₂ from fossil fuels is warming the planet"
+          },
+          {
+            "start": "1958-03",
+            "end": "ongoing",
+            "name": "Keeling Curve measurements",
+            "info": "Charles David Keeling begins continuous CO₂ monitoring at Mauna Loa Observatory; the resulting curve becomes an icon of climate science"
+          },
+          {
+            "start": "1979-02-12",
+            "end": "1979-02-23",
+            "name": "First World Climate Conference",
+            "info": "WMO conference in Geneva issues declaration that CO₂ from fossil fuels could cause serious climate change"
+          },
+          {
+            "start": "1988-06-23",
+            "name": "Hansen testifies to US Senate",
+            "info": "NASA scientist James Hansen tells Congress he is 99% certain that global warming is caused by human activity"
+          },
+          {
+            "start": "1988-11",
+            "name": "IPCC established",
+            "info": "Intergovernmental Panel on Climate Change created by WMO and UNEP to assess climate science"
+          },
+          {
+            "start": "1988",
+            "name": "CO₂ passes 350 ppm",
+            "startApprox": ["1987", "1989"],
+            "info": "Atmospheric CO₂ crosses 350 ppm, the level later identified by scientists as the safe upper limit"
+          },
+          {
+            "start": "1990-08",
+            "name": "IPCC First Assessment Report",
+            "info": "Concludes that human activities are substantially increasing greenhouse gas concentrations"
+          },
+          {
+            "start": "2013-05-09",
+            "name": "CO₂ passes 400 ppm",
+            "info": "Mauna Loa records daily CO₂ above 400 ppm for the first time in at least 3 million years"
+          },
+          {
+            "start": "2016",
+            "name": "Global temperature crosses +1.0°C",
+            "startApprox": ["2015", "2017"],
+            "info": "Annual global mean temperature first exceeds 1.0°C above the 1850–1900 pre-industrial baseline"
+          },
+          {
+            "start": "2021-08",
+            "end": "2023-03",
+            "name": "IPCC Sixth Assessment Report",
+            "info": "Most comprehensive climate assessment yet; states it is 'unequivocal' that human influence has warmed the planet"
+          },
+          {
+            "start": "2024",
+            "name": "CO₂ annual mean passes 422 ppm",
+            "info": "Atmospheric CO₂ continues its relentless rise at approximately 2.5 ppm per year"
+          },
+          {
+            "start": "2024",
+            "name": "+1.5°C threshold breached",
+            "info": "2024 becomes the first calendar year with global mean temperature exceeding 1.5°C above pre-industrial levels"
+          },
+          {
+            "start": "2045",
+            "name": "Projected +2.0°C global warming",
+            "startApprox": ["2035", "2060"],
+            "info": "Under current policies, the world is projected to cross 2.0°C of warming above pre-industrial levels"
+          }
+        ]
+      },
+      {
+        "name": "International Agreements",
+        "start": "1992",
+        "end": "ongoing",
+        "info": "Decades of negotiations have produced binding and non-binding climate commitments — repeatedly undermined by withdrawal and inaction",
+        "nested": [
+          {
+            "start": "1992-06-03",
+            "end": "1992-06-14",
+            "name": "Rio Earth Summit",
+            "info": "UN Conference on Environment and Development opens UNFCCC for signature; 154 nations sign"
+          },
+          {
+            "start": "1994-03-21",
+            "end": "ongoing",
+            "name": "UNFCCC in force",
+            "info": "United Nations Framework Convention on Climate Change enters into force with 197 parties"
+          },
+          {
+            "start": "1997-12-11",
+            "name": "Kyoto Protocol adopted",
+            "info": "First treaty with binding emission reduction targets for industrialized nations; commits to 5% reduction below 1990 levels"
+          },
+          {
+            "start": "2001-03-28",
+            "name": "US rejects Kyoto Protocol",
+            "info": "President George W. Bush announces the US will not ratify the Kyoto Protocol, calling it 'fatally flawed'"
+          },
+          {
+            "start": "2005-02-16",
+            "end": "2020-12-31",
+            "name": "Kyoto Protocol in force",
+            "info": "Enters into force after Russian ratification; first commitment period 2008–2012, extended through 2020"
+          },
+          {
+            "start": "2009-12-07",
+            "end": "2009-12-18",
+            "name": "Copenhagen Accord",
+            "info": "COP15 ends in a non-binding political accord; widely seen as a failure of international climate diplomacy"
+          },
+          {
+            "start": "2015-12-12",
+            "name": "Paris Agreement adopted",
+            "info": "196 parties agree to limit warming to well below 2°C, pursuing efforts to limit to 1.5°C above pre-industrial"
+          },
+          {
+            "start": "2016-11-04",
+            "end": "ongoing",
+            "name": "Paris Agreement in force",
+            "info": "Enters into force in record time; but pledged national contributions remain far short of stated goals"
+          },
+          {
+            "start": "2017-06-01",
+            "name": "US first withdrawal from Paris",
+            "info": "President Trump announces US withdrawal; effective November 2020. Rejoined by President Biden on January 20, 2021"
+          },
+          {
+            "start": "2021-10-31",
+            "end": "2021-11-13",
+            "name": "Glasgow Climate Pact",
+            "info": "COP26 strengthens Paris commitments; first COP decision explicitly mentioning fossil fuel phase-down"
+          },
+          {
+            "start": "2025-01-20",
+            "name": "US second withdrawal from Paris",
+            "info": "President Trump signs executive order withdrawing the United States from the Paris Agreement for the second time"
+          }
+        ]
+      },
+      {
+        "name": "Extreme Weather & Wildfires",
+        "start": "2003",
+        "end": "ongoing",
+        "info": "Climate change is driving unprecedented heatwaves, wildfires, and storms with increasing frequency and intensity",
+        "nested": [
+          {
+            "start": "2003-06",
+            "end": "2003-08",
+            "name": "European heat wave",
+            "info": "Kills over 70,000 people across Europe; the deadliest natural disaster in European recorded history"
+          },
+          {
+            "start": "2010-06",
+            "end": "2010-08",
+            "name": "Russian heat wave",
+            "info": "Record temperatures up to 44°C cause wildfires and crop failure; approximately 56,000 excess deaths"
+          },
+          {
+            "start": "2017-08-25",
+            "end": "2017-09-02",
+            "name": "Hurricane Harvey",
+            "info": "Stalls over Houston delivering unprecedented 1.5 m of rainfall; $125 billion in damage"
+          },
+          {
+            "start": "2019-09",
+            "end": "2020-03",
+            "name": "Australian Black Summer",
+            "info": "Bushfires burn 18.6 million hectares, destroy 5,900 buildings, and kill an estimated 3 billion animals"
+          },
+          {
+            "start": "2021-06-25",
+            "end": "2021-07-01",
+            "name": "Pacific Northwest heat dome",
+            "info": "Lytton, British Columbia records 49.6°C — the highest temperature ever recorded in Canada; over 1,400 deaths"
+          },
+          {
+            "start": "2023-05",
+            "end": "2023-10",
+            "name": "Canadian wildfire season",
+            "info": "Worst wildfire season in Canadian history: 18.5 million hectares burned, smoke blankets eastern North America"
+          }
+        ]
+      },
+      {
+        "name": "Sea Level Rise",
+        "start": "1900",
+        "end": "ongoing",
+        "startApprox": ["1880", "1920"],
+        "info": "Global mean sea level has risen ~20 cm since 1900 and the rate is accelerating as ice sheets and glaciers melt",
+        "nested": [
+          {
+            "start": "1993",
+            "end": "ongoing",
+            "name": "Satellite altimetry era",
+            "info": "Precise satellite measurements begin; reveal sea level rising at 3.1 mm/year, accelerating to 4.5 mm/year by the 2020s"
+          },
+          {
+            "start": "2100",
+            "name": "Projected sea level +0.3–1.0 m",
+            "startApprox": ["2080", "2150"],
+            "info": "IPCC projects 0.3–1.0 m of sea level rise by 2100 depending on emissions scenario; could exceed 2 m under high-end ice sheet instability"
+          }
+        ]
+      },
+      {
+        "name": "Climate Tipping Points",
+        "start": "2020",
+        "end": "ongoing",
+        "startApprox": ["2010", "2025"],
+        "info": "Critical Earth system thresholds that, once crossed, trigger self-reinforcing changes irreversible on human timescales",
+        "nested": [
+          {
+            "start": "1979",
+            "end": "ongoing",
+            "name": "Arctic sea ice decline",
+            "info": "Summer sea ice extent has declined ~40% since satellite records began in 1979; September 2012 record low of 3.41 million km²"
+          },
+          {
+            "start": "2040",
+            "name": "Projected ice-free Arctic summer",
+            "startApprox": ["2030", "2050"],
+            "info": "First summer with less than 1 million km² of Arctic sea ice, exposing dark ocean that absorbs more heat"
+          },
+          {
+            "start": "2004",
+            "end": "ongoing",
+            "name": "AMOC weakening detected",
+            "startApprox": ["2000", "2010"],
+            "info": "Atlantic Meridional Overturning Circulation has weakened ~15% since the mid-20th century; full collapse would radically alter Northern Hemisphere climate"
+          },
+          {
+            "start": "2050",
+            "name": "Projected AMOC collapse risk",
+            "startApprox": ["2025", "2095"],
+            "info": "Studies suggest the Atlantic circulation could collapse between the 2030s and 2090s under continued warming"
+          },
+          {
+            "start": "2000",
+            "end": "ongoing",
+            "name": "Permafrost thaw acceleration",
+            "startApprox": ["1990", "2010"],
+            "info": "Arctic permafrost contains ~1,500 billion tonnes of carbon; thawing releases methane and CO₂ in a self-reinforcing feedback loop"
+          },
+          {
+            "start": "2000",
+            "end": "ongoing",
+            "name": "Greenland ice sheet mass loss",
+            "startApprox": ["1990", "2005"],
+            "info": "Greenland is losing ice at an accelerating rate; complete loss would raise sea levels by 7.2 metres over millennia"
+          },
+          {
+            "start": "2000",
+            "end": "ongoing",
+            "name": "West Antarctic Ice Sheet destabilization",
+            "startApprox": ["1990", "2010"],
+            "info": "Marine ice sheet instability may have been triggered; could contribute 3–5 m of sea level rise over centuries"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "Sixth Mass Extinction",
+    "start": "1900",
+    "end": "ongoing",
+    "startApprox": ["1870", "1950"],
+    "info": "Earth is experiencing its sixth mass extinction, the first caused by a single species; current extinction rates are 100–1,000 times the natural background rate",
+    "nested": [
+      {
+        "start": "1914-09-01",
+        "name": "Last Passenger Pigeon dies",
+        "info": "Martha, the last Passenger Pigeon, dies at Cincinnati Zoo; the species once numbered 3–5 billion individuals"
+      },
+      {
+        "start": "1936-09-07",
+        "name": "Last Thylacine dies",
+        "info": "The last known Tasmanian Tiger, Benjamin, dies at Hobart Zoo; driven to extinction by hunting, habitat loss, and disease"
+      },
+      {
+        "start": "1970",
+        "end": "ongoing",
+        "name": "Wildlife population collapse",
+        "info": "WWF Living Planet Index documents 69% average decline in monitored wildlife populations between 1970 and 2018"
+      },
+      {
+        "start": "1973-03-03",
+        "name": "CITES signed",
+        "info": "Convention on International Trade in Endangered Species adopted; regulates trade in over 38,000 species"
+      },
+      {
+        "start": "1998",
+        "name": "First global coral bleaching",
+        "info": "El Niño–driven ocean temperatures trigger the first recognized global mass coral bleaching event"
+      },
+      {
+        "start": "2006",
+        "name": "Baiji dolphin declared extinct",
+        "startApprox": ["2004", "2007"],
+        "info": "An extensive Yangtze River survey fails to find a single Baiji; the first cetacean driven to extinction by human activity"
+      },
+      {
+        "start": "2014",
+        "end": "2017",
+        "name": "Third global coral bleaching",
+        "info": "The longest and most widespread coral bleaching event on record; 75% of the world's reefs experience bleaching-level heat stress"
+      },
+      {
+        "start": "2017-10",
+        "name": "Insect apocalypse study published",
+        "info": "Krefeld study reveals 75% decline in flying insect biomass over 27 years in German protected areas"
+      },
+      {
+        "start": "2018-03-19",
+        "name": "Last male Northern White Rhino dies",
+        "info": "Sudan dies at Ol Pejeta Conservancy in Kenya; only two females remain, making the subspecies functionally extinct"
+      },
+      {
+        "start": "2019-05-06",
+        "name": "IPBES: 1 million species at risk",
+        "info": "UN global assessment finds 1 million animal and plant species threatened with extinction, many within decades"
+      },
+      {
+        "start": "2023",
+        "end": "2024",
+        "name": "Fourth global coral bleaching",
+        "info": "NOAA confirms the fourth global bleaching event in April 2024; record ocean temperatures devastate reefs worldwide"
+      },
+      {
+        "start": "2050",
+        "name": "Projected Amazon rainforest dieback",
+        "startApprox": ["2040", "2070"],
+        "info": "At current deforestation rates and warming, the Amazon could cross a tipping point and transition from rainforest to savanna"
+      }
+    ]
+  },
+  {
+    "name": "Ocean Crises",
+    "start": "1950",
+    "end": "ongoing",
+    "startApprox": ["1900", "1960"],
+    "info": "The world's oceans face acidification, plastic pollution, dead zones, and ecosystem collapse on an unprecedented scale",
+    "nested": [
+      {
+        "start": "1850",
+        "end": "ongoing",
+        "name": "Ocean acidification",
+        "startApprox": ["1800", "1870"],
+        "info": "Oceans have absorbed ~30% of human CO₂ emissions, dropping pH by 0.1 units — a 26% increase in acidity, faster than any change in 300 million years"
+      },
+      {
+        "start": "1950",
+        "end": "ongoing",
+        "name": "Ocean dead zones expansion",
+        "startApprox": ["1940", "1960"],
+        "info": "Oxygen-depleted dead zones have quadrupled since the 1950s; over 700 identified globally by 2024, driven by nutrient runoff and warming"
+      },
+      {
+        "start": "1950",
+        "end": "ongoing",
+        "name": "Great Pacific Garbage Patch forming",
+        "startApprox": ["1945", "1960"],
+        "info": "Plastic debris accumulates in the North Pacific subtropical gyre; by the 2020s it covers 1.6 million km² — three times the size of France"
+      },
+      {
+        "start": "1997-08",
+        "name": "Great Pacific Garbage Patch documented",
+        "info": "Sailor and researcher Charles Moore discovers vast concentrations of floating plastic debris while crossing the North Pacific"
+      },
+      {
+        "start": "2022-03-24",
+        "name": "Microplastics found in human blood",
+        "info": "Study in Environment International detects microplastic particles in 80% of human blood samples tested"
+      },
+      {
+        "start": "2050",
+        "name": "Projected: more plastic than fish",
+        "startApprox": ["2040", "2060"],
+        "info": "Ellen MacArthur Foundation projects that by weight, the ocean could contain more plastic than fish if current trends continue"
+      }
+    ]
+  },
+  {
+    "name": "Chemical Contamination",
+    "start": "1939",
+    "end": "ongoing",
+    "info": "Synthetic chemicals released into the environment persist for decades or centuries, accumulating in ecosystems and human bodies",
+    "nested": [
+      {
+        "name": "DDT Era",
+        "start": "1939",
+        "end": "2004",
+        "info": "A miracle pesticide that became a global ecological poison before being largely banned",
+        "nested": [
+          {
+            "start": "1939",
+            "name": "DDT's insecticidal properties discovered",
+            "info": "Paul Hermann Müller discovers DDT kills insects on contact; he later receives the 1948 Nobel Prize for this work"
+          },
+          {
+            "start": "1945",
+            "end": "1972",
+            "name": "Widespread DDT use",
+            "info": "DDT sprayed massively for agriculture and mosquito control; accumulates in food chains causing eggshell thinning in birds of prey"
+          },
+          {
+            "start": "1962-09-27",
+            "name": "Silent Spring published",
+            "info": "Rachel Carson's book documents DDT's devastating effects on wildlife; sparks the modern environmental movement"
+          },
+          {
+            "start": "1972-06-14",
+            "name": "US bans DDT",
+            "info": "EPA bans DDT for agricultural use in the United States; other nations follow over the next decades"
+          },
+          {
+            "start": "2001-05-22",
+            "name": "Stockholm Convention adopted",
+            "info": "Global treaty on persistent organic pollutants restricts DDT to disease vector control only; 152 signatories"
+          }
+        ]
+      },
+      {
+        "name": "PFAS: Forever Chemicals",
+        "start": "1938",
+        "end": "ongoing",
+        "info": "Per- and polyfluoroalkyl substances do not break down in the environment and have contaminated virtually every living organism on Earth",
+        "nested": [
+          {
+            "start": "1938-04-06",
+            "name": "Teflon accidentally invented",
+            "info": "Roy Plunkett at DuPont accidentally discovers polytetrafluoroethylene (PTFE); commercial production begins in 1945"
+          },
+          {
+            "start": "1951",
+            "end": "ongoing",
+            "name": "PFAS in mass production",
+            "info": "DuPont begins using PFOA (C8) to manufacture Teflon; 3M produces PFOS for Scotchgard. Both companies aware of toxicity risks by the 1960s"
+          },
+          {
+            "start": "1998",
+            "name": "PFAS contamination exposed",
+            "startApprox": ["1998", "2001"],
+            "info": "Attorney Rob Bilott begins uncovering evidence that DuPont knowingly contaminated water supplies near its Parkersburg, West Virginia plant"
+          },
+          {
+            "start": "2005",
+            "end": "2012",
+            "name": "C8 Science Panel study",
+            "info": "Independent panel finds probable links between PFOA exposure and kidney cancer, testicular cancer, thyroid disease, and other conditions"
+          },
+          {
+            "start": "2006",
+            "end": "2015",
+            "name": "PFOA Stewardship Program",
+            "info": "EPA and eight major companies agree to phase out PFOA by 2015; companies switch to shorter-chain PFAS that are also persistent"
+          },
+          {
+            "start": "2022-08",
+            "name": "PFAS detected in rainwater globally",
+            "info": "Stockholm University study finds PFAS in rainwater everywhere on Earth exceeds EPA safety guidelines; nowhere on the planet is safe"
+          },
+          {
+            "start": "2023-03",
+            "name": "EPA proposes first PFAS drinking water limits",
+            "info": "EPA proposes enforceable limits of 4 parts per trillion for PFOA and PFOS in US drinking water"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "Deforestation",
+    "start": "1970",
+    "end": "ongoing",
+    "info": "Industrial-scale destruction of the world's forests, eliminating carbon sinks and biodiversity at catastrophic rates",
+    "nested": [
+      {
+        "start": "1970",
+        "end": "ongoing",
+        "name": "Amazon deforestation",
+        "info": "Over 800,000 km² of Amazon rainforest cleared since 1970 — an area larger than Turkey — primarily for cattle ranching and soy"
+      },
+      {
+        "start": "1997-09",
+        "end": "1998-04",
+        "name": "Southeast Asian peat fires",
+        "info": "El Niño–fueled fires in Indonesia's peatlands burn for months; release CO₂ equivalent to 13–40% of global fossil fuel emissions that year"
+      },
+      {
+        "start": "2004",
+        "name": "Peak Amazon deforestation rate",
+        "info": "Annual Amazon deforestation reaches 27,772 km²; international pressure and monitoring programs lead to decline in following years"
+      },
+      {
+        "start": "2015-06",
+        "end": "2015-11",
+        "name": "Indonesian fires crisis",
+        "info": "Devastating peat and forest fires release more CO₂ daily than the entire US economy; 500,000+ cases of respiratory illness"
+      },
+      {
+        "start": "2001",
+        "end": "ongoing",
+        "name": "Global tree cover loss accelerating",
+        "info": "Global Forest Watch documents the loss of 437 million hectares of tree cover from 2001 to 2023 — over 10% of global forest area"
+      }
+    ]
+  },
+  {
+    "name": "Environmental Disasters",
+    "start": "1952",
+    "end": "ongoing",
+    "info": "Catastrophic pollution events that killed thousands and contaminated vast areas, often spurring regulatory action decades too late",
+    "nested": [
+      {
+        "start": "1952-12-05",
+        "end": "1952-12-09",
+        "name": "Great Smog of London",
+        "info": "Coal smoke and fog blanket London for five days; kills approximately 12,000 people and sickens 100,000"
+      },
+      {
+        "start": "1984-12-03",
+        "name": "Bhopal gas disaster",
+        "info": "Methyl isocyanate leak at Union Carbide plant kills 3,800+ immediately; estimated 15,000–20,000 total deaths over following years"
+      },
+      {
+        "start": "1986-04-26",
+        "name": "Chernobyl disaster",
+        "info": "Reactor No. 4 explodes at Chernobyl Nuclear Power Plant; worst nuclear disaster in history, contaminating vast areas of Europe"
+      },
+      {
+        "start": "1986-04-26",
+        "end": "ongoing",
+        "name": "Chernobyl Exclusion Zone",
+        "info": "2,600 km² remains uninhabitable; will not be safe for human habitation for approximately 20,000 years"
+      },
+      {
+        "start": "1989-03-24",
+        "name": "Exxon Valdez oil spill",
+        "info": "Tanker runs aground in Prince William Sound, Alaska, spilling 37,000 tonnes of crude oil; devastates marine ecosystem"
+      },
+      {
+        "start": "2010-04-20",
+        "end": "2010-09-19",
+        "name": "Deepwater Horizon oil spill",
+        "info": "Largest marine oil spill in history: 4.9 million barrels flow into the Gulf of Mexico over 87 days"
+      },
+      {
+        "start": "2011-03-11",
+        "name": "Fukushima Daiichi disaster",
+        "info": "Earthquake and tsunami cause three reactor meltdowns; largest nuclear disaster since Chernobyl, contaminating the Pacific"
+      }
+    ]
+  },
+  {
+    "name": "Projected Futures Under Current Trajectory",
+    "start": "2030",
+    "end": "2100",
+    "startApprox": ["2025", "2035"],
+    "endApprox": ["2100", "2200"],
+    "info": "What the science projects if current emission trajectories and ecological destruction continue",
+    "nested": [
+      {
+        "start": "2030",
+        "end": "2050",
+        "name": "Coral reefs effectively eliminated",
+        "startApprox": ["2025", "2035"],
+        "endApprox": ["2040", "2060"],
+        "info": "At +1.5°C, 70–90% of coral reefs die; at +2°C, 99% are lost, collapsing marine food webs that support 500 million people"
+      },
+      {
+        "start": "2030",
+        "end": "ongoing",
+        "name": "Climate migration acceleration",
+        "startApprox": ["2025", "2040"],
+        "info": "World Bank projects 216 million internal climate migrants by 2050 across six regions due to drought, floods, and sea level rise"
+      },
+      {
+        "start": "2040",
+        "end": "ongoing",
+        "name": "Global crop yield decline",
+        "startApprox": ["2030", "2050"],
+        "info": "Projected 10–25% decline in global crop yields per degree of warming; 3.5 billion people face food insecurity by mid-century"
+      },
+      {
+        "start": "2050",
+        "name": "1 billion in unlivable heat zones",
+        "startApprox": ["2040", "2070"],
+        "info": "Regions regularly exceeding wet-bulb temperatures of 35°C — the limit of human survivability — could be home to over 1 billion people"
+      },
+      {
+        "start": "2100",
+        "name": "Projected 3–6°C warming (worst case)",
+        "startApprox": ["2080", "2120"],
+        "info": "Without drastic emission cuts, global temperatures could reach 3–6°C above pre-industrial levels — a transformation of Earth's climate unseen in millions of years"
+      }
+    ]
+  }
+]
