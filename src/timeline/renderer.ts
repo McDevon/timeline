@@ -493,11 +493,23 @@ function drawContainer(
         : colors.containerBorder;
   const lineWidth = isSelected || isHovered ? 2 : 1;
 
-  applyGradient(ctx, item, viewport, canvasWidth, x1, boxWidth, fillColor, strokeColor, lineWidth);
+  // When both uncertainty gradient and child overflow exist on the same side,
+  // extend the bar to cover both so applyGradient draws one smooth fade
+  const combinedLeft = item.approxStartRange !== undefined && item.overflowStart !== undefined;
+  const combinedRight = item.approxEndRange !== undefined && item.overflowEnd !== undefined;
+
+  let drawLeft = x1;
+  let drawRight = x1 + boxWidth;
+  if (combinedLeft) drawLeft = yearToX(item.overflowStart!, viewport, canvasWidth);
+  if (combinedRight) drawRight = yearToX(item.overflowEnd!, viewport, canvasWidth);
+  const drawWidth = Math.max(drawRight - drawLeft, 3);
+
+  applyGradient(ctx, item, viewport, canvasWidth, drawLeft, drawWidth, fillColor, strokeColor, lineWidth);
 
   // Draw overflow shadows for children extending beyond container
+  // (skip sides already covered by the extended gradient above)
   if (!item.isCollapsed) {
-    drawOverflowShadow(ctx, item, viewport, canvasWidth, fillColor);
+    drawOverflowShadow(ctx, item, viewport, canvasWidth, fillColor, combinedLeft, combinedRight);
   }
 
   if (item.isCollapsed) {
@@ -530,7 +542,11 @@ function drawContainer(
       : x1 + 8;
     ctx.save();
     ctx.beginPath();
-    ctx.rect(x1, item.y, boxWidth, item.height);
+    const clipLeft = item.overflowStart !== undefined
+      ? yearToX(item.overflowStart, viewport, canvasWidth) : x1;
+    const clipRight = item.overflowEnd !== undefined
+      ? yearToX(item.overflowEnd, viewport, canvasWidth) : x1 + boxWidth;
+    ctx.rect(clipLeft, item.y, clipRight - clipLeft, item.height);
     ctx.clip();
     ctx.fillText(item.event.name, labelX, labelY);
     ctx.restore();
@@ -577,6 +593,8 @@ function drawOverflowShadow(
   viewport: Viewport,
   canvasWidth: number,
   fillColor: string,
+  skipLeft?: boolean,
+  skipRight?: boolean,
 ) {
   if (item.overflowStart === undefined && item.overflowEnd === undefined) return;
 
@@ -586,7 +604,7 @@ function drawOverflowShadow(
   const radius = LAYOUT.containerRadius;
 
   // Left overflow shadow
-  if (item.overflowStart !== undefined) {
+  if (item.overflowStart !== undefined && !skipLeft) {
     const shadowLeft = yearToX(item.overflowStart, viewport, canvasWidth);
     const shadowRight = yearToX(item.startYear, viewport, canvasWidth);
     const w = shadowRight - shadowLeft;
@@ -601,7 +619,7 @@ function drawOverflowShadow(
   }
 
   // Right overflow shadow
-  if (item.overflowEnd !== undefined) {
+  if (item.overflowEnd !== undefined && !skipRight) {
     const shadowLeft = yearToX(item.endYear, viewport, canvasWidth);
     const shadowRight = yearToX(item.overflowEnd, viewport, canvasWidth);
     const w = shadowRight - shadowLeft;
