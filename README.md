@@ -8,15 +8,15 @@ Important events in the Roman Empire and the Eastern Roman Empire
 
 ![Example timeline](example1.png)
 
-Examining relations of different events in a TV and movie series
+Examining relations of different events in a TV and movie series. This data is available in `public/star_trek_events.json`.
 
 ![Example timeline](example2.png)
 
-Visualising the timelines of different global crises
+Visualising the timelines of different global crises. This data is available in `public/global_disasters.json`.
 
 ![Example timeline](example3.png)
 
-The purpose of this project is two-fold. First, to create a tool for personal use, learning the scale of historical events, and to be able to present historical data in meaningful ways. Second, to learn to use LLM agent tools when developing software projects.
+Note that this tool is not meant for project planning or to be used as a Gantt chart tool. The main purpose is to be useful for personal history learning and for fictional story development and worldbuilding.
 
 ## Features
 
@@ -38,9 +38,11 @@ Current features include
 
 The default events are loaded from `public/events.json`. After initial load, the browser uses local state and does not reload from the file unless default events are reloaded by the user.
 
+If `events.json` is not found, the application uses `events.example.json` as a fallback. Any json file in the `public` directory can be used as the initial `events.json`.
+
 ## Running
 
-Requires [Node.js](https://nodejs.org/) and [pnpm](https://pnpm.io/).
+Requires [Node.js](https://nodejs.org/) and [pnpm](https://pnpm.io/). Dependencies have been kept at minimum.
 
 To start a local development server:
 
