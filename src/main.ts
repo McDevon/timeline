@@ -1,5 +1,5 @@
 import { loadEvents } from './data/loader';
-import { render, computeFullRange, computeMaxLayoutY, LAYOUT, LayoutTransition, ReorderState } from './timeline/renderer';
+import { render, computeFullRange, computeMaxLayoutY, LAYOUT, ReorderState } from './timeline/renderer';
 import { computeLayout, LayoutItem } from './timeline/layout';
 import { Viewport, zoomViewport, xToYear } from './timeline/viewport';
 import { hitTest } from './timeline/hitTest';
@@ -19,16 +19,9 @@ import { dateToDecimalYear, decimalYearToIso } from './data/time';
 import { isStoreInitialized, setStoreInitialized, loadStoredEvents, saveStoredEvents, clearStoredEvents, clearStore } from './data/store';
 import { validateEvents } from './data/validate';
 import { loadSavedTheme, applyTheme } from './themes';
-
-function toSnakeCase(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
-}
-
-function countEvents(event: TimelineEvent): number {
-  let n = 1;
-  if (event.nested) for (const child of event.nested) n += countEvents(child);
-  return n;
-}
+import { AnimationManager, easeInOut, LAYOUT_ANIM_MS } from './animation';
+import { toSnakeCase, countEvents, removeEvent, findParent, collectDescendants, isDescendantOf } from './eventActions';
+import { findSiblingInfo, findSiblingLayoutItems, findParentLayoutItem, buildRefPositions, computeDropIndex } from './timeline/reorder';
 
 function setupCanvas(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
   const dpr = window.devicePixelRatio || 1;
@@ -101,13 +94,9 @@ async function main() {
   const view = {
     viewport: (saved?.viewport ?? computeFullRange(events)) as Viewport,
     scrollY: 0,
-    animFrom: null as Viewport | null,
-    animTo: null as Viewport | null,
-    animStartTime: 0,
-    scrollFrom: 0,
-    scrollTo: null as number | null,
-    scrollAnimStart: 0,
   };
+
+  const anim = new AnimationManager();
 
   // --- Selection state ---
   const sel = {
@@ -156,70 +145,13 @@ async function main() {
   // rAF-batched rendering
   let rafId = 0;
 
-  const ZOOM_ANIM_MS = 150;
-
-  // Layout transition animation state
-  interface LayoutTransitionState {
-    startTime: number;
-    fadingOut: LayoutItem[];
-    yOffsets: Map<TimelineEvent, number>;
-    fadingIn: Set<TimelineEvent>;
-  }
-  let layoutTransition: LayoutTransitionState | null = null;
-  const LAYOUT_ANIM_MS = 200;
-
-  function easeInOut(t: number): number {
-    return t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
-  }
-
   function draw() {
     rafId = 0;
 
-    if (view.animFrom && view.animTo) {
-      const elapsed = performance.now() - view.animStartTime;
-      const t = Math.min(elapsed / ZOOM_ANIM_MS, 1);
-      const e = easeInOut(t);
-      view.viewport = {
-        start: view.animFrom.start + (view.animTo.start - view.animFrom.start) * e,
-        end: view.animFrom.end + (view.animTo.end - view.animFrom.end) * e,
-      };
-      if (t < 1) {
-        rafId = requestAnimationFrame(draw);
-      } else {
-        view.animFrom = null;
-        view.animTo = null;
-      }
-    }
-
-    // Scroll animation
-    if (view.scrollTo !== null) {
-      const elapsed = performance.now() - view.scrollAnimStart;
-      const t = Math.min(elapsed / SCROLL_ANIM_MS, 1);
-      view.scrollY = view.scrollFrom + (view.scrollTo - view.scrollFrom) * easeInOut(t);
-      if (t < 1) {
-        if (rafId === 0) rafId = requestAnimationFrame(draw);
-      } else {
-        view.scrollTo = null;
-      }
-    }
-
-    // Layout transition animation
-    let transition: LayoutTransition | undefined;
-    if (layoutTransition) {
-      const elapsed = performance.now() - layoutTransition.startTime;
-      const lt = Math.min(elapsed / LAYOUT_ANIM_MS, 1);
-      transition = {
-        fadingOut: layoutTransition.fadingOut,
-        yOffsets: layoutTransition.yOffsets,
-        fadingIn: layoutTransition.fadingIn,
-        progress: easeInOut(lt),
-      };
-      if (lt < 1) {
-        if (rafId === 0) rafId = requestAnimationFrame(draw);
-      } else {
-        layoutTransition = null;
-      }
-    }
+    const { viewport, scrollY, transition, needsFrame } = anim.tick(view.viewport, view.scrollY);
+    view.viewport = viewport;
+    view.scrollY = scrollY;
+    if (needsFrame) rafId = requestAnimationFrame(draw);
 
     const ctx = setupCanvas(canvas);
     const rect = canvas.getBoundingClientRect();
@@ -242,18 +174,12 @@ async function main() {
   }
 
   function animateZoom(target: Viewport) {
-    view.animFrom = { ...view.viewport };
-    view.animTo = target;
-    view.animStartTime = performance.now();
+    anim.animateZoom(view.viewport, target);
     requestRedraw();
   }
 
-  const SCROLL_ANIM_MS = 150;
-
   function animateScroll(target: number) {
-    view.scrollFrom = view.scrollY;
-    view.scrollTo = Math.max(0, Math.min(target, computeMaxScrollY()));
-    view.scrollAnimStart = performance.now();
+    anim.animateScroll(view.scrollY, target, computeMaxScrollY());
     requestRedraw();
   }
 
@@ -342,14 +268,14 @@ async function main() {
       }
     }
 
-    layoutTransition = { startTime: performance.now(), fadingOut, yOffsets, fadingIn };
+    anim.layoutTransition = { startTime: performance.now(), fadingOut, yOffsets, fadingIn };
 
     // Clear state referencing now-hidden children
     if (!wasCollapsed) {
-      if (sel.hoveredItem && sel.hoveredItem.event !== event && isDescendantOf(sel.hoveredItem, event)) {
+      if (sel.hoveredItem && sel.hoveredItem.event !== event && isDescendantOf(sel.hoveredItem.event, event)) {
         setHoveredItem(null);
       }
-      if (sel.selectedItem && sel.selectedItem.event !== event && isDescendantOf(sel.selectedItem, event)) {
+      if (sel.selectedItem && sel.selectedItem.event !== event && isDescendantOf(sel.selectedItem.event, event)) {
         sel.selectedItem = null;
         eventListPanel?.selectEvent(null);
         eventMenu.hide();
@@ -367,103 +293,18 @@ async function main() {
   /** Stable reference positions for drop index computation (dragged item removed from flow). */
   let reorderRefPositions: { center: number; bottom: number }[] | null = null;
 
-  /** Find the sibling list and parent path key for an event. */
-  function findSiblingInfo(event: TimelineEvent): { siblings: TimelineEvent[]; parentPath: string } {
-    const visibleRoot = events.filter(e => !hiddenEvents.has(e));
-    if (visibleRoot.includes(event)) {
-      return { siblings: visibleRoot, parentPath: '[]' };
-    }
-    function walk(list: TimelineEvent[], path: string[]): { siblings: TimelineEvent[]; parentPath: string } | null {
-      for (const e of list) {
-        if (e.nested && e.nested.includes(event)) {
-          return { siblings: e.nested, parentPath: JSON.stringify([...path, e.name]) };
-        }
-        if (e.nested) {
-          const found = walk(e.nested, [...path, e.name]);
-          if (found) return found;
-        }
-      }
-      return null;
-    }
-    return walk(events, []) ?? { siblings: [event], parentPath: '[]' };
-  }
-
-  /** Find layout items that are siblings of the given item. */
-  function findSiblingLayoutItems(item: LayoutItem): LayoutItem[] {
-    if (layout.some(l => l.event === item.event)) return layout;
-    function walkChildren(items: LayoutItem[]): LayoutItem[] | null {
-      for (const parent of items) {
-        if (parent.children.some(c => c.event === item.event)) return parent.children;
-        if (parent.children.length > 0) {
-          const found = walkChildren(parent.children);
-          if (found) return found;
-        }
-      }
-      return null;
-    }
-    return walkChildren(layout) ?? [item];
-  }
-
-  /** Find the parent layout item for a nested event. */
-  function findParentLayoutItem(event: TimelineEvent): LayoutItem | null {
-    function walk(items: LayoutItem[]): LayoutItem | null {
-      for (const item of items) {
-        if (item.children.some(c => c.event === event)) return item;
-        if (item.children.length > 0) {
-          const found = walk(item.children);
-          if (found) return found;
-        }
-      }
-      return null;
-    }
-    return walk(layout);
-  }
-
-  /** Build per-item reference positions from siblings (excluding the dragged item). */
-  function buildRefPositions(draggedItem: LayoutItem): { center: number; bottom: number }[] {
-    return findSiblingLayoutItems(draggedItem)
-      .filter(s => s.event !== draggedItem.event)
-      .map(s => ({ center: s.y + s.height / 2, bottom: s.y + s.height }))
-      .sort((a, b) => a.center - b.center);
-  }
-
-  /** Compute drop index from cursor Y using per-item reference positions. */
-  function computeDropIndex(positions: { center: number; bottom: number }[], cursorY: number): number {
-    if (positions.length === 0) return 0;
-
-    // Count items whose center boundary is above the cursor.
-    // Cap boundaries so the user never needs to drag more than
-    // MAX_BOUNDARY_GAP past the previous item's bottom.
-    const MAX_BOUNDARY_GAP = 60;
-    let count = 0;
-    let prevBottom = -Infinity;
-    for (const pos of positions) {
-      let boundary = pos.center;
-      if (prevBottom !== -Infinity) {
-        boundary = Math.min(boundary, prevBottom + MAX_BOUNDARY_GAP);
-      }
-      if (cursorY >= boundary) {
-        count++;
-        prevBottom = Math.max(prevBottom, pos.bottom);
-      } else {
-        break;
-      }
-    }
-    return count;
-  }
-
   function onReorderMove(item: LayoutItem, cursorY: number) {
     // Save original orders for cancel on first move
     if (!reorderOriginalOrders) {
       reorderOriginalOrders = new Map(eventOrders);
     }
 
-    const { siblings, parentPath } = findSiblingInfo(item.event);
+    const { siblings, parentPath } = findSiblingInfo(item.event, events, hiddenEvents);
 
     // Clamp ghostY to parent bounds for nested events
     let ghostY = cursorY;
     if (parentPath !== '[]') {
-      const parentItem = findParentLayoutItem(item.event);
+      const parentItem = findParentLayoutItem(item.event, layout);
       if (parentItem) {
         const minY = parentItem.y + 30; // containerHeaderHeight + padding
         const maxY = parentItem.y + parentItem.height - 6;
@@ -490,7 +331,7 @@ async function main() {
       const withoutDragged = order.filter(n => n !== item.event.name);
       eventOrders.set(parentPath, withoutDragged);
       relayout();
-      reorderRefPositions = buildRefPositions(item);
+      reorderRefPositions = buildRefPositions(item, layout);
       // Restore dragged item at its original position
       const restored = [...withoutDragged];
       const restoreIndex = originalIndex >= 0 ? Math.min(originalIndex, withoutDragged.length) : withoutDragged.length;
@@ -504,14 +345,14 @@ async function main() {
       reorderLastIndex = dropIndex;
 
       // Capture current visual positions of siblings for animation
-      const siblingItems = findSiblingLayoutItems(item);
+      const siblingItems = findSiblingLayoutItems(item, layout);
       const oldPositions = new Map<TimelineEvent, number>();
       for (const s of siblingItems) {
         let visualY = s.y;
-        if (layoutTransition) {
-          const offset = layoutTransition.yOffsets.get(s.event);
+        if (anim.layoutTransition) {
+          const offset = anim.layoutTransition.yOffsets.get(s.event);
           if (offset) {
-            const elapsed = performance.now() - layoutTransition.startTime;
+            const elapsed = performance.now() - anim.layoutTransition.startTime;
             const progress = easeInOut(Math.min(elapsed / LAYOUT_ANIM_MS, 1));
             visualY = s.y + offset * (1 - progress);
           }
@@ -556,7 +397,7 @@ async function main() {
       relayout();
 
       // Animate siblings to new positions
-      const newSiblings = findSiblingLayoutItems(item);
+      const newSiblings = findSiblingLayoutItems(item, layout);
       const yOffsets = new Map<TimelineEvent, number>();
       for (const s of newSiblings) {
         const oldY = oldPositions.get(s.event);
@@ -564,7 +405,7 @@ async function main() {
           yOffsets.set(s.event, oldY - s.y);
         }
       }
-      layoutTransition = yOffsets.size > 0
+      anim.layoutTransition = yOffsets.size > 0
         ? { startTime: performance.now(), fadingOut: [], yOffsets, fadingIn: new Set() }
         : null;
     }
@@ -642,12 +483,12 @@ async function main() {
   const ZOOM_DELTA = 120; // equivalent to one scroll wheel tick
   document.getElementById('zoom-in')!.addEventListener('click', () => {
     const center = canvas.clientWidth / 2;
-    const base = view.animTo ?? view.viewport;
+    const base = anim.animTo ?? view.viewport;
     animateZoom(zoomViewport(base, center, canvas.clientWidth, -ZOOM_DELTA));
   });
   document.getElementById('zoom-out')!.addEventListener('click', () => {
     const center = canvas.clientWidth / 2;
-    const base = view.animTo ?? view.viewport;
+    const base = anim.animTo ?? view.viewport;
     animateZoom(zoomViewport(base, center, canvas.clientWidth, ZOOM_DELTA));
   });
 
@@ -683,7 +524,7 @@ async function main() {
       dblClickPrevViewport = null;
       dblClickItem = null;
     } else {
-      dblClickPrevViewport = { ...(view.animTo ?? view.viewport) };
+      dblClickPrevViewport = { ...(anim.animTo ?? view.viewport) };
       dblClickItem = hit;
       const padding = (hit.nominalEndYear - hit.nominalStartYear) * 0.1;
       animateZoom({
@@ -694,16 +535,6 @@ async function main() {
   });
 
   // Event list panel — visibility toggles
-  function isDescendantOf(item: LayoutItem, ancestor: TimelineEvent): boolean {
-    if (item.event === ancestor) return true;
-    if (!ancestor.nested) return false;
-    for (const child of ancestor.nested) {
-      if (item.event === child) return true;
-      if (child.nested && isDescendantOf(item, child)) return true;
-    }
-    return false;
-  }
-
   function onToggleEvent(event: TimelineEvent, visible: boolean) {
     // Capture old Y positions
     const oldPositions = new Map<TimelineEvent, number>();
@@ -730,17 +561,17 @@ async function main() {
     if (visible) fadingIn.add(event);
 
     // Start animation
-    layoutTransition = { startTime: performance.now(), fadingOut, yOffsets, fadingIn };
+    anim.layoutTransition = { startTime: performance.now(), fadingOut, yOffsets, fadingIn };
 
     // Clear hovered/selected if they reference the hidden event
     if (!visible) {
-      if (sel.hoveredItem && isDescendantOf(sel.hoveredItem, event)) setHoveredItem(null);
-      if (sel.selectedItem && isDescendantOf(sel.selectedItem, event)) {
+      if (sel.hoveredItem && isDescendantOf(sel.hoveredItem.event, event)) setHoveredItem(null);
+      if (sel.selectedItem && isDescendantOf(sel.selectedItem.event, event)) {
         sel.selectedItem = null;
         eventListPanel?.selectEvent(null);
         eventMenu.hide();
       }
-      if (dblClickItem && isDescendantOf(dblClickItem, event)) {
+      if (dblClickItem && isDescendantOf(dblClickItem.event, event)) {
         dblClickPrevViewport = null;
         dblClickItem = null;
       }
@@ -767,7 +598,7 @@ async function main() {
     // Account for UI panels overlaying the left side of the canvas:
     // - events list panel (always)
     // - event menu (only when expanded)
-    const vp = view.animTo ?? view.viewport;
+    const vp = anim.animTo ?? view.viewport;
     const canvasWidth = canvas.clientWidth;
     const occludedRight = eventMenu.isExpanded()
       ? eventMenu.getRightEdge() - rect.left
@@ -817,7 +648,7 @@ async function main() {
       dblClickPrevViewport = null;
       dblClickItem = null;
     } else {
-      dblClickPrevViewport = { ...(view.animTo ?? view.viewport) };
+      dblClickPrevViewport = { ...(anim.animTo ?? view.viewport) };
       dblClickItem = item;
       const padding = (item.nominalEndYear - item.nominalStartYear) * 0.1;
       animateZoom({
@@ -906,42 +737,6 @@ async function main() {
     saveStoredEvents(events);
     undoManager.push(snapshot());
     infoLog.show(`Deleted "${event.name}"`);
-  }
-
-  function findParent(list: TimelineEvent[], target: TimelineEvent): TimelineEvent | null {
-    for (const e of list) {
-      if (e.nested?.includes(target)) return e;
-      if (e.nested) {
-        const found = findParent(e.nested, target);
-        if (found) return found;
-      }
-    }
-    return null;
-  }
-
-  function collectDescendants(event: TimelineEvent): Set<TimelineEvent> {
-    const result = new Set<TimelineEvent>();
-    function walk(list: TimelineEvent[]) {
-      for (const e of list) {
-        result.add(e);
-        if (e.nested) walk(e.nested);
-      }
-    }
-    if (event.nested) walk(event.nested);
-    return result;
-  }
-
-  function removeEvent(arr: TimelineEvent[], target: TimelineEvent): boolean {
-    for (let i = 0; i < arr.length; i++) {
-      if (arr[i] === target) {
-        arr.splice(i, 1);
-        return true;
-      }
-      if (arr[i].nested && removeEvent(arr[i].nested!, target)) {
-        return true;
-      }
-    }
-    return false;
   }
 
   const eventMenu = new EventMenu({
@@ -1095,7 +890,7 @@ async function main() {
       if (parent && parentStart !== null && parentEnd !== null) {
         start = decimalYearToIso((parentStart + parentEnd) / 2);
       } else {
-        const vp = view.animTo ?? view.viewport;
+        const vp = anim.animTo ?? view.viewport;
         start = decimalYearToIso((vp.start + vp.end) / 2);
       }
     }
@@ -1180,7 +975,7 @@ async function main() {
 
       const fadingIn = new Set<TimelineEvent>();
       for (const ne of newEvents) fadingIn.add(ne);
-      layoutTransition = {
+      anim.layoutTransition = {
         startTime: performance.now(),
         fadingOut: [],
         yOffsets: new Map(),
@@ -1311,10 +1106,7 @@ async function main() {
       : null;
 
     // Cancel in-progress animations
-    view.animFrom = null;
-    view.animTo = null;
-    view.scrollTo = null;
-    layoutTransition = null;
+    anim.cancelAll();
     reorderState = null;
     reorderOriginalOrders = null;
     reorderRefPositions = null;

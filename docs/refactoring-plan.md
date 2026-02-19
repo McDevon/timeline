@@ -88,13 +88,13 @@ Each state carries only the data relevant to it. Transitions happen by assigning
 
 **Fix:** Extract cohesive groups of functions into modules:
 
-1. **`src/eventActions.ts`** — Event CRUD operations (add, remove, move parent, reorder). Takes the events array and callbacks as parameters. Includes `deleteEvent`, `removeEvent`, `moveEvent`, `createEvent`.
+1. **`src/eventActions.ts`** — Pure event tree operations: `removeEvent`, `findParent`, `collectDescendants`, `isDescendantOf`, `countEvents`, `toSnakeCase`.
 
-2. **`src/animation.ts`** — Zoom and scroll animation state machine. Owns `animFrom`/`animTo`/`animStartTime` and the easing logic. Exposes `animateZoom()`, `animatescroll()`, `tick()`.
+2. **`src/animation.ts`** — `AnimationManager` class owning viewport animation, scroll animation, and layout transition state. Exposes `animateZoom()`, `animateScroll()`, `tick()`, `cancelAll()`. Also exports `easeInOut()` and `LAYOUT_ANIM_MS`.
 
-3. Move reorder logic (currently ~150 lines: `onReorderMove`, `computeDropIndex`, `findSiblingInfo`, `findSiblingLayoutItems`) into **`src/timeline/reorder.ts`**.
+3. **`src/timeline/reorder.ts`** — Reorder layout utilities: `findSiblingInfo`, `findSiblingLayoutItems`, `findParentLayoutItem`, `buildRefPositions`, `computeDropIndex`.
 
-main.ts becomes the coordinator: it creates the modules, wires them together, and runs the draw loop.
+main.ts shrank from ~1,420 to ~1,210 lines. The `draw()` function simplified from ~50 lines of animation tick logic to a single `anim.tick()` call. The `view` object dropped from 8 fields to 2 (viewport, scrollY).
 
 **Files:** `src/main.ts` (shrinks), new `src/eventActions.ts`, `src/animation.ts`, `src/timeline/reorder.ts`
 
