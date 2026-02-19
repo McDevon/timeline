@@ -8,6 +8,7 @@ export class DateInput {
   private monthSelect: HTMLSelectElement;
   private daySelect: HTMLSelectElement;
   private suppressChange = false;
+  private onCommit: ((isoDate: string) => void) | null = null;
 
   constructor(private onChange: (isoDate: string) => void) {
     this.el = document.createElement('div');
@@ -22,11 +23,15 @@ export class DateInput {
     this.yearInput.min = '1';
     this.yearInput.className = 'date-input-year';
     this.yearInput.addEventListener('input', () => this.emitChange());
+    this.yearInput.addEventListener('blur', () => this.emitCommit());
+    this.yearInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') this.emitCommit();
+    });
 
     this.eraSelect = document.createElement('select');
     this.eraSelect.className = 'date-input-era';
     this.eraSelect.innerHTML = '<option value="CE">CE</option><option value="BCE">BCE</option>';
-    this.eraSelect.addEventListener('change', () => this.emitChange());
+    this.eraSelect.addEventListener('change', () => { this.emitChange(); this.emitCommit(); });
 
     row1.appendChild(this.yearInput);
     row1.appendChild(this.eraSelect);
@@ -43,12 +48,13 @@ export class DateInput {
     this.monthSelect.addEventListener('change', () => {
       this.updateDayOptions();
       this.emitChange();
+      this.emitCommit();
     });
 
     this.daySelect = document.createElement('select');
     this.daySelect.className = 'date-input-day';
     this.updateDayOptions();
-    this.daySelect.addEventListener('change', () => this.emitChange());
+    this.daySelect.addEventListener('change', () => { this.emitChange(); this.emitCommit(); });
     row2.appendChild(this.monthSelect);
     row2.appendChild(this.daySelect);
     this.el.appendChild(row2);
@@ -56,6 +62,11 @@ export class DateInput {
 
   getElement(): HTMLDivElement {
     return this.el;
+  }
+
+  /** Register a callback that fires only on committed changes (blur, Enter, or discrete selects). */
+  setOnCommit(cb: (isoDate: string) => void): void {
+    this.onCommit = cb;
   }
 
   setValue(isoDate: string): void {
@@ -109,6 +120,13 @@ export class DateInput {
     const year = parseInt(this.yearInput.value, 10);
     if (!year || year < 1) return;
     this.onChange(this.getValue());
+  }
+
+  private emitCommit(): void {
+    if (this.suppressChange) return;
+    const year = parseInt(this.yearInput.value, 10);
+    if (!year || year < 1) return;
+    this.onCommit?.(this.getValue());
   }
 }
 

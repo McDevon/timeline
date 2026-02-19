@@ -45,6 +45,11 @@ export function showConfirmDialog(message: string, onConfirm: () => void): void 
     if (e.key === 'Escape') {
       close();
       window.removeEventListener('keydown', onKeyDown);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      close();
+      onConfirm();
+      window.removeEventListener('keydown', onKeyDown);
     }
   }
   window.addEventListener('keydown', onKeyDown);

@@ -138,6 +138,10 @@ export class EventMenu {
     this.startDateInput = new DateInput((iso) => {
       if (!this.currentEvent) return;
       callbacks.onChangeStart(this.currentEvent, iso);
+      this.updateTypeButtons();
+    });
+    this.startDateInput.setOnCommit((iso) => {
+      if (!this.currentEvent) return;
       // Clamp end date if start moved past it
       if (
         this.currentType === "range" &&
@@ -153,7 +157,6 @@ export class EventMenu {
           }
         }
       }
-      this.updateTypeButtons();
     });
     body.appendChild(this.startDateInput.getElement());
 
@@ -183,6 +186,9 @@ export class EventMenu {
     this.endDateInput = new DateInput((iso) => {
       if (!this.currentEvent) return;
       callbacks.onChangeEnd(this.currentEvent, iso);
+    });
+    this.endDateInput.setOnCommit((iso) => {
+      if (!this.currentEvent) return;
       // Clamp start date if end moved before it
       if (dateToDecimalYear(iso) < dateToDecimalYear(this.currentEvent.start)) {
         callbacks.onChangeStart(this.currentEvent, iso);

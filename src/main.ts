@@ -739,47 +739,50 @@ async function main() {
     requestRedraw();
   }
 
+  /** Pan and scroll so the given layout item is visible, accounting for UI panel occlusion. */
+  function scrollItemIntoView(item: LayoutItem) {
+    const rect = canvas.getBoundingClientRect();
+
+    // Horizontal: pan viewport if event is not visible
+    // Account for UI panels overlaying the left side of the canvas:
+    // - events list panel (always)
+    // - event menu (only when expanded)
+    const vp = animTo ?? viewport;
+    const canvasWidth = canvas.clientWidth;
+    const occludedRight = eventMenu.isExpanded()
+      ? eventMenu.getRightEdge() - rect.left
+      : (eventListPanel?.getRightEdge() ?? 0) - rect.left;
+    const visibleLeftYear = xToYear(occludedRight, vp, canvasWidth);
+    const eventOutLeft = item.endYear < visibleLeftYear;
+    const eventOutRight = item.startYear > vp.end;
+    if (eventOutLeft || eventOutRight) {
+      const visibleSpan = vp.end - visibleLeftYear;
+      const eventMid = (item.startYear + item.endYear) / 2;
+      // Center the event within the unoccluded portion of the canvas
+      const visibleCenter = visibleLeftYear + visibleSpan / 2;
+      const offset = eventMid - visibleCenter;
+      animateZoom({ start: vp.start + offset, end: vp.end + offset });
+    }
+
+    // Vertical: scroll if event is not visible
+    const visibleTop = scrollY + LAYOUT.eventsStartY;
+    const visibleBottom = scrollY + rect.height;
+    const itemTop = item.y;
+    const itemBottom = item.y + item.height;
+    if (itemBottom > visibleBottom) {
+      scrollY = Math.min(itemBottom - rect.height + 20, computeMaxScrollY());
+    } else if (itemTop < visibleTop) {
+      scrollY = Math.max(itemTop - LAYOUT.eventsStartY - 10, 0);
+    }
+  }
+
   function onSelectEvent(event: TimelineEvent) {
     const item = findLayoutItem(event, layout);
     selectedItem = item;
     eventListPanel?.selectEvent(event);
     eventMenu.show(event);
 
-    if (item) {
-      const rect = canvas.getBoundingClientRect();
-
-      // Horizontal: pan viewport if event is not visible
-      // Account for UI panels overlaying the left side of the canvas:
-      // - events list panel (always)
-      // - event menu (only when expanded)
-      const vp = animTo ?? viewport;
-      const canvasWidth = canvas.clientWidth;
-      const occludedRight = eventMenu.isExpanded()
-        ? eventMenu.getRightEdge() - rect.left
-        : (eventListPanel?.getRightEdge() ?? 0) - rect.left;
-      const visibleLeftYear = xToYear(occludedRight, vp, canvasWidth);
-      const eventOutLeft = item.endYear < visibleLeftYear;
-      const eventOutRight = item.startYear > vp.end;
-      if (eventOutLeft || eventOutRight) {
-        const visibleSpan = vp.end - visibleLeftYear;
-        const eventMid = (item.startYear + item.endYear) / 2;
-        // Center the event within the unoccluded portion of the canvas
-        const visibleCenter = visibleLeftYear + visibleSpan / 2;
-        const offset = eventMid - visibleCenter;
-        animateZoom({ start: vp.start + offset, end: vp.end + offset });
-      }
-
-      // Vertical: scroll if event is not visible
-      const visibleTop = scrollY + LAYOUT.eventsStartY;
-      const visibleBottom = scrollY + rect.height;
-      const itemTop = item.y;
-      const itemBottom = item.y + item.height;
-      if (itemBottom > visibleBottom) {
-        scrollY = Math.min(itemBottom - rect.height + 20, computeMaxScrollY());
-      } else if (itemTop < visibleTop) {
-        scrollY = Math.max(itemTop - LAYOUT.eventsStartY - 10, 0);
-      }
-    }
+    if (item) scrollItemIntoView(item);
 
     requestRedraw();
   }
@@ -1106,12 +1109,14 @@ async function main() {
     saveStoredEvents(events);
     eventListPanel?.rebuild(events, onToggleEvent, onHoverEvent, onSelectEvent, hiddenEvents, onContextMenu);
 
-    // 6. Select and edit
+    // 6. Select, scroll into view, and edit
     const item = findLayoutItem(newEvent, layout);
     selectedItem = item;
     eventListPanel?.selectEvent(newEvent);
     eventMenu.show(newEvent);
     eventMenu.focusName();
+    if (item) scrollItemIntoView(item);
+    requestRedraw();
 
     undoManager.push(snapshot());
   });
@@ -1378,6 +1383,27 @@ async function main() {
         restoreFromSnapshot(state);
         infoLog.show('Redo');
       }
+      return;
+    }
+
+    // Delete/Backspace: delete selected event
+    if ((e.key === 'Delete' || e.key === 'Backspace') && selectedItem) {
+      e.preventDefault();
+      const event = selectedItem.event;
+      showConfirmDialog(`Delete "${event.name}"?`, () => {
+        removeEvent(events, event);
+        hiddenEvents.delete(event);
+        collapsedEvents.delete(event);
+        selectedItem = null;
+        eventMenu.hide();
+        eventListPanel?.selectEvent(null);
+        eventListPanel?.removeEvent(event);
+        relayout();
+        requestRedraw();
+        saveStoredEvents(events);
+        undoManager.push(snapshot());
+        infoLog.show(`Deleted "${event.name}"`);
+      });
       return;
     }
   });
