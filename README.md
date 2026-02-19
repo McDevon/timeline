@@ -16,7 +16,7 @@ Visualising the timelines of different global crises. This data is available in 
 
 ![Example timeline](example3.png)
 
-Note that this tool is not meant for project planning or to be used as a Gantt chart tool. The main purpose is to be useful for personal history learning and for fictional story development and worldbuilding.
+Note that this tool is not meant for project planning or to be used as a Gantt chart tool. The main goal is to be useful for personal history learning and for fictional story development and worldbuilding.
 
 ## Features
 
