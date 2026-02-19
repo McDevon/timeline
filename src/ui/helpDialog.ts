@@ -20,6 +20,7 @@ const SHORTCUTS: [string, string][] = [
   ["Reorder events", "Drag an event vertically"],
   ["Undo", "Ctrl/\u2318 + Z"],
   ["Redo", "Ctrl + Y or \u2318 + Shift + Z"],
+  ["Delete event", "Delete or backspace"],
 ];
 
 export function showHelpDialog(): void {
@@ -75,7 +76,7 @@ export function showHelpDialog(): void {
   });
 
   function onKeyDown(e: KeyboardEvent) {
-    if (e.key === "Escape") close();
+    if (e.key === "Escape" || e.key === "Enter") close();
   }
   window.addEventListener("keydown", onKeyDown);
 }
