@@ -365,7 +365,7 @@ async function main() {
   let reorderOriginalOrders: Map<string, string[]> | null = null;
   let reorderLastIndex = -1;
   /** Stable reference positions for drop index computation (dragged item removed from flow). */
-  let reorderRefRows: { y: number; height: number; count: number }[] | null = null;
+  let reorderRefPositions: { center: number; bottom: number }[] | null = null;
 
   /** Find the sibling list and parent path key for an event. */
   function findSiblingInfo(event: TimelineEvent): { siblings: TimelineEvent[]; parentPath: string } {
@@ -419,52 +419,32 @@ async function main() {
     return walk(layout);
   }
 
-  /** Build row data from sibling layout items (excluding the dragged item). */
-  function buildRefRows(draggedItem: LayoutItem): { y: number; height: number; count: number }[] {
-    const others = findSiblingLayoutItems(draggedItem)
+  /** Build per-item reference positions from siblings (excluding the dragged item). */
+  function buildRefPositions(draggedItem: LayoutItem): { center: number; bottom: number }[] {
+    return findSiblingLayoutItems(draggedItem)
       .filter(s => s.event !== draggedItem.event)
-      .sort((a, b) => a.y - b.y);
-    if (others.length === 0) return [];
-
-    // Group into rows (items at the same Y ± 1px)
-    const groups: LayoutItem[][] = [];
-    for (const item of others) {
-      const lastGroup = groups[groups.length - 1];
-      if (!lastGroup || Math.abs(item.y - lastGroup[0].y) > 1) {
-        groups.push([item]);
-      } else {
-        lastGroup.push(item);
-      }
-    }
-
-    return groups.map(g => ({
-      y: g[0].y,
-      height: Math.max(...g.map(r => r.y + r.height)) - g[0].y,
-      count: g.length,
-    }));
+      .map(s => ({ center: s.y + s.height / 2, bottom: s.y + s.height }))
+      .sort((a, b) => a.center - b.center);
   }
 
-  /** Compute drop index from cursor Y using stable reference rows. */
-  function computeDropIndex(rows: { y: number; height: number; count: number }[], cursorY: number): number {
-    if (rows.length === 0) return 0;
+  /** Compute drop index from cursor Y using per-item reference positions. */
+  function computeDropIndex(positions: { center: number; bottom: number }[], cursorY: number): number {
+    if (positions.length === 0) return 0;
 
-    // Count items in rows whose midpoint is above the cursor.
-    // For distant rows (tall containers), cap the boundary so the user
-    // never needs to drag more than MAX_BOUNDARY_GAP past the previous row.
+    // Count items whose center boundary is above the cursor.
+    // Cap boundaries so the user never needs to drag more than
+    // MAX_BOUNDARY_GAP past the previous item's bottom.
     const MAX_BOUNDARY_GAP = 60;
     let count = 0;
-    for (let i = 0; i < rows.length; i++) {
-      const rowTop = rows[i].y;
-      const rowBottom = rowTop + rows[i].height;
-      let boundary = (rowTop + rowBottom) / 2;
-
-      if (i > 0) {
-        const prevBottom = rows[i - 1].y + rows[i - 1].height;
+    let prevBottom = -Infinity;
+    for (const pos of positions) {
+      let boundary = pos.center;
+      if (prevBottom !== -Infinity) {
         boundary = Math.min(boundary, prevBottom + MAX_BOUNDARY_GAP);
       }
-
       if (cursorY >= boundary) {
-        count += rows[i].count;
+        count++;
+        prevBottom = Math.max(prevBottom, pos.bottom);
       } else {
         break;
       }
@@ -504,13 +484,13 @@ async function main() {
     // Build stable reference rows on first move: remove dragged item from
     // the order, relayout to get positions without it, capture those, then
     // restore. This ensures drop boundaries don't shift during the drag.
-    if (!reorderRefRows) {
+    if (!reorderRefPositions) {
       const order = eventOrders.get(parentPath)!;
       const originalIndex = order.indexOf(item.event.name);
       const withoutDragged = order.filter(n => n !== item.event.name);
       eventOrders.set(parentPath, withoutDragged);
       relayout();
-      reorderRefRows = buildRefRows(item);
+      reorderRefPositions = buildRefPositions(item);
       // Restore dragged item at its original position
       const restored = [...withoutDragged];
       const restoreIndex = originalIndex >= 0 ? Math.min(originalIndex, withoutDragged.length) : withoutDragged.length;
@@ -519,7 +499,7 @@ async function main() {
       relayout();
     }
 
-    const dropIndex = computeDropIndex(reorderRefRows, ghostY);
+    const dropIndex = computeDropIndex(reorderRefPositions, ghostY);
     if (dropIndex !== reorderLastIndex) {
       reorderLastIndex = dropIndex;
 
@@ -547,8 +527,10 @@ async function main() {
       const visualOrder = [...siblingItems]
         .filter(s => s.event !== item.event)
         .sort((a, b) => {
-          if (Math.abs(a.y - b.y) > 1) return a.y - b.y;
-          // Same row: preserve existing custom order
+          const centerA = a.y + a.height / 2;
+          const centerB = b.y + b.height / 2;
+          if (Math.abs(centerA - centerB) > 1) return centerA - centerB;
+          // Same visual center: preserve existing custom order
           if (oldIndexMap) {
             const ai = oldIndexMap.get(a.event.name) ?? Infinity;
             const bi = oldIndexMap.get(b.event.name) ?? Infinity;
@@ -593,7 +575,7 @@ async function main() {
     reorderState = null;
     reorderOriginalOrders = null;
     reorderLastIndex = -1;
-    reorderRefRows = null;
+    reorderRefPositions = null;
     undoManager.push(snapshot());
     requestRedraw();
   }
@@ -606,7 +588,7 @@ async function main() {
     }
     reorderState = null;
     reorderLastIndex = -1;
-    reorderRefRows = null;
+    reorderRefPositions = null;
     relayout();
     requestRedraw();
   }
@@ -1335,7 +1317,7 @@ async function main() {
     layoutTransition = null;
     reorderState = null;
     reorderOriginalOrders = null;
-    reorderRefRows = null;
+    reorderRefPositions = null;
 
     // Replace events array
     events.length = 0;
