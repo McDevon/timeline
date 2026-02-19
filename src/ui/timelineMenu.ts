@@ -2,6 +2,7 @@ import { themes, Theme, applyTheme, loadSavedTheme } from '../themes';
 
 export interface TimelineMenuCallbacks {
   onImport: () => void;
+  onLoadFile: () => void;
   onExport: () => void;
   onToggleTodayLine: (show: boolean) => void;
   onDeleteAll: () => void;
@@ -37,6 +38,7 @@ export class TimelineMenu {
     body.className = 'timeline-menu-body';
 
     body.appendChild(this.createButton('Import events', false, callbacks.onImport));
+    body.appendChild(this.createButton('Load events from file', false, callbacks.onLoadFile));
     body.appendChild(this.createButton('Export events', false, callbacks.onExport));
     body.appendChild(this.createCheckbox('Show today indicator', initialShowTodayLine, callbacks.onToggleTodayLine));
     body.appendChild(this.createThemeButton(callbacks));

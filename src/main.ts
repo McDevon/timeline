@@ -1000,6 +1000,59 @@ async function main() {
     reader.readAsText(file);
   }
 
+  function loadEventsFromFile(file: File) {
+    if (!file.name.endsWith('.json')) {
+      infoLog.show(`Cannot load "${file.name}": only .json files are supported`);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(reader.result as string);
+      } catch {
+        infoLog.show(`Invalid JSON in "${file.name}"`);
+        return;
+      }
+
+      const result = validateEvents(parsed);
+      if ('error' in result) {
+        infoLog.show(result.error);
+        return;
+      }
+
+      const count = result.events.reduce((n, e) => n + countEvents(e), 0);
+      showConfirmDialog(
+        `Replace all current events with ${count} event${count !== 1 ? 's' : ''} from "${file.name}"? This cannot be undone.`,
+        async () => {
+          events.length = 0;
+          events.push(...result.events);
+          hiddenEvents.clear();
+          collapsedEvents.clear();
+          eventOrders.clear();
+          await saveStoredEvents(events);
+          sel.hoveredItem = null;
+          sel.selectedItem = null;
+          eventMenu.hide();
+          dblClickPrevViewport = null;
+          dblClickItem = null;
+          relayout();
+          undoManager.init(snapshot());
+          eventListPanel?.rebuild(events, onToggleEvent, onHoverEvent, onSelectEvent, hiddenEvents, onContextMenu);
+          requestRedraw();
+          infoLog.show(`Loaded ${count} event${count !== 1 ? 's' : ''} from "${file.name}"`);
+        },
+      );
+    };
+
+    reader.onerror = () => {
+      infoLog.show(`Failed to read "${file.name}"`);
+    };
+
+    reader.readAsText(file);
+  }
+
   // --- File drop handler ---
   let dropOverlay: HTMLDivElement | null = null;
   let dragCounter = 0;
@@ -1053,6 +1106,16 @@ async function main() {
       input.addEventListener('change', () => {
         const file = input.files?.[0];
         if (file) importEventsFromFile(file);
+      });
+      input.click();
+    },
+    onLoadFile: () => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.json';
+      input.addEventListener('change', () => {
+        const file = input.files?.[0];
+        if (file) loadEventsFromFile(file);
       });
       input.click();
     },
