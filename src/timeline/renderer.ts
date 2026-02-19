@@ -101,6 +101,13 @@ export function computeFullRange(events: TimelineEvent[]): Viewport {
   }
 
   walk(events);
+
+  // Empty events: show a sensible default range around the current year
+  if (min === Infinity || max === -Infinity) {
+    const now = new Date().getFullYear();
+    return { start: now - 50, end: now + 10 };
+  }
+
   const span = max - min;
   min -= span * 0.02;
   max += span * 0.02;

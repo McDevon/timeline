@@ -10,10 +10,14 @@ export async function loadEvents(url: string, fallbackUrl: string): Promise<Time
     // Primary URL missing or not valid JSON — try fallback
   }
 
-  const fallback = await fetch(fallbackUrl);
-  if (fallback.ok) {
-    return fallback.json() as Promise<TimelineEvent[]>;
+  try {
+    const fallback = await fetch(fallbackUrl);
+    if (fallback.ok) {
+      return fallback.json() as Promise<TimelineEvent[]>;
+    }
+  } catch {
+    // Fallback also unavailable
   }
 
-  throw new Error(`Failed to load events from ${url} or ${fallbackUrl}`);
+  return [];
 }

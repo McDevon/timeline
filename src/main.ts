@@ -47,13 +47,17 @@ async function main() {
 
   // IndexedDB is the primary data store. On first load, seed from static JSON.
   let events: TimelineEvent[];
-  const initialized = await isStoreInitialized();
-  if (initialized) {
-    events = await loadStoredEvents();
-  } else {
-    events = await loadEvents('/events.json', '/events.example.json');
-    await saveStoredEvents(events);
-    await setStoreInitialized();
+  try {
+    const initialized = await isStoreInitialized();
+    if (initialized) {
+      events = await loadStoredEvents();
+    } else {
+      events = await loadEvents('/events.json', '/events.example.json');
+      await saveStoredEvents(events);
+      await setStoreInitialized();
+    }
+  } catch {
+    events = [];
   }
 
   const infoLog = new InfoLog();
