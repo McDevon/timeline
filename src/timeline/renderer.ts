@@ -551,18 +551,12 @@ function drawContainer(
     ctx.fillText(item.event.name, labelX, labelY);
     ctx.restore();
 
-    // Draw children
+    // Draw children in two passes: non-point first, then point events on top
     for (const child of item.children) {
-      drawLayoutItem(
-        ctx,
-        child,
-        viewport,
-        canvasWidth,
-        hoveredItem,
-        selectedItem,
-        snapHighlightYears,
-        transition,
-      );
+      if (!child.isPoint) drawLayoutItem(ctx, child, viewport, canvasWidth, hoveredItem, selectedItem, snapHighlightYears, transition);
+    }
+    for (const child of item.children) {
+      if (child.isPoint) drawLayoutItem(ctx, child, viewport, canvasWidth, hoveredItem, selectedItem, snapHighlightYears, transition);
     }
   }
 }
@@ -947,9 +941,12 @@ export function render(
   // Set module-level drag state so nested drawLayoutItem calls can dim the dragged item
   currentDraggedEvent = reorderState?.draggedEvent ?? null;
 
-  // Draw current layout items (transition offsets/fades applied inside drawLayoutItem)
+  // Draw current layout items in two passes: non-point first, then point events on top
   for (const item of layout) {
-    drawLayoutItem(ctx, item, viewport, canvasWidth, hoveredItem, selectedItem, snapState.highlightYears, transition);
+    if (!item.isPoint) drawLayoutItem(ctx, item, viewport, canvasWidth, hoveredItem, selectedItem, snapState.highlightYears, transition);
+  }
+  for (const item of layout) {
+    if (item.isPoint) drawLayoutItem(ctx, item, viewport, canvasWidth, hoveredItem, selectedItem, snapState.highlightYears, transition);
   }
 
   // Draw reorder ghost on top of everything else

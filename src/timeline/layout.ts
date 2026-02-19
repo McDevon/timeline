@@ -8,6 +8,9 @@ import { dateToDecimalYear, todayDecimalYear } from '../data/time';
  */
 export type EventOrderMap = Map<string, string[]>;
 
+/** Tiny time radius so same-date point events register as overlapping in layout. */
+const POINT_OVERLAP_RADIUS = 0.001;
+
 const LAYOUT = {
   parentBarHeight: 30,
   childBarHeight: 22,
@@ -197,6 +200,8 @@ function placeLevel(
     if (isPoint) {
       return {
         ...base,
+        overlapStart: startYear - POINT_OVERLAP_RADIUS,
+        overlapEnd: endYear + POINT_OVERLAP_RADIUS,
         height: barHeight,
         isContainer: false,
         isCollapsed: false,
