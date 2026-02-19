@@ -12,7 +12,7 @@ Examining relations of different events in a TV and movie series. This data is a
 
 ![Example timeline](example2.png)
 
-Visualising the timelines of different global crises. This data is available in `public/global_disasters.json`.
+Visualising the timelines of different global crises. This data is available in `public/global_crises.json`.
 
 ![Example timeline](example3.png)
 
