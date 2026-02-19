@@ -1,0 +1,235 @@
+.timeline-tooltip {
+  position: fixed;
+  padding: 8px 12px;
+  background: var(--tl-panel-bg);
+  border: 1px solid var(--tl-border);
+  border-radius: 6px;
+  color: var(--tl-text);
+  font-family: sans-serif;
+  font-size: 13px;
+  line-height: 1.4;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease-in-out;
+  z-index: 100;
+  max-width: 300px;
+}
+.timeline-tooltip.visible {
+  opacity: 1;
+}
+.timeline-tooltip .tooltip-dates {
+  color: var(--tl-text-muted);
+  font-size: 12px;
+}
+.timeline-tooltip .tooltip-approx {
+  color: var(--tl-text-approx);
+  font-size: 12px;
+  font-style: italic;
+}
+.timeline-tooltip .tooltip-info {
+  color: var(--tl-text-subtle);
+  font-size: 12px;
+}
+.zoom-controls {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 50;
+}
+.zoom-btn {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--tl-border);
+  border-radius: 6px;
+  background: var(--tl-panel-bg);
+  color: var(--tl-text);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.zoom-btn:hover {
+  background: var(--tl-hover-bg);
+  border-color: var(--tl-border-accent);
+}
+.zoom-btn:active {
+  background: var(--tl-active-bg);
+}
+.info-log {
+  position: fixed;
+  bottom: 70px;
+  right: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  pointer-events: none;
+  z-index: 100;
+}
+.info-log-message {
+  background: var(--tl-panel-bg);
+  border: 1px solid var(--tl-border);
+  color: var(--tl-text);
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-family: sans-serif;
+  font-size: 13px;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+}
+.info-log-message.visible {
+  opacity: 1;
+}
+.info-log-message.fading {
+  opacity: 0;
+  transition: opacity 0.5s ease-in-out;
+}
+.drop-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--tl-drop-overlay-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--tl-text);
+  font-family: sans-serif;
+  font-size: 24px;
+  font-weight: 600;
+  z-index: 200;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease-in-out;
+  border: 3px dashed var(--tl-border);
+}
+.drop-overlay.visible {
+  opacity: 1;
+}
+.date-input-row {
+  display: flex;
+  gap: 4px;
+  padding: 2px 10px;
+}
+.date-input-year {
+  flex: 1;
+  min-width: 0;
+  background: var(--tl-page-bg);
+  border: 1px solid var(--tl-border);
+  border-radius: 4px;
+  color: var(--tl-text);
+  font-family: sans-serif;
+  font-size: 13px;
+  padding: 3px 6px;
+}
+.date-input-year:focus {
+  outline: none;
+  border-color: var(--tl-border-accent);
+}
+.date-input-era,
+.date-input-month,
+.date-input-day {
+  background: var(--tl-page-bg);
+  border: 1px solid var(--tl-border);
+  border-radius: 4px;
+  color: var(--tl-text);
+  font-family: sans-serif;
+  font-size: 12px;
+  padding: 3px 2px;
+}
+.date-input-era:focus,
+.date-input-month:focus,
+.date-input-day:focus {
+  outline: none;
+  border-color: var(--tl-border-accent);
+}
+.date-input-era {
+  width: 52px;
+}
+.date-input-month {
+  flex: 1;
+}
+.date-input-day {
+  width: 44px;
+}
+/* Hide number input spinner */
+.date-input-year::-webkit-inner-spin-button,
+.date-input-year::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.date-input-year {
+  -moz-appearance: textfield;
+}
+.approx-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--tl-text-muted);
+  cursor: pointer;
+}
+.approx-toggle input[type="checkbox"] {
+  margin: 0;
+}
+.approx-fields {
+  padding-left: 10px;
+}
+.approx-label {
+  padding: 2px 10px 0;
+  font-size: 11px;
+  color: var(--tl-text-muted);
+}
+.new-event-btn {
+  position: fixed;
+  bottom: 20px;
+  z-index: 50;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background: var(--tl-panel-bg);
+  border: 1px solid var(--tl-border);
+  color: var(--tl-text);
+  font-family: sans-serif;
+  font-size: 20px;
+  line-height: 30px;
+  text-align: center;
+  cursor: pointer;
+  user-select: none;
+}
+.new-event-btn:hover {
+  background: var(--tl-hover-bg);
+  border-color: var(--tl-border-accent);
+}
+.info-btn {
+  position: fixed;
+  bottom: 104px;
+  right: 20px;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--tl-border);
+  border-radius: 50%;
+  background: var(--tl-panel-bg);
+  color: var(--tl-text);
+  font-size: 18px;
+  font-style: italic;
+  font-family: Georgia, 'Times New Roman', serif;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+.info-btn:hover {
+  background: var(--tl-hover-bg);
+  border-color: var(--tl-border-accent);
+}
+.info-btn:active {
+  background: var(--tl-active-bg);
+}

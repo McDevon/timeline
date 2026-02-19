@@ -1,0 +1,39 @@
+:root {
+  --tl-page-bg: #1a1a2e;
+  --tl-panel-bg: #16213e;
+  --tl-border: #533483;
+  --tl-border-accent: #7b52ab;
+  --tl-text: #e0e0e0;
+  --tl-text-muted: #b0b0b0;
+  --tl-text-approx: #9090b0;
+  --tl-text-subtle: #a0a0a0;
+  --tl-hover-bg: #1a3a5c;
+  --tl-active-bg: #0f2840;
+  --tl-list-highlight: rgba(255,255,255,0.05);
+  --tl-list-highlight-strong: rgba(255,255,255,0.1);
+  --tl-check-color: #7b52ab;
+  --tl-check-hidden-border: #3a2560;
+  --tl-scrollbar-thumb: #533483;
+  --tl-destructive-text: #e05050;
+  --tl-destructive-hover-bg: rgba(224,80,80,0.1);
+  --tl-destructive-bg: #3a1515;
+  --tl-destructive-border: #a03030;
+  --tl-destructive-hover-border: #c04040;
+  --tl-destructive-confirm-hover-bg: #4a1f1f;
+  --tl-drop-overlay-bg: rgba(15,52,96,0.6);
+  --tl-backdrop-bg: rgba(0,0,0,0.5);
+}
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--tl-page-bg);
+}
+canvas {
+  display: block;
+}

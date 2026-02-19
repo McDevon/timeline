@@ -1,3 +1,7 @@
+import './styles/base.css';
+import './styles/controls.css';
+import './styles/panels.css';
+import './styles/dialogs.css';
 import { loadEvents } from './data/loader';
 import { render, computeFullRange, computeMaxLayoutY, LAYOUT, ReorderState } from './timeline/renderer';
 import { computeLayout, LayoutItem } from './timeline/layout';
