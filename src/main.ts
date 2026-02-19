@@ -123,7 +123,7 @@ async function main() {
   function computeMaxScrollY(): number {
     const maxY = computeMaxLayoutY(layout);
     const canvasHeight = canvas.getBoundingClientRect().height;
-    return Math.max(0, maxY - canvasHeight + 20);
+    return Math.max(0, maxY - canvasHeight + 100);
   }
 
   function findLayoutItem(event: TimelineEvent, items: LayoutItem[]): LayoutItem | null {
