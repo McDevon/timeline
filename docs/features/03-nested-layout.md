@@ -41,6 +41,8 @@ Sweep-and-prune, sorted by start time (`src/timeline/layout.ts`):
 
 This applies recursively at every nesting level.
 
+Point events (no end date, no uncertainty) have zero time span, so they would never overlap each other or range event boundaries. To ensure same-date point events stack vertically, they are given a tiny overlap radius (0.001 years) for conflict detection only — their visual position is unchanged.
+
 ## Two-Phase Layout
 
 **Phase 1 — Size and place** (`placeLevel`): Recursively compute heights and relative Y positions. Containers compute their height from the total height of their placed children. Positions are relative to each level's origin (Y = 0).
@@ -49,7 +51,7 @@ This applies recursively at every nesting level.
 
 ## Rendering
 
-**Draw** (`src/timeline/renderer.ts`): Render from the layout structure. Parent containers drawn first (background), children drawn on top.
+**Draw** (`src/timeline/renderer.ts`): Render from the layout structure. Parent containers drawn first (background), children drawn on top. At each level, point events are drawn in a second pass on top of all bars and containers so they remain visible at range boundaries.
 
 ## Container Sizing
 
