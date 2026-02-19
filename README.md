@@ -38,7 +38,9 @@ Current features include
 
 The default events are loaded from `public/events.json`. After initial load, the browser uses local state and does not reload from the file unless default events are reloaded by the user.
 
-If `events.json` is not found, the application uses `events.example.json` as a fallback. Any json file in the `public` directory can be used as the initial `events.json`.
+If `events.json` is not found, the application uses `events.example.json` as a fallback. Any json file in the repository's `public` directory can be used as the initial `events.json` by changing filename.
+
+If you want the application to open with empty canvas, either remove both json files or add an `events.json` with an empty array.
 
 ## Running
 
