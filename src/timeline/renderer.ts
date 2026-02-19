@@ -972,7 +972,7 @@ export function render(
   ctx.save();
   ctx.globalAlpha = 0.9;
   ctx.fillStyle = colors.background;
-  ctx.fillRect(0, 0, canvasWidth, LAYOUT.eventsStartY);
+  ctx.fillRect(0, 0, canvasWidth, LAYOUT.eventsStartY - 1);
   ctx.restore();
 
   // Axis and overlays drawn in screen space (not scrolled)
