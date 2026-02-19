@@ -13,34 +13,59 @@ export interface InputHandlers {
   restoreSelectionOverrides(anchor: SnapDetail | null, extend: SnapDetail | null): void;
 }
 
+export interface InputConfig {
+  canvas: HTMLCanvasElement;
+  getViewport: () => Viewport;
+  setViewport: (v: Viewport) => void;
+  getLayout: () => LayoutItem[];
+  getHovered: () => LayoutItem | null;
+  setHovered: (item: LayoutItem | null) => void;
+  setSelected: (item: LayoutItem | null) => void;
+  setCursorX: (x: number) => void;
+  getSelection: () => TimelineSelection | null;
+  setSelection: (sel: TimelineSelection | null) => void;
+  setSnapState: (state: SnapState) => void;
+  onCollapseToggle: (event: import('../types').TimelineEvent) => void;
+  onReorderMove: (item: LayoutItem, cursorY: number) => void;
+  onReorderEnd: (item: LayoutItem) => void;
+  onReorderCancel: () => void;
+  getScrollY: () => number;
+  setScrollY: (y: number) => void;
+  getMaxScrollY: () => number;
+  requestRedraw: () => void;
+  getShowTodayLine?: () => boolean;
+  onContextMenu?: (event: import('../types').TimelineEvent, x: number, y: number) => void;
+}
+
 const CLICK_THRESHOLD = 3; // pixels — movement under this is a click, not a drag
 
 /**
  * Attach input handlers to a canvas for panning, hover, and click.
  */
-export function setupInput(
-  canvas: HTMLCanvasElement,
-  getViewport: () => Viewport,
-  setViewport: (v: Viewport) => void,
-  getLayout: () => LayoutItem[],
-  getHovered: () => LayoutItem | null,
-  setHovered: (item: LayoutItem | null) => void,
-  setSelected: (item: LayoutItem | null) => void,
-  setCursorX: (x: number) => void,
-  getSelection: () => TimelineSelection | null,
-  setSelection: (sel: TimelineSelection | null) => void,
-  setSnapState: (state: SnapState) => void,
-  onCollapseToggle: (event: import('../types').TimelineEvent) => void,
-  onReorderMove: (item: LayoutItem, cursorY: number) => void,
-  onReorderEnd: (item: LayoutItem) => void,
-  onReorderCancel: () => void,
-  getScrollY: () => number,
-  setScrollY: (y: number) => void,
-  getMaxScrollY: () => number,
-  requestRedraw: () => void,
-  getShowTodayLine?: () => boolean,
-  onContextMenu?: (event: import('../types').TimelineEvent, x: number, y: number) => void,
-): InputHandlers {
+export function setupInput(config: InputConfig): InputHandlers {
+  const {
+    canvas,
+    getViewport,
+    setViewport,
+    getLayout,
+    getHovered,
+    setHovered,
+    setSelected,
+    setCursorX,
+    getSelection,
+    setSelection,
+    setSnapState,
+    onCollapseToggle,
+    onReorderMove,
+    onReorderEnd,
+    onReorderCancel,
+    getScrollY,
+    setScrollY,
+    getMaxScrollY,
+    requestRedraw,
+    getShowTodayLine,
+    onContextMenu,
+  } = config;
   const tooltip = new Tooltip();
 
   function clearSelection() {
@@ -283,18 +308,14 @@ export function setupInput(
   }
 
   // --- Mouse drag + click ---
-  let dragMode: 'none' | 'panning' | 'axis-selecting' | 'reordering' = 'none';
-  let mouseDownX = 0;
-  let mouseDownY = 0;
-  let lastMouseX = 0;
-  let didDrag = false;
-  let axisAnchorYear = 0;
+  type DragState =
+    | { mode: 'none' }
+    | { mode: 'axis-selecting'; mouseDownX: number; mouseDownY: number; anchorYear: number; didDrag: boolean }
+    | { mode: 'panning'; mouseDownX: number; mouseDownY: number; lastMouseX: number; didDrag: boolean; decided: boolean; startViewport: Viewport; reorderCandidate: LayoutItem | null }
+    | { mode: 'reordering'; item: LayoutItem; startViewport: Viewport };
 
-  // Reorder drag state
+  let drag: DragState = { mode: 'none' };
   const REORDER_DECISION_THRESHOLD = 8;
-  let dragDecided = false;
-  let viewportAtDragStart: Viewport | null = null;
-  let reorderItem: LayoutItem | null = null;
 
   // Auto-scroll during reorder drag
   const AUTOSCROLL_ZONE = 60; // px from edge
@@ -305,7 +326,7 @@ export function setupInput(
   function startAutoScroll(): void {
     if (autoScrollRaf) return;
     function tick() {
-      if (dragMode !== 'reordering') { autoScrollRaf = 0; return; }
+      if (drag.mode !== 'reordering') { autoScrollRaf = 0; return; }
       const rect = canvas.getBoundingClientRect();
       const relY = lastClientY - rect.top;
       let delta = 0;
@@ -317,7 +338,7 @@ export function setupInput(
       if (delta !== 0) {
         const newScroll = Math.max(0, Math.min(getScrollY() + delta, getMaxScrollY()));
         setScrollY(newScroll);
-        onReorderMove(reorderItem!, (lastClientY - rect.top) + newScroll);
+        onReorderMove(drag.item, (lastClientY - rect.top) + newScroll);
         scheduleRedraw();
       }
       autoScrollRaf = requestAnimationFrame(tick);
@@ -364,27 +385,33 @@ export function setupInput(
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    mouseDownX = e.clientX;
-    mouseDownY = e.clientY;
-    lastMouseX = e.clientX;
-    didDrag = false;
-
     cursorSnapYear = null;
 
     if (y < LAYOUT.eventsStartY) {
       // Axis region — start selection mode
-      dragMode = 'axis-selecting';
-      axisAnchorYear = snapYear(x);
+      drag = {
+        mode: 'axis-selecting',
+        mouseDownX: e.clientX,
+        mouseDownY: e.clientY,
+        anchorYear: snapYear(x),
+        didDrag: false,
+      };
       canvas.style.cursor = 'col-resize';
       selAnchorOverride = null;
       selExtendOverride = null;
     } else {
       // Events region — start panning (may pivot to reorder)
-      dragMode = 'panning';
-      dragDecided = false;
-      viewportAtDragStart = { ...getViewport() };
       const hit = hitTest(x, y, getLayout(), getViewport(), canvas.clientWidth, getScrollY());
-      reorderItem = hit;
+      drag = {
+        mode: 'panning',
+        mouseDownX: e.clientX,
+        mouseDownY: e.clientY,
+        lastMouseX: e.clientX,
+        didDrag: false,
+        decided: false,
+        startViewport: { ...getViewport() },
+        reorderCandidate: hit,
+      };
       updateCursorLine(-1, LAYOUT.eventsStartY);
       canvas.style.cursor = 'grabbing';
     }
@@ -393,66 +420,62 @@ export function setupInput(
   function onMouseMove(e: MouseEvent) {
     modifierHeld = e.ctrlKey || e.metaKey;
 
-    if (dragMode === 'axis-selecting') {
-      const dist = Math.hypot(e.clientX - mouseDownX, e.clientY - mouseDownY);
-      if (dist >= CLICK_THRESHOLD) {
-        didDrag = true;
-      }
-      if (didDrag) {
+    if (drag.mode === 'axis-selecting') {
+      const dist = Math.hypot(e.clientX - drag.mouseDownX, e.clientY - drag.mouseDownY);
+      if (dist >= CLICK_THRESHOLD) drag.didDrag = true;
+      if (drag.didDrag) {
         const rect = canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const currentYear = snapYear(x);
         setSelection({
-          start: Math.min(axisAnchorYear, currentYear),
-          end: Math.max(axisAnchorYear, currentYear),
-          anchor: axisAnchorYear,
+          start: Math.min(drag.anchorYear, currentYear),
+          end: Math.max(drag.anchorYear, currentYear),
+          anchor: drag.anchorYear,
         });
         scheduleRedraw();
       }
       return;
     }
 
-    if (dragMode === 'reordering') {
+    if (drag.mode === 'reordering') {
       lastClientY = e.clientY;
       const rect = canvas.getBoundingClientRect();
       const canvasY = e.clientY - rect.top;
-      onReorderMove(reorderItem!, canvasY + getScrollY());
+      onReorderMove(drag.item, canvasY + getScrollY());
       scheduleRedraw();
       return;
     }
 
-    if (dragMode === 'panning') {
-      const dx = lastMouseX - e.clientX;
-      lastMouseX = e.clientX;
+    if (drag.mode === 'panning') {
+      const dx = drag.lastMouseX - e.clientX;
+      drag.lastMouseX = e.clientX;
 
-      const dist = Math.hypot(e.clientX - mouseDownX, e.clientY - mouseDownY);
+      const dist = Math.hypot(e.clientX - drag.mouseDownX, e.clientY - drag.mouseDownY);
 
       // Direction decision: after threshold, check if vertical drag on an event
-      if (!dragDecided && dist >= REORDER_DECISION_THRESHOLD && reorderItem !== null) {
-        const absDx = Math.abs(e.clientX - mouseDownX);
-        const absDy = Math.abs(e.clientY - mouseDownY);
+      if (!drag.decided && dist >= REORDER_DECISION_THRESHOLD && drag.reorderCandidate !== null) {
+        const absDx = Math.abs(e.clientX - drag.mouseDownX);
+        const absDy = Math.abs(e.clientY - drag.mouseDownY);
         if (absDy > absDx) {
           // Pivot to reorder mode
-          dragDecided = true;
-          dragMode = 'reordering';
-          if (viewportAtDragStart) setViewport(viewportAtDragStart);
+          const item = drag.reorderCandidate;
+          setViewport(drag.startViewport);
+          drag = { mode: 'reordering', item, startViewport: drag.startViewport };
           tooltip.hide();
           canvas.style.cursor = 'ns-resize';
           lastClientY = e.clientY;
           const rect = canvas.getBoundingClientRect();
-          onReorderMove(reorderItem, e.clientY - rect.top + getScrollY());
+          onReorderMove(item, e.clientY - rect.top + getScrollY());
           startAutoScroll();
           scheduleRedraw();
           return;
         }
         // Horizontal — confirm pan
-        dragDecided = true;
-        reorderItem = null;
+        drag.decided = true;
+        drag.reorderCandidate = null;
       }
 
-      if (dist >= CLICK_THRESHOLD) {
-        didDrag = true;
-      }
+      if (dist >= CLICK_THRESHOLD) drag.didDrag = true;
 
       const viewport = getViewport();
       setViewport(panViewport(viewport, dx, canvas.clientWidth));
@@ -475,16 +498,14 @@ export function setupInput(
 
   function onMouseUp(e: MouseEvent) {
     modifierHeld = e.ctrlKey || e.metaKey;
-    const mode = dragMode;
-    dragMode = 'none';
+    const state = drag;
+    drag = { mode: 'none' };
 
-    if (mode === 'none') return; // mousedown wasn't on the canvas
+    if (state.mode === 'none') return; // mousedown wasn't on the canvas
 
-    if (mode === 'reordering') {
+    if (state.mode === 'reordering') {
       stopAutoScroll();
-      onReorderEnd(reorderItem!);
-      reorderItem = null;
-      viewportAtDragStart = null;
+      onReorderEnd(state.item);
       const rect = canvas.getBoundingClientRect();
       cursorCanvasX = e.clientX - rect.left;
       cursorCanvasY = e.clientY - rect.top;
@@ -495,8 +516,8 @@ export function setupInput(
       return;
     }
 
-    if (mode === 'axis-selecting') {
-      if (!didDrag) {
+    if (state.mode === 'axis-selecting') {
+      if (!state.didDrag) {
         // Click on axis (not drag)
         const rect = canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
@@ -526,7 +547,7 @@ export function setupInput(
       }
       // If didDrag, range was already committed during mousemove
       scheduleRedraw();
-    } else if (mode === 'panning' && !didDrag) {
+    } else if (state.mode === 'panning' && !state.didDrag) {
       // Click in events area (not drag)
       const rect = canvas.getBoundingClientRect();
       const x = e.clientX - rect.left;
@@ -625,7 +646,7 @@ export function setupInput(
   }
 
   function onMouseLeave() {
-    if (dragMode === 'none') {
+    if (drag.mode === 'none') {
       cursorCanvasX = -1;
       cursorCanvasY = -1;
       updateCursorLine(-1, LAYOUT.eventsStartY);
@@ -637,12 +658,10 @@ export function setupInput(
   }
 
   function onKeyDown(e: KeyboardEvent) {
-    if (e.key === 'Escape' && dragMode === 'reordering') {
+    if (e.key === 'Escape' && drag.mode === 'reordering') {
       stopAutoScroll();
-      dragMode = 'none';
+      drag = { mode: 'none' };
       onReorderCancel();
-      reorderItem = null;
-      viewportAtDragStart = null;
       canvas.style.cursor = 'grab';
       scheduleRedraw();
     }

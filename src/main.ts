@@ -86,7 +86,7 @@ async function main() {
     layout = computeLayout(events, LAYOUT.eventsStartY, collapsedEvents, eventOrders, hiddenEvents);
     // Clamp scroll if layout shrank
     const max = computeMaxScrollY();
-    if (scrollY > max) scrollY = max;
+    if (view.scrollY > max) view.scrollY = max;
   }
 
   // Undo/redo
@@ -97,19 +97,45 @@ async function main() {
     return captureSnapshot(events, hiddenEvents, collapsedEvents, eventOrders);
   }
 
-  // Initialize viewport — use saved or compute full range
-  let viewport: Viewport = saved?.viewport ?? computeFullRange(events);
+  // --- View state ---
+  const view = {
+    viewport: (saved?.viewport ?? computeFullRange(events)) as Viewport,
+    scrollY: 0,
+    animFrom: null as Viewport | null,
+    animTo: null as Viewport | null,
+    animStartTime: 0,
+    scrollFrom: 0,
+    scrollTo: null as number | null,
+    scrollAnimStart: 0,
+  };
 
-  // Vertical scroll state
-  let scrollY = 0;
+  // --- Selection state ---
+  const sel = {
+    selection: (saved?.selection ?? null) as TimelineSelection | null,
+    selectedItem: null as LayoutItem | null,
+    hoveredItem: null as LayoutItem | null,
+    snapState: { highlightYears: new Set<number>(), cursorDetail: null, selStartDetail: null, selEndDetail: null } as SnapState,
+  };
+
+  // --- UI state ---
+  const ui = {
+    cursorX: -1,
+    showTodayLine: saved?.showTodayLine ?? true,
+  };
+
+  let dblClickPrevViewport: Viewport | null = null;
+  let dblClickItem: LayoutItem | null = null;
+  let preClickSelection: TimelineSelection | null = null;
+  let preClickSelectedItem: LayoutItem | null = null;
+  let preClickSnapOverrides: { anchor: SnapDetail | null; extend: SnapDetail | null } = { anchor: null, extend: null };
+  let lastMouseDownTime = 0;
+  let eventListPanel: EventListPanel | null = null;
 
   function computeMaxScrollY(): number {
     const maxY = computeMaxLayoutY(layout);
     const canvasHeight = canvas.getBoundingClientRect().height;
     return Math.max(0, maxY - canvasHeight + 20);
   }
-  let hoveredItem: LayoutItem | null = null;
-  let eventListPanel: EventListPanel | null = null;
 
   function findLayoutItem(event: TimelineEvent, items: LayoutItem[]): LayoutItem | null {
     for (const item of items) {
@@ -123,28 +149,13 @@ async function main() {
   }
 
   function setHoveredItem(item: LayoutItem | null) {
-    hoveredItem = item;
+    sel.hoveredItem = item;
     eventListPanel?.highlightEvent(item?.event ?? null);
   }
-  let selectedItem: LayoutItem | null = null;
-  let cursorX = -1;
-  let selection: TimelineSelection | null = saved?.selection ?? null;
-  let snapState: SnapState = { highlightYears: new Set(), cursorDetail: null, selStartDetail: null, selEndDetail: null };
-  let showTodayLine: boolean = saved?.showTodayLine ?? true;
-  let dblClickPrevViewport: Viewport | null = null;
-  let dblClickItem: LayoutItem | null = null;
-  let preClickSelection: TimelineSelection | null = null;
-  let preClickSelectedItem: LayoutItem | null = null;
-  let preClickSnapOverrides: { anchor: SnapDetail | null; extend: SnapDetail | null } = { anchor: null, extend: null };
-  let lastMouseDownTime = 0;
 
   // rAF-batched rendering
   let rafId = 0;
 
-  // Zoom animation state
-  let animFrom: Viewport | null = null;
-  let animTo: Viewport | null = null;
-  let animStartTime = 0;
   const ZOOM_ANIM_MS = 150;
 
   // Layout transition animation state
@@ -164,31 +175,31 @@ async function main() {
   function draw() {
     rafId = 0;
 
-    if (animFrom && animTo) {
-      const elapsed = performance.now() - animStartTime;
+    if (view.animFrom && view.animTo) {
+      const elapsed = performance.now() - view.animStartTime;
       const t = Math.min(elapsed / ZOOM_ANIM_MS, 1);
       const e = easeInOut(t);
-      viewport = {
-        start: animFrom.start + (animTo.start - animFrom.start) * e,
-        end: animFrom.end + (animTo.end - animFrom.end) * e,
+      view.viewport = {
+        start: view.animFrom.start + (view.animTo.start - view.animFrom.start) * e,
+        end: view.animFrom.end + (view.animTo.end - view.animFrom.end) * e,
       };
       if (t < 1) {
         rafId = requestAnimationFrame(draw);
       } else {
-        animFrom = null;
-        animTo = null;
+        view.animFrom = null;
+        view.animTo = null;
       }
     }
 
     // Scroll animation
-    if (scrollTo !== null) {
-      const elapsed = performance.now() - scrollAnimStart;
+    if (view.scrollTo !== null) {
+      const elapsed = performance.now() - view.scrollAnimStart;
       const t = Math.min(elapsed / SCROLL_ANIM_MS, 1);
-      scrollY = scrollFrom + (scrollTo - scrollFrom) * easeInOut(t);
+      view.scrollY = view.scrollFrom + (view.scrollTo - view.scrollFrom) * easeInOut(t);
       if (t < 1) {
         if (rafId === 0) rafId = requestAnimationFrame(draw);
       } else {
-        scrollTo = null;
+        view.scrollTo = null;
       }
     }
 
@@ -212,15 +223,14 @@ async function main() {
 
     const ctx = setupCanvas(canvas);
     const rect = canvas.getBoundingClientRect();
-    render(ctx, rect.width, rect.height, layout, viewport, hoveredItem, selectedItem, cursorX, selection, snapState, scrollY, showTodayLine, transition, reorderState ?? undefined);
+    render(ctx, rect.width, rect.height, layout, view.viewport, sel.hoveredItem, sel.selectedItem, ui.cursorX, sel.selection, sel.snapState, view.scrollY, ui.showTodayLine, transition, reorderState ?? undefined);
   }
 
-  // Debounced state persistence
   let saveTimer = 0;
   function scheduleSave() {
     clearTimeout(saveTimer);
     saveTimer = window.setTimeout(() => {
-      saveState(viewport, selection, hiddenEvents, collapsedEvents, events, eventOrders, showTodayLine);
+      saveState(view.viewport, sel.selection, hiddenEvents, collapsedEvents, events, eventOrders, ui.showTodayLine);
     }, 500);
   }
 
@@ -232,41 +242,37 @@ async function main() {
   }
 
   function animateZoom(target: Viewport) {
-    animFrom = { ...viewport };
-    animTo = target;
-    animStartTime = performance.now();
+    view.animFrom = { ...view.viewport };
+    view.animTo = target;
+    view.animStartTime = performance.now();
     requestRedraw();
   }
 
-  // Scroll animation state
-  let scrollFrom = 0;
-  let scrollTo: number | null = null;
-  let scrollAnimStart = 0;
   const SCROLL_ANIM_MS = 150;
 
   function animateScroll(target: number) {
-    scrollFrom = scrollY;
-    scrollTo = Math.max(0, Math.min(target, computeMaxScrollY()));
-    scrollAnimStart = performance.now();
+    view.scrollFrom = view.scrollY;
+    view.scrollTo = Math.max(0, Math.min(target, computeMaxScrollY()));
+    view.scrollAnimStart = performance.now();
     requestRedraw();
   }
 
   /** After relayout, re-find and re-select the event, scrolling into view if needed. */
   function reselectEvent(event: TimelineEvent, prevScroll?: number) {
     const item = findLayoutItem(event, layout);
-    selectedItem = item;
+    sel.selectedItem = item;
     if (item) {
       const rect = canvas.getBoundingClientRect();
       // Use pre-relayout scroll to detect if the event moved out of the old view
-      const checkScroll = prevScroll ?? scrollY;
+      const checkScroll = prevScroll ?? view.scrollY;
       const visibleTop = checkScroll + LAYOUT.eventsStartY;
       const visibleBottom = checkScroll + rect.height;
       if (item.y + item.height > visibleBottom) {
         // Restore pre-clamp scroll so animation starts from the right place
-        if (prevScroll !== undefined) scrollY = prevScroll;
+        if (prevScroll !== undefined) view.scrollY = prevScroll;
         animateScroll(item.y + item.height - rect.height + 20);
       } else if (item.y < visibleTop) {
-        if (prevScroll !== undefined) scrollY = prevScroll;
+        if (prevScroll !== undefined) view.scrollY = prevScroll;
         animateScroll(Math.max(item.y - LAYOUT.eventsStartY - 10, 0));
       }
     }
@@ -340,11 +346,11 @@ async function main() {
 
     // Clear state referencing now-hidden children
     if (!wasCollapsed) {
-      if (hoveredItem && hoveredItem.event !== event && isDescendantOf(hoveredItem, event)) {
+      if (sel.hoveredItem && sel.hoveredItem.event !== event && isDescendantOf(sel.hoveredItem, event)) {
         setHoveredItem(null);
       }
-      if (selectedItem && selectedItem.event !== event && isDescendantOf(selectedItem, event)) {
-        selectedItem = null;
+      if (sel.selectedItem && sel.selectedItem.event !== event && isDescendantOf(sel.selectedItem, event)) {
+        sel.selectedItem = null;
         eventListPanel?.selectEvent(null);
         eventMenu.hide();
       }
@@ -606,41 +612,41 @@ async function main() {
   }
 
   // Wire up input
-  const inputHandlers = setupInput(
+  const inputHandlers = setupInput({
     canvas,
-    () => viewport,
-    (v: Viewport) => {
-      const spanBefore = viewport.end - viewport.start;
+    getViewport: () => view.viewport,
+    setViewport: (v: Viewport) => {
+      const spanBefore = view.viewport.end - view.viewport.start;
       const spanAfter = v.end - v.start;
       if (Math.abs(spanAfter - spanBefore) > 1e-6) {
         dblClickPrevViewport = null;
         dblClickItem = null;
       }
-      viewport = v;
+      view.viewport = v;
     },
-    () => layout,
-    () => hoveredItem,
-    setHoveredItem,
-    (item: LayoutItem | null) => {
-      selectedItem = item;
+    getLayout: () => layout,
+    getHovered: () => sel.hoveredItem,
+    setHovered: setHoveredItem,
+    setSelected: (item: LayoutItem | null) => {
+      sel.selectedItem = item;
       eventListPanel?.selectEvent(item?.event ?? null);
       if (item) eventMenu.show(item.event); else eventMenu.hide();
     },
-    (x: number) => { cursorX = x; },
-    () => selection,
-    (sel: TimelineSelection | null) => { selection = sel; },
-    (state: SnapState) => { snapState = state; },
+    setCursorX: (x: number) => { ui.cursorX = x; },
+    getSelection: () => sel.selection,
+    setSelection: (s: TimelineSelection | null) => { sel.selection = s; },
+    setSnapState: (state: SnapState) => { sel.snapState = state; },
     onCollapseToggle,
     onReorderMove,
     onReorderEnd,
     onReorderCancel,
-    () => scrollY,
-    (y: number) => { scrollY = y; },
-    computeMaxScrollY,
+    getScrollY: () => view.scrollY,
+    setScrollY: (y: number) => { view.scrollY = y; },
+    getMaxScrollY: computeMaxScrollY,
     requestRedraw,
-    () => showTodayLine,
+    getShowTodayLine: () => ui.showTodayLine,
     onContextMenu,
-  );
+  });
 
   // Info button
   const infoBtn = document.createElement('button');
@@ -654,12 +660,12 @@ async function main() {
   const ZOOM_DELTA = 120; // equivalent to one scroll wheel tick
   document.getElementById('zoom-in')!.addEventListener('click', () => {
     const center = canvas.clientWidth / 2;
-    const base = animTo ?? viewport;
+    const base = view.animTo ?? view.viewport;
     animateZoom(zoomViewport(base, center, canvas.clientWidth, -ZOOM_DELTA));
   });
   document.getElementById('zoom-out')!.addEventListener('click', () => {
     const center = canvas.clientWidth / 2;
-    const base = animTo ?? viewport;
+    const base = view.animTo ?? view.viewport;
     animateZoom(zoomViewport(base, center, canvas.clientWidth, ZOOM_DELTA));
   });
 
@@ -667,8 +673,8 @@ async function main() {
   canvas.addEventListener('mousedown', () => {
     const now = performance.now();
     if (now - lastMouseDownTime > 500) {
-      preClickSelection = selection ? { ...selection } : null;
-      preClickSelectedItem = selectedItem;
+      preClickSelection = sel.selection ? { ...sel.selection } : null;
+      preClickSelectedItem = sel.selectedItem;
       preClickSnapOverrides = inputHandlers.getSelectionOverrides();
     }
     lastMouseDownTime = now;
@@ -679,23 +685,23 @@ async function main() {
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    const hit = hitTest(x, y, layout, viewport, canvas.clientWidth, scrollY);
+    const hit = hitTest(x, y, layout, view.viewport, canvas.clientWidth, view.scrollY);
 
     if (!hit || hit.event.end === undefined || e.ctrlKey || e.metaKey) return;
 
     // Restore selection state from before the double-click
-    selection = preClickSelection;
-    selectedItem = preClickSelectedItem;
+    sel.selection = preClickSelection;
+    sel.selectedItem = preClickSelectedItem;
     inputHandlers.restoreSelectionOverrides(preClickSnapOverrides.anchor, preClickSnapOverrides.extend);
-    eventListPanel?.selectEvent(selectedItem?.event ?? null);
-    if (selectedItem) eventMenu.show(selectedItem.event); else eventMenu.hide();
+    eventListPanel?.selectEvent(sel.selectedItem?.event ?? null);
+    if (sel.selectedItem) eventMenu.show(sel.selectedItem.event); else eventMenu.hide();
 
     if (dblClickItem && hit.event === dblClickItem.event && dblClickPrevViewport) {
       animateZoom(dblClickPrevViewport);
       dblClickPrevViewport = null;
       dblClickItem = null;
     } else {
-      dblClickPrevViewport = { ...(animTo ?? viewport) };
+      dblClickPrevViewport = { ...(view.animTo ?? view.viewport) };
       dblClickItem = hit;
       const padding = (hit.nominalEndYear - hit.nominalStartYear) * 0.1;
       animateZoom({
@@ -746,9 +752,9 @@ async function main() {
 
     // Clear hovered/selected if they reference the hidden event
     if (!visible) {
-      if (hoveredItem && isDescendantOf(hoveredItem, event)) setHoveredItem(null);
-      if (selectedItem && isDescendantOf(selectedItem, event)) {
-        selectedItem = null;
+      if (sel.hoveredItem && isDescendantOf(sel.hoveredItem, event)) setHoveredItem(null);
+      if (sel.selectedItem && isDescendantOf(sel.selectedItem, event)) {
+        sel.selectedItem = null;
         eventListPanel?.selectEvent(null);
         eventMenu.hide();
       }
@@ -779,7 +785,7 @@ async function main() {
     // Account for UI panels overlaying the left side of the canvas:
     // - events list panel (always)
     // - event menu (only when expanded)
-    const vp = animTo ?? viewport;
+    const vp = view.animTo ?? view.viewport;
     const canvasWidth = canvas.clientWidth;
     const occludedRight = eventMenu.isExpanded()
       ? eventMenu.getRightEdge() - rect.left
@@ -797,20 +803,20 @@ async function main() {
     }
 
     // Vertical: scroll if event is not visible
-    const visibleTop = scrollY + LAYOUT.eventsStartY;
-    const visibleBottom = scrollY + rect.height;
+    const visibleTop = view.scrollY + LAYOUT.eventsStartY;
+    const visibleBottom = view.scrollY + rect.height;
     const itemTop = item.y;
     const itemBottom = item.y + item.height;
     if (itemBottom > visibleBottom) {
-      scrollY = Math.min(itemBottom - rect.height + 20, computeMaxScrollY());
+      view.scrollY = Math.min(itemBottom - rect.height + 20, computeMaxScrollY());
     } else if (itemTop < visibleTop) {
-      scrollY = Math.max(itemTop - LAYOUT.eventsStartY - 10, 0);
+      view.scrollY = Math.max(itemTop - LAYOUT.eventsStartY - 10, 0);
     }
   }
 
   function onSelectEvent(event: TimelineEvent) {
     const item = findLayoutItem(event, layout);
-    selectedItem = item;
+    sel.selectedItem = item;
     eventListPanel?.selectEvent(event);
     eventMenu.show(event);
 
@@ -829,7 +835,7 @@ async function main() {
       dblClickPrevViewport = null;
       dblClickItem = null;
     } else {
-      dblClickPrevViewport = { ...(animTo ?? viewport) };
+      dblClickPrevViewport = { ...(view.animTo ?? view.viewport) };
       dblClickItem = item;
       const padding = (item.nominalEndYear - item.nominalStartYear) * 0.1;
       animateZoom({
@@ -893,20 +899,7 @@ async function main() {
       const count = countEvents(event);
       infoLog.show(`Exported "${event.name}"${count > 1 ? ` with ${count - 1} sub-events` : ''}`);
     },
-    onDelete: (event) => {
-      removeEvent(events, event);
-      hiddenEvents.delete(event);
-      collapsedEvents.delete(event);
-      selectedItem = null;
-      eventMenu.hide();
-      eventListPanel?.selectEvent(null);
-      eventListPanel?.removeEvent(event);
-      relayout();
-      requestRedraw();
-      saveStoredEvents(events);
-      undoManager.push(snapshot());
-      infoLog.show(`Deleted "${event.name}"`);
-    },
+    onDelete: deleteEvent,
     getParentCandidates,
     getCurrentParent: (event) => findParent(events, event),
   });
@@ -918,6 +911,21 @@ async function main() {
   eventListPanel = new EventListPanel(events, onToggleEvent, onHoverEvent, onSelectEvent, hiddenEvents, onDblClickEvent, onContextMenu);
 
   // --- Event editing helpers ---
+  function deleteEvent(event: TimelineEvent) {
+    removeEvent(events, event);
+    hiddenEvents.delete(event);
+    collapsedEvents.delete(event);
+    sel.selectedItem = null;
+    eventMenu.hide();
+    eventListPanel?.selectEvent(null);
+    eventListPanel?.removeEvent(event);
+    relayout();
+    requestRedraw();
+    saveStoredEvents(events);
+    undoManager.push(snapshot());
+    infoLog.show(`Deleted "${event.name}"`);
+  }
+
   function findParent(list: TimelineEvent[], target: TimelineEvent): TimelineEvent | null {
     for (const e of list) {
       if (e.nested?.includes(target)) return e;
@@ -970,7 +978,7 @@ async function main() {
     },
     onChangeStart: (event, start) => {
       event.start = start;
-      const prevScroll = scrollY;
+      const prevScroll = view.scrollY;
       relayout();
       reselectEvent(event, prevScroll);
       requestRedraw();
@@ -984,7 +992,7 @@ async function main() {
       } else {
         event.end = end;
       }
-      const prevScroll = scrollY;
+      const prevScroll = view.scrollY;
       relayout();
       reselectEvent(event, prevScroll);
       requestRedraw();
@@ -994,7 +1002,7 @@ async function main() {
     onChangeStartApprox: (event, approx) => {
       if (approx === undefined) delete event.startApprox;
       else event.startApprox = approx;
-      const prevScroll = scrollY;
+      const prevScroll = view.scrollY;
       relayout();
       reselectEvent(event, prevScroll);
       requestRedraw();
@@ -1004,7 +1012,7 @@ async function main() {
     onChangeEndApprox: (event, approx) => {
       if (approx === undefined) delete event.endApprox;
       else event.endApprox = approx;
-      const prevScroll = scrollY;
+      const prevScroll = view.scrollY;
       relayout();
       reselectEvent(event, prevScroll);
       requestRedraw();
@@ -1041,20 +1049,7 @@ async function main() {
       undoManager.push(snapshot());
       infoLog.show(`Moved "${event.name}" to ${newParent ? `"${newParent.name}"` : 'top level'}`);
     },
-    onDelete: (event) => {
-      removeEvent(events, event);
-      hiddenEvents.delete(event);
-      collapsedEvents.delete(event);
-      selectedItem = null;
-      eventMenu.hide();
-      eventListPanel?.selectEvent(null);
-      eventListPanel?.removeEvent(event);
-      relayout();
-      requestRedraw();
-      saveStoredEvents(events);
-      undoManager.push(snapshot());
-      infoLog.show(`Deleted "${event.name}"`);
-    },
+    onDelete: deleteEvent,
     onExport: (event) => {
       const json = JSON.stringify(event, null, 2);
       const blob = new Blob([json], { type: 'application/json' });
@@ -1085,8 +1080,8 @@ async function main() {
 
   newEventBtn.addEventListener('click', () => {
     // 1. Determine parent
-    const parent = (selectedItem && selectedItem.event.end !== undefined)
-      ? selectedItem.event : null;
+    const parent = (sel.selectedItem && sel.selectedItem.event.end !== undefined)
+      ? sel.selectedItem.event : null;
 
     // 2. Determine date/type
     let start: string;
@@ -1097,10 +1092,10 @@ async function main() {
       ? (parent.end === 'ongoing' ? dateToDecimalYear(new Date().toISOString().slice(0, 10)) : dateToDecimalYear(parent.end!))
       : null;
 
-    if (selection && selection.start !== selection.end) {
+    if (sel.selection && sel.selection.start !== sel.selection.end) {
       // Range selection
-      let selStart = selection.start;
-      let selEnd = selection.end;
+      let selStart = sel.selection.start;
+      let selEnd = sel.selection.end;
       if (parent && parentStart !== null && parentEnd !== null) {
         // Clamp to parent range if overlapping
         if (selStart < parentEnd && selEnd > parentStart) {
@@ -1110,15 +1105,15 @@ async function main() {
       }
       start = decimalYearToIso(selStart);
       end = decimalYearToIso(selEnd);
-    } else if (selection && selection.start === selection.end) {
+    } else if (sel.selection && sel.selection.start === sel.selection.end) {
       // Single cursor point
-      start = decimalYearToIso(selection.start);
+      start = decimalYearToIso(sel.selection.start);
     } else {
       // No cursor/selection — use center of parent or viewport
       if (parent && parentStart !== null && parentEnd !== null) {
         start = decimalYearToIso((parentStart + parentEnd) / 2);
       } else {
-        const vp = animTo ?? viewport;
+        const vp = view.animTo ?? view.viewport;
         start = decimalYearToIso((vp.start + vp.end) / 2);
       }
     }
@@ -1143,7 +1138,7 @@ async function main() {
 
     // 6. Select, scroll into view, and edit
     const item = findLayoutItem(newEvent, layout);
-    selectedItem = item;
+    sel.selectedItem = item;
     eventListPanel?.selectEvent(newEvent);
     eventMenu.show(newEvent);
     eventMenu.focusName();
@@ -1299,8 +1294,8 @@ async function main() {
         eventOrders.clear();
         await clearStoredEvents();
         eventListPanel?.clear();
-        hoveredItem = null;
-        selectedItem = null;
+        sel.hoveredItem = null;
+        sel.selectedItem = null;
         eventMenu.hide();
         dblClickPrevViewport = null;
         dblClickItem = null;
@@ -1318,25 +1313,25 @@ async function main() {
       });
     },
     onToggleTodayLine: (show) => {
-      showTodayLine = show;
+      ui.showTodayLine = show;
       requestRedraw();
     },
     onThemeChange: () => requestRedraw(),
-  }, showTodayLine);
+  }, ui.showTodayLine);
 
   // --- Undo/redo ---
   undoManager.init(snapshot());
 
   function restoreFromSnapshot(state: UndoableState): void {
     // Capture selected event identity before replacing state
-    const selectedPath = selectedItem
-      ? eventToPath(selectedItem.event, events)
+    const selectedPath = sel.selectedItem
+      ? eventToPath(sel.selectedItem.event, events)
       : null;
 
     // Cancel in-progress animations
-    animFrom = null;
-    animTo = null;
-    scrollTo = null;
+    view.animFrom = null;
+    view.animTo = null;
+    view.scrollTo = null;
     layoutTransition = null;
     reorderState = null;
     reorderOriginalOrders = null;
@@ -1365,21 +1360,21 @@ async function main() {
       const event = pathToEvent(selectedPath, events);
       if (event) {
         const item = findLayoutItem(event, layout);
-        selectedItem = item;
+        sel.selectedItem = item;
         eventListPanel?.selectEvent(event);
         eventMenu.show(event);
       } else {
-        selectedItem = null;
+        sel.selectedItem = null;
         eventListPanel?.selectEvent(null);
         eventMenu.hide();
       }
     } else {
-      selectedItem = null;
+      sel.selectedItem = null;
       eventListPanel?.selectEvent(null);
       eventMenu.hide();
     }
 
-    hoveredItem = null;
+    sel.hoveredItem = null;
     inputHandlers.restoreSelectionOverrides(null, null);
 
     // Rebuild event list and redraw
@@ -1420,23 +1415,10 @@ async function main() {
     }
 
     // Delete/Backspace: delete selected event
-    if ((e.key === 'Delete' || e.key === 'Backspace') && selectedItem) {
+    if ((e.key === 'Delete' || e.key === 'Backspace') && sel.selectedItem) {
       e.preventDefault();
-      const event = selectedItem.event;
-      showConfirmDialog(`Delete "${event.name}"?`, () => {
-        removeEvent(events, event);
-        hiddenEvents.delete(event);
-        collapsedEvents.delete(event);
-        selectedItem = null;
-        eventMenu.hide();
-        eventListPanel?.selectEvent(null);
-        eventListPanel?.removeEvent(event);
-        relayout();
-        requestRedraw();
-        saveStoredEvents(events);
-        undoManager.push(snapshot());
-        infoLog.show(`Deleted "${event.name}"`);
-      });
+      const event = sel.selectedItem.event;
+      showConfirmDialog(`Delete "${event.name}"?`, () => deleteEvent(event));
       return;
     }
   });
@@ -1449,7 +1431,7 @@ async function main() {
   draw();
   window.addEventListener('resize', () => {
     const max = computeMaxScrollY();
-    if (scrollY > max) scrollY = max;
+    if (view.scrollY > max) view.scrollY = max;
     requestRedraw();
   });
 }
