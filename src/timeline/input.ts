@@ -412,6 +412,7 @@ export function setupInput(config: InputConfig): InputHandlers {
         startViewport: { ...viewport },
         didDrag: false,
       };
+      tooltip.hide();
       updateCursorLine(-1, LAYOUT.eventsStartY);
       canvas.style.cursor = 'ew-resize';
     } else {
