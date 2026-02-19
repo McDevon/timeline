@@ -19,6 +19,7 @@ Allow the user to zoom in and out on the timeline horizontally, anchored at the 
 |-------|--------|
 | Ctrl/Cmd + wheel | Zoom anchored at cursor |
 | Trackpad pinch | Zoom anchored at cursor (same mechanism) |
+| Ctrl/Cmd + drag (events area) | Zoom anchored at mousedown position |
 | Plain wheel | Pan horizontally (unchanged) |
 | Click + drag | Pan (unchanged) |
 
@@ -33,7 +34,18 @@ newStart = anchorYear - (anchorYear - viewport.start) * factor
 newEnd   = anchorYear + (viewport.end - anchorYear) * factor
 ```
 
+## Drag-to-Zoom
+
+Ctrl/Cmd + drag in the events area zooms horizontally:
+
+- The year under the cursor at mousedown is the **anchor** and stays at a fixed pixel position
+- Horizontal drag distance determines zoom level exponentially: `factor = 2^(-dx / 200)`
+- Drag right = zoom in, drag left = zoom out (~200px for a 2× change)
+- Escape cancels and restores the original viewport
+- If no drag occurs (click), falls through to normal click behavior (collapse toggle, selection)
+- Modifier state is locked at mousedown — releasing Ctrl mid-drag doesn't change mode
+
 ## Technical Approach
 
-1. `src/timeline/viewport.ts` — add `zoomViewport()`, `xToYear()`, and zoom span limits
-2. `src/timeline/input.ts` — branch `onWheel` on `ctrlKey || metaKey`
+1. `src/timeline/viewport.ts` — `zoomViewport()`, `xToYear()`, zoom span limits (`MIN_SPAN`, `MAX_SPAN`)
+2. `src/timeline/input.ts` — `onWheel` branches on `ctrlKey || metaKey`; `zooming` drag state handles Ctrl+drag

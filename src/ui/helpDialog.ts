@@ -5,6 +5,7 @@ const SHORTCUTS: [string, string][] = [
   ],
   ["Pan vertically", "Scroll wheel"],
   ["Zoom in / out", "Ctrl/\u2318 + scroll, or pinch on trackpad"],
+  ["Zoom by dragging", "Ctrl/\u2318 + drag horizontally"],
   ["Select a point in time", "Click on the time axis"],
   ["Select a time range", "Drag on the time axis"],
   [

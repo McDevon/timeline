@@ -1,4 +1,4 @@
-import { Viewport, panViewport, zoomViewport, xToYear, yearToX } from './viewport';
+import { Viewport, panViewport, zoomViewport, xToYear, yearToX, MIN_SPAN, MAX_SPAN } from './viewport';
 import { LayoutItem } from './layout';
 import { TimelineSelection } from '../types';
 import { hitTest } from './hitTest';
@@ -38,6 +38,7 @@ export interface InputConfig {
 }
 
 const CLICK_THRESHOLD = 3; // pixels — movement under this is a click, not a drag
+const ZOOM_DRAG_SENSITIVITY = 200; // pixels of horizontal drag for a 2× zoom
 
 /**
  * Attach input handlers to a canvas for panning, hover, and click.
@@ -312,7 +313,8 @@ export function setupInput(config: InputConfig): InputHandlers {
     | { mode: 'none' }
     | { mode: 'axis-selecting'; mouseDownX: number; mouseDownY: number; anchorYear: number; didDrag: boolean }
     | { mode: 'panning'; mouseDownX: number; mouseDownY: number; lastMouseX: number; didDrag: boolean; decided: boolean; startViewport: Viewport; reorderCandidate: LayoutItem | null }
-    | { mode: 'reordering'; item: LayoutItem; startViewport: Viewport };
+    | { mode: 'reordering'; item: LayoutItem; startViewport: Viewport }
+    | { mode: 'zooming'; mouseDownX: number; mouseDownY: number; anchorYear: number; startViewport: Viewport; didDrag: boolean };
 
   let drag: DragState = { mode: 'none' };
   const REORDER_DECISION_THRESHOLD = 8;
@@ -399,6 +401,19 @@ export function setupInput(config: InputConfig): InputHandlers {
       canvas.style.cursor = 'col-resize';
       selAnchorOverride = null;
       selExtendOverride = null;
+    } else if (modifierHeld) {
+      // Ctrl/Cmd + drag in events region — zoom drag
+      const viewport = getViewport();
+      drag = {
+        mode: 'zooming',
+        mouseDownX: e.clientX,
+        mouseDownY: e.clientY,
+        anchorYear: xToYear(x, viewport, canvas.clientWidth),
+        startViewport: { ...viewport },
+        didDrag: false,
+      };
+      updateCursorLine(-1, LAYOUT.eventsStartY);
+      canvas.style.cursor = 'ew-resize';
     } else {
       // Events region — start panning (may pivot to reorder)
       const hit = hitTest(x, y, getLayout(), getViewport(), canvas.clientWidth, getScrollY());
@@ -431,6 +446,25 @@ export function setupInput(config: InputConfig): InputHandlers {
           start: Math.min(drag.anchorYear, currentYear),
           end: Math.max(drag.anchorYear, currentYear),
           anchor: drag.anchorYear,
+        });
+        scheduleRedraw();
+      }
+      return;
+    }
+
+    if (drag.mode === 'zooming') {
+      const dist = Math.hypot(e.clientX - drag.mouseDownX, e.clientY - drag.mouseDownY);
+      if (dist >= CLICK_THRESHOLD) drag.didDrag = true;
+      if (drag.didDrag) {
+        const totalDx = e.clientX - drag.mouseDownX;
+        let zoomFactor = Math.pow(2, -totalDx / ZOOM_DRAG_SENSITIVITY);
+        const originalSpan = drag.startViewport.end - drag.startViewport.start;
+        let newSpan = originalSpan * zoomFactor;
+        newSpan = Math.max(MIN_SPAN, Math.min(MAX_SPAN, newSpan));
+        zoomFactor = newSpan / originalSpan;
+        setViewport({
+          start: drag.anchorYear - (drag.anchorYear - drag.startViewport.start) * zoomFactor,
+          end: drag.anchorYear + (drag.startViewport.end - drag.anchorYear) * zoomFactor,
         });
         scheduleRedraw();
       }
@@ -547,7 +581,7 @@ export function setupInput(config: InputConfig): InputHandlers {
       }
       // If didDrag, range was already committed during mousemove
       scheduleRedraw();
-    } else if (state.mode === 'panning' && !state.didDrag) {
+    } else if ((state.mode === 'panning' || state.mode === 'zooming') && !state.didDrag) {
       // Click in events area (not drag)
       const rect = canvas.getBoundingClientRect();
       const x = e.clientX - rect.left;
@@ -663,6 +697,12 @@ export function setupInput(config: InputConfig): InputHandlers {
       drag = { mode: 'none' };
       onReorderCancel();
       canvas.style.cursor = 'grab';
+      scheduleRedraw();
+    }
+    if (e.key === 'Escape' && drag.mode === 'zooming') {
+      setViewport(drag.startViewport);
+      drag = { mode: 'none' };
+      canvas.style.cursor = getHovered() ? 'pointer' : 'grab';
       scheduleRedraw();
     }
   }

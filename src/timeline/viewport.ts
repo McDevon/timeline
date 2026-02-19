@@ -6,8 +6,8 @@ export interface Viewport {
 /** Padding in pixels on left/right of the drawing area. Must match renderer LAYOUT.paddingX. */
 const PADDING_X = 0;
 
-const MIN_SPAN = 0.1;     // ~1 month visible
-const MAX_SPAN = 10_000;  // practical ceiling
+export const MIN_SPAN = 0.1;     // ~1 month visible
+export const MAX_SPAN = 10_000;  // practical ceiling
 
 /**
  * Shift the viewport by a pixel delta, converting to year delta
