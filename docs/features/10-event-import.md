@@ -8,7 +8,7 @@ Provide full event data management: importing new events, exporting, deleting, a
 
 ### IndexedDB as Primary Store
 
-Database `timeline-data` with two object stores:
+Database `timeline-data` (or `timeline-data-{slug}` for path-based timelines — see Feature 15) with two object stores:
 
 - **`events`** — all event data (both original and imported)
 - **`meta`** — initialization flag to distinguish "first load" from "user deleted everything"
@@ -33,6 +33,8 @@ A collapsible panel positioned bottom-left, to the right of the Events panel. St
 | Button | Style | Action |
 |--------|-------|--------|
 | Import events | Normal | Opens system file picker for `.json` files |
+| Import into new event | Normal | Opens file picker, prompts for container name, wraps imported events |
+| Load events from file | Normal | Confirmation dialog → replaces all events with file contents |
 | Export events | Normal | Downloads all events as `timeline-events.json` |
 | Delete all events | Destructive | Confirmation dialog → clears all data |
 | Reload default events | Destructive | Confirmation dialog → resets to static file |
@@ -113,10 +115,12 @@ A reusable modal dialog for destructive actions:
 ### `src/data/store.ts`
 
 IndexedDB wrapper with functions:
-- `isStoreInitialized()` / `setStoreInitialized()` — check/set the initialization flag
-- `loadStoredEvents()` / `saveStoredEvents(events)` — read/write all event data
-- `clearStoredEvents()` — removes events but keeps initialized flag (for Delete All)
-- `clearStore()` — removes everything including initialized flag (for Reload Defaults)
+- `isStoreInitialized(slug)` / `setStoreInitialized(slug)` — check/set the initialization flag
+- `loadStoredEvents(slug)` / `saveStoredEvents(slug, events)` — read/write all event data
+- `clearStoredEvents(slug)` — removes events but keeps initialized flag (for Delete All)
+- `clearStore(slug)` — removes everything including initialized flag (for Reload Defaults)
+
+All functions accept a `slug` parameter for per-timeline storage isolation (see Feature 15).
 
 ### `src/data/validate.ts`
 

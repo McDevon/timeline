@@ -43,8 +43,8 @@ The `version` field allows future schema evolution.
 
 - `eventToPath()` — walks the event tree to build a name path from root to target
 - `pathToEvent()` — resolves a name path back to an event reference
-- `saveState()` — serializes state to `localStorage` key `timeline-state`
-- `loadState()` — deserializes and resolves paths; returns null on missing/invalid data
+- `saveState(slug, ...)` — serializes state to `localStorage` key `timeline-state` (or `timeline-state-{slug}` for path-based timelines — see Feature 15)
+- `loadState(slug, ...)` — deserializes and resolves paths; returns null on missing/invalid data
 
 ### `src/main.ts` integration
 

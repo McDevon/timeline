@@ -18,7 +18,7 @@ Timeline is a single-page web application that renders an interactive horizontal
 ## Module Structure
 
 ### `src/data/`
-Responsible for loading and parsing event data. Currently fetches from a static JSON file in `public/`. Designed so the data source can later be swapped to a database API without changing consumers.
+Responsible for loading and parsing event data. Fetches from a static JSON file in `public/`, determined by the timeline config (see `src/timeline-config.ts`). IndexedDB serves as the primary store after first load — all functions accept a slug parameter for per-timeline isolation.
 
 ### `src/timeline/`
 The Canvas rendering engine. Handles drawing the timeline axis, events, nested groups, and all visual representation. This module should be self-contained and receive prepared data — it should not know where the data comes from.
@@ -28,6 +28,9 @@ HTML/CSS components for controls, information panels, and other non-Canvas UI. C
 
 ### `src/types.ts`
 Shared TypeScript type definitions used across all modules.
+
+### `src/timeline-config.ts`
+URL routing for multiple timelines. Reads `location.pathname`, looks up the slug in `public/timelines.json`, and returns a config with data URL, default theme, and storage slug. Each path gets isolated IndexedDB and localStorage.
 
 ### `src/main.ts`
 Application entry point. Wires together data loading, the timeline engine, and UI controls. Owns the viewport, layout, animation state, and event visibility. Layout is recomputed dynamically when events are toggled visible/hidden, with animated transitions (Y interpolation and alpha fading) handled in the rAF draw loop.
