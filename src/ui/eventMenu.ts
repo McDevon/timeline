@@ -12,6 +12,7 @@ export interface ParentCandidate {
 
 export interface EventMenuCallbacks {
   onRename: (event: TimelineEvent, name: string) => void;
+  onCommitRename: (event: TimelineEvent, currentName: string) => string | null;
   onEditInfo: (event: TimelineEvent, info: string) => void;
   onChangeStart: (event: TimelineEvent, start: string) => void;
   onChangeEnd: (event: TimelineEvent, end: string | undefined) => void;
@@ -109,6 +110,16 @@ export class EventMenu {
       if (val.length === 0) return;
       this.titleSpan.textContent = val;
       callbacks.onRename(this.currentEvent, val);
+    });
+    this.nameInput.addEventListener("blur", () => {
+      if (!this.currentEvent) return;
+      const val = this.nameInput.value.trim();
+      if (val.length === 0) return;
+      const corrected = callbacks.onCommitRename(this.currentEvent, val);
+      if (corrected !== null) {
+        this.nameInput.value = corrected;
+        this.titleSpan.textContent = corrected;
+      }
     });
     nameField.appendChild(nameLabel);
     nameField.appendChild(this.nameInput);

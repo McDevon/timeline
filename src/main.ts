@@ -25,7 +25,7 @@ import { isStoreInitialized, setStoreInitialized, loadStoredEvents, saveStoredEv
 import { validateEvents } from './data/validate';
 import { loadSavedTheme, applyTheme } from './themes';
 import { AnimationManager, easeInOut, LAYOUT_ANIM_MS } from './animation';
-import { toSnakeCase, countEvents, removeEvent, findParent, collectDescendants, isDescendantOf } from './eventActions';
+import { toSnakeCase, countEvents, removeEvent, findParent, collectDescendants, isDescendantOf, getSiblings, uniqueSiblingName, deduplicateSiblingNames } from './eventActions';
 import { findSiblingInfo, findSiblingLayoutItems, findParentLayoutItem, buildRefPositions, computeDropIndex } from './timeline/reorder';
 import { resolveTimeline } from './timeline-config';
 
@@ -708,6 +708,11 @@ async function main() {
         if (!newParent.nested) newParent.nested = [];
         newParent.nested.push(event);
       }
+      const destSiblings = newParent?.nested ?? events;
+      const unique = uniqueSiblingName(event.name, destSiblings, event);
+      if (unique !== event.name) {
+        event.name = unique;
+      }
       relayout();
       requestRedraw();
       eventListPanel?.rebuild(events, onToggleEvent, onHoverEvent, onSelectEvent, hiddenEvents, onContextMenu);
@@ -765,6 +770,21 @@ async function main() {
       requestRedraw();
       saveStoredEvents(slug, events);
       if (!skipCoalesce) undoManager.pushCoalesced(`rename:${getEventId(event)}`, snapshot());
+    },
+    onCommitRename: (event, name) => {
+      const siblings = getSiblings(event, events);
+      const unique = uniqueSiblingName(name, siblings, event);
+      if (unique !== name) {
+        event.name = unique;
+        eventListPanel?.updateEventName(event);
+        relayout();
+        requestRedraw();
+        saveStoredEvents(slug, events);
+        undoManager.push(snapshot());
+        infoLog.show(`Renamed to "${unique}" to avoid duplicate name`);
+        return unique;
+      }
+      return null;
     },
     onEditInfo: (event, info) => {
       event.info = info || undefined;
@@ -834,6 +854,13 @@ async function main() {
       } else {
         if (!newParent.nested) newParent.nested = [];
         newParent.nested.push(event);
+      }
+
+      // Ensure unique name at destination
+      const destSiblings = newParent?.nested ?? events;
+      const unique = uniqueSiblingName(event.name, destSiblings, event);
+      if (unique !== event.name) {
+        event.name = unique;
       }
 
       // Update UI
@@ -914,7 +941,8 @@ async function main() {
     }
 
     // 3. Create event
-    const newEvent: TimelineEvent = { name: 'New event', start };
+    const siblings = parent?.nested ?? events;
+    const newEvent: TimelineEvent = { name: uniqueSiblingName('New event', siblings), start };
     if (end !== undefined) newEvent.end = end;
 
     // 4. Add to data
@@ -966,19 +994,12 @@ async function main() {
         return;
       }
 
-      // Deduplicate against existing events
+      // Ensure unique sibling names within imported data and against existing events
+      deduplicateSiblingNames(result.events);
       const newEvents: TimelineEvent[] = [];
       for (const ie of result.events) {
-        if (events.some(e => e.name === ie.name)) {
-          infoLog.show(`Skipped duplicate event: ${ie.name}`);
-        } else {
-          newEvents.push(ie);
-        }
-      }
-
-      if (newEvents.length === 0) {
-        infoLog.show(`No new events to add from "${file.name}"`);
-        return;
+        ie.name = uniqueSiblingName(ie.name, events);
+        newEvents.push(ie);
       }
 
       // Add to main events array and persist
@@ -1036,6 +1057,7 @@ async function main() {
         return;
       }
 
+      deduplicateSiblingNames(result.events);
       const count = result.events.reduce((n, e) => n + countEvents(e), 0);
       showConfirmDialog(
         `Replace all current events with ${count} event${count !== 1 ? 's' : ''} from "${file.name}"? This cannot be undone.`,
@@ -1089,7 +1111,10 @@ async function main() {
         return;
       }
 
-      showPromptDialog('Name for the container event:', 'Event name', async (name) => {
+      deduplicateSiblingNames(result.events);
+
+      showPromptDialog('Name for the container event:', 'Event name', async (rawName) => {
+        const name = uniqueSiblingName(rawName, events);
         // Compute container bounds from imported events
         let earliestIso = '';
         let latestIso = '';

@@ -56,3 +56,33 @@ export function isDescendantOf(event: TimelineEvent, ancestor: TimelineEvent): b
   }
   return false;
 }
+
+/** Get the sibling array containing this event (the parent's nested array, or top-level). */
+export function getSiblings(event: TimelineEvent, allEvents: TimelineEvent[]): TimelineEvent[] {
+  const parent = findParent(allEvents, event);
+  return parent?.nested ?? allEvents;
+}
+
+/** Return baseName if unique among siblings, otherwise append " (2)", " (3)", etc.
+ *  `exclude` is the event being renamed (skip it in the uniqueness check). */
+export function uniqueSiblingName(baseName: string, siblings: TimelineEvent[], exclude?: TimelineEvent): string {
+  const siblingNames = new Set(
+    siblings.filter(e => e !== exclude).map(e => e.name),
+  );
+  if (!siblingNames.has(baseName)) return baseName;
+  let counter = 2;
+  while (siblingNames.has(`${baseName} (${counter})`)) counter++;
+  return `${baseName} (${counter})`;
+}
+
+/** Recursively ensure no two siblings share a name. Mutates in place. */
+export function deduplicateSiblingNames(list: TimelineEvent[]): void {
+  const seen = new Set<string>();
+  for (const e of list) {
+    if (seen.has(e.name)) {
+      e.name = uniqueSiblingName(e.name, list, e);
+    }
+    seen.add(e.name);
+    if (e.nested) deduplicateSiblingNames(e.nested);
+  }
+}

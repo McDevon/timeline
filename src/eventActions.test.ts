@@ -6,6 +6,9 @@ import {
   findParent,
   collectDescendants,
   isDescendantOf,
+  getSiblings,
+  uniqueSiblingName,
+  deduplicateSiblingNames,
 } from './eventActions';
 import { eventToPath, pathToEvent } from './state';
 import { TimelineEvent } from './types';
@@ -242,5 +245,127 @@ describe('eventToPath / pathToEvent', () => {
     const path = eventToPath(gc, events);
     expect(path).not.toBeNull();
     expect(pathToEvent(path!, events)).toBe(gc);
+  });
+});
+
+describe('getSiblings', () => {
+  it('returns top-level array for root event', () => {
+    const a = makeEvent('A', '2000');
+    const b = makeEvent('B', '2001');
+    const all = [a, b];
+    expect(getSiblings(a, all)).toBe(all);
+  });
+
+  it('returns parent nested array for nested event', () => {
+    const child = makeEvent('C', '2001');
+    const parent = makeEvent('P', '2000', '2010', [child]);
+    expect(getSiblings(child, [parent])).toBe(parent.nested);
+  });
+
+  it('returns nested array for deeply nested event', () => {
+    const gc = makeEvent('GC', '2002');
+    const child = makeEvent('C', '2001', '2005', [gc]);
+    const parent = makeEvent('P', '2000', '2010', [child]);
+    expect(getSiblings(gc, [parent])).toBe(child.nested);
+  });
+});
+
+describe('uniqueSiblingName', () => {
+  it('returns name unchanged when no collision', () => {
+    const siblings = [makeEvent('A', '2000'), makeEvent('B', '2001')];
+    expect(uniqueSiblingName('C', siblings)).toBe('C');
+  });
+
+  it('appends (2) on first collision', () => {
+    const siblings = [makeEvent('A', '2000'), makeEvent('B', '2001')];
+    expect(uniqueSiblingName('A', siblings)).toBe('A (2)');
+  });
+
+  it('increments counter when (2) is also taken', () => {
+    const siblings = [
+      makeEvent('A', '2000'),
+      makeEvent('A (2)', '2001'),
+    ];
+    expect(uniqueSiblingName('A', siblings)).toBe('A (3)');
+  });
+
+  it('skips gaps in counter', () => {
+    const siblings = [
+      makeEvent('A', '2000'),
+      makeEvent('A (2)', '2001'),
+      makeEvent('A (4)', '2002'),
+    ];
+    expect(uniqueSiblingName('A', siblings)).toBe('A (3)');
+  });
+
+  it('excludes a specific event from the check', () => {
+    const a = makeEvent('A', '2000');
+    const b = makeEvent('B', '2001');
+    const siblings = [a, b];
+    // Renaming 'a' to 'A' should be fine since we exclude 'a' itself
+    expect(uniqueSiblingName('A', siblings, a)).toBe('A');
+  });
+
+  it('excludes event but still detects other collisions', () => {
+    const a = makeEvent('A', '2000');
+    const b = makeEvent('B', '2001');
+    const siblings = [a, b];
+    // Renaming 'a' to 'B' collides with 'b'
+    expect(uniqueSiblingName('B', siblings, a)).toBe('B (2)');
+  });
+
+  it('handles empty siblings list', () => {
+    expect(uniqueSiblingName('A', [])).toBe('A');
+  });
+});
+
+describe('deduplicateSiblingNames', () => {
+  it('does nothing when no duplicates', () => {
+    const list = [makeEvent('A', '2000'), makeEvent('B', '2001')];
+    deduplicateSiblingNames(list);
+    expect(list.map(e => e.name)).toEqual(['A', 'B']);
+  });
+
+  it('suffixes duplicate sibling names', () => {
+    const list = [
+      makeEvent('A', '2000'),
+      makeEvent('A', '2001'),
+    ];
+    deduplicateSiblingNames(list);
+    expect(list[0].name).toBe('A');
+    expect(list[1].name).toBe('A (2)');
+  });
+
+  it('handles three-way duplicates', () => {
+    const list = [
+      makeEvent('A', '2000'),
+      makeEvent('A', '2001'),
+      makeEvent('A', '2002'),
+    ];
+    deduplicateSiblingNames(list);
+    expect(list.map(e => e.name)).toEqual(['A', 'A (2)', 'A (3)']);
+  });
+
+  it('fixes duplicates in nested events', () => {
+    const list = [
+      makeEvent('P', '2000', '2010', [
+        makeEvent('C', '2001'),
+        makeEvent('C', '2002'),
+      ]),
+    ];
+    deduplicateSiblingNames(list);
+    expect(list[0].nested![0].name).toBe('C');
+    expect(list[0].nested![1].name).toBe('C (2)');
+  });
+
+  it('allows same name in different parents', () => {
+    const list = [
+      makeEvent('P1', '2000', '2010', [makeEvent('Child', '2001')]),
+      makeEvent('P2', '2000', '2010', [makeEvent('Child', '2001')]),
+    ];
+    deduplicateSiblingNames(list);
+    // Same name under different parents is fine
+    expect(list[0].nested![0].name).toBe('Child');
+    expect(list[1].nested![0].name).toBe('Child');
   });
 });
