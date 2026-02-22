@@ -1,0 +1,12 @@
+{
+  "environmental-crises": {
+    "data": "/global_crises.json",
+    "theme": "fire-and-ash",
+    "title": "Global Crises"
+  },
+  "star-trek": {
+    "data": "/star_trek_events.json",
+    "theme": "midnight",
+    "title": "Star Trek Timeline"
+  }
+}

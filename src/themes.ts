@@ -376,22 +376,30 @@ const FIRE_AND_ASH: Theme = {
 
 export const themes: Theme[] = [MIDNIGHT, PARCHMENT, FIRE_AND_ASH, SLATE, FOREST, HIGH_CONTRAST];
 
-const STORAGE_KEY = 'timeline-theme';
+const STORAGE_BASE = 'timeline-theme';
 
-export function applyTheme(theme: Theme, redraw: () => void): void {
+function themeKey(slug: string): string {
+  return slug ? `${STORAGE_BASE}-${slug}` : STORAGE_BASE;
+}
+
+export function applyTheme(slug: string, theme: Theme, redraw: () => void): void {
   setCanvasColors(theme.canvas);
   const style = document.documentElement.style;
   for (const [prop, value] of Object.entries(theme.ui)) {
     style.setProperty(prop, value);
   }
-  localStorage.setItem(STORAGE_KEY, theme.id);
+  localStorage.setItem(themeKey(slug), theme.id);
   redraw();
 }
 
-export function loadSavedTheme(): Theme {
-  const id = localStorage.getItem(STORAGE_KEY);
+export function loadSavedTheme(slug: string, defaultThemeId?: string): Theme {
+  const id = localStorage.getItem(themeKey(slug));
   if (id) {
     const found = themes.find(t => t.id === id);
+    if (found) return found;
+  }
+  if (defaultThemeId) {
+    const found = themes.find(t => t.id === defaultThemeId);
     if (found) return found;
   }
   return MIDNIGHT;

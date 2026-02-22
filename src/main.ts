@@ -15,7 +15,7 @@ import { InfoLog } from './ui/infoLog';
 import { TimelineMenu } from './ui/timelineMenu';
 import { EventMenu } from './ui/eventMenu';
 import { ContextMenu } from './ui/contextMenu';
-import { showConfirmDialog } from './ui/confirmDialog';
+import { showAlertDialog, showConfirmDialog } from './ui/confirmDialog';
 import { showPromptDialog } from './ui/promptDialog';
 import { showHelpDialog } from './ui/helpDialog';
 import { saveState, loadState, eventToPath, pathToEvent } from './state';
@@ -27,6 +27,7 @@ import { loadSavedTheme, applyTheme } from './themes';
 import { AnimationManager, easeInOut, LAYOUT_ANIM_MS } from './animation';
 import { toSnakeCase, countEvents, removeEvent, findParent, collectDescendants, isDescendantOf } from './eventActions';
 import { findSiblingInfo, findSiblingLayoutItems, findParentLayoutItem, buildRefPositions, computeDropIndex } from './timeline/reorder';
+import { resolveTimeline } from './timeline-config';
 
 function setupCanvas(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
   const dpr = window.devicePixelRatio || 1;
@@ -46,16 +47,20 @@ async function main() {
     throw new Error('Canvas element not found');
   }
 
+  const config = await resolveTimeline();
+  const slug = config.slug;
+  if (config.title) document.title = config.title;
+
   // IndexedDB is the primary data store. On first load, seed from static JSON.
   let events: TimelineEvent[];
   try {
-    const initialized = await isStoreInitialized();
+    const initialized = await isStoreInitialized(slug);
     if (initialized) {
-      events = await loadStoredEvents();
+      events = await loadStoredEvents(slug);
     } else {
-      events = await loadEvents('/events.json', '/events.example.json');
-      await saveStoredEvents(events);
-      await setStoreInitialized();
+      events = await loadEvents(config.dataUrl, config.fallbackUrl);
+      await saveStoredEvents(slug, events);
+      await setStoreInitialized(slug);
     }
   } catch {
     events = [];
@@ -63,13 +68,17 @@ async function main() {
 
   const infoLog = new InfoLog();
 
+  if (config.unknownSlug) {
+    showAlertDialog(`Timeline "/${config.unknownSlug}" not found. Showing default timeline.`);
+  }
+
   // Visibility, collapse, and ordering state
   const hiddenEvents = new Set<TimelineEvent>();
   const collapsedEvents = new Set<TimelineEvent>();
   const eventOrders = new Map<string, string[]>();
 
   // Restore saved state
-  const saved = loadState(events);
+  const saved = loadState(slug, events);
   if (saved) {
     saved.hiddenEvents.forEach(e => hiddenEvents.add(e));
     saved.collapsedEvents.forEach(e => collapsedEvents.add(e));
@@ -171,7 +180,7 @@ async function main() {
   function scheduleSave() {
     clearTimeout(saveTimer);
     saveTimer = window.setTimeout(() => {
-      saveState(view.viewport, sel.selection, hiddenEvents, collapsedEvents, events, eventOrders, ui.showTodayLine);
+      saveState(slug, view.viewport, sel.selection, hiddenEvents, collapsedEvents, events, eventOrders, ui.showTodayLine);
     }, 500);
   }
 
@@ -702,7 +711,7 @@ async function main() {
       relayout();
       requestRedraw();
       eventListPanel?.rebuild(events, onToggleEvent, onHoverEvent, onSelectEvent, hiddenEvents, onContextMenu);
-      saveStoredEvents(events);
+      saveStoredEvents(slug, events);
       undoManager.push(snapshot());
       infoLog.show(`Moved "${event.name}" to ${newParent ? `"${newParent.name}"` : 'top level'}`);
     },
@@ -743,7 +752,7 @@ async function main() {
     eventListPanel?.removeEvent(event);
     relayout();
     requestRedraw();
-    saveStoredEvents(events);
+    saveStoredEvents(slug, events);
     undoManager.push(snapshot());
     infoLog.show(`Deleted "${event.name}"`);
   }
@@ -754,12 +763,12 @@ async function main() {
       eventListPanel?.updateEventName(event);
       relayout();
       requestRedraw();
-      saveStoredEvents(events);
+      saveStoredEvents(slug, events);
       if (!skipCoalesce) undoManager.pushCoalesced(`rename:${getEventId(event)}`, snapshot());
     },
     onEditInfo: (event, info) => {
       event.info = info || undefined;
-      saveStoredEvents(events);
+      saveStoredEvents(slug, events);
       if (!skipCoalesce) undoManager.pushCoalesced(`info:${getEventId(event)}`, snapshot());
     },
     onChangeStart: (event, start) => {
@@ -768,7 +777,7 @@ async function main() {
       relayout();
       reselectEvent(event, prevScroll);
       requestRedraw();
-      saveStoredEvents(events);
+      saveStoredEvents(slug, events);
       if (!skipCoalesce) undoManager.pushCoalesced(`start:${getEventId(event)}`, snapshot());
     },
     onChangeEnd: (event, end) => {
@@ -782,7 +791,7 @@ async function main() {
       relayout();
       reselectEvent(event, prevScroll);
       requestRedraw();
-      saveStoredEvents(events);
+      saveStoredEvents(slug, events);
       if (!skipCoalesce) undoManager.pushCoalesced(`end:${getEventId(event)}`, snapshot());
     },
     onChangeStartApprox: (event, approx) => {
@@ -792,7 +801,7 @@ async function main() {
       relayout();
       reselectEvent(event, prevScroll);
       requestRedraw();
-      saveStoredEvents(events);
+      saveStoredEvents(slug, events);
       if (!skipCoalesce) undoManager.pushCoalesced(`startApprox:${getEventId(event)}`, snapshot());
     },
     onChangeEndApprox: (event, approx) => {
@@ -802,7 +811,7 @@ async function main() {
       relayout();
       reselectEvent(event, prevScroll);
       requestRedraw();
-      saveStoredEvents(events);
+      saveStoredEvents(slug, events);
       if (!skipCoalesce) undoManager.pushCoalesced(`endApprox:${getEventId(event)}`, snapshot());
     },
     onTypeChange: () => {
@@ -831,7 +840,7 @@ async function main() {
       relayout();
       requestRedraw();
       eventListPanel?.rebuild(events, onToggleEvent, onHoverEvent, onSelectEvent, hiddenEvents, onContextMenu);
-      saveStoredEvents(events);
+      saveStoredEvents(slug, events);
       undoManager.push(snapshot());
       infoLog.show(`Moved "${event.name}" to ${newParent ? `"${newParent.name}"` : 'top level'}`);
     },
@@ -919,7 +928,7 @@ async function main() {
     // 5. Update
     relayout();
     requestRedraw();
-    saveStoredEvents(events);
+    saveStoredEvents(slug, events);
     eventListPanel?.rebuild(events, onToggleEvent, onHoverEvent, onSelectEvent, hiddenEvents, onContextMenu);
 
     // 6. Select, scroll into view, and edit
@@ -974,7 +983,7 @@ async function main() {
 
       // Add to main events array and persist
       events.push(...newEvents);
-      await saveStoredEvents(events);
+      await saveStoredEvents(slug, events);
 
       // Snapshot after import for undo
       undoManager.push(snapshot());
@@ -1036,7 +1045,7 @@ async function main() {
           hiddenEvents.clear();
           collapsedEvents.clear();
           eventOrders.clear();
-          await saveStoredEvents(events);
+          await saveStoredEvents(slug, events);
           sel.hoveredItem = null;
           sel.selectedItem = null;
           eventMenu.hide();
@@ -1123,7 +1132,7 @@ async function main() {
         if (latestApprox) container.endApprox = latestApprox;
 
         events.push(container);
-        await saveStoredEvents(events);
+        await saveStoredEvents(slug, events);
         undoManager.push(snapshot());
 
         relayout();
@@ -1244,7 +1253,7 @@ async function main() {
         hiddenEvents.clear();
         collapsedEvents.clear();
         eventOrders.clear();
-        await clearStoredEvents();
+        await clearStoredEvents(slug);
         eventListPanel?.clear();
         sel.hoveredItem = null;
         sel.selectedItem = null;
@@ -1259,8 +1268,9 @@ async function main() {
     },
     onReloadDefaults: () => {
       showConfirmDialog('Reload default events? All imported events and settings will be lost.', async () => {
-        await clearStore();
-        localStorage.removeItem('timeline-state');
+        await clearStore(slug);
+        localStorage.removeItem(slug ? `timeline-state-${slug}` : 'timeline-state');
+        localStorage.removeItem(slug ? `timeline-theme-${slug}` : 'timeline-theme');
         location.reload();
       });
     },
@@ -1269,7 +1279,7 @@ async function main() {
       requestRedraw();
     },
     onThemeChange: () => requestRedraw(),
-  }, ui.showTodayLine);
+  }, ui.showTodayLine, slug);
 
   // --- Undo/redo ---
   undoManager.init(snapshot());
@@ -1328,7 +1338,7 @@ async function main() {
 
     // Rebuild event list and redraw
     eventListPanel?.rebuild(events, onToggleEvent, onHoverEvent, onSelectEvent, hiddenEvents, onContextMenu);
-    saveStoredEvents(events);
+    saveStoredEvents(slug, events);
     requestRedraw();
   }
 
@@ -1373,8 +1383,8 @@ async function main() {
   });
 
   // Apply saved theme before first draw
-  const savedTheme = loadSavedTheme();
-  applyTheme(savedTheme, () => {});
+  const savedTheme = loadSavedTheme(slug, config.defaultTheme);
+  applyTheme(slug, savedTheme, () => {});
 
   // Initial draw and resize handler
   draw();

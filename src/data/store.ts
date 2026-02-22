@@ -1,15 +1,19 @@
 import { TimelineEvent } from '../types';
 
-const DB_NAME = 'timeline-data';
+const DB_BASE_NAME = 'timeline-data';
 const EVENTS_STORE = 'events';
 const META_STORE = 'meta';
 const EVENTS_KEY = 'all';
 const INITIALIZED_KEY = 'initialized';
 const DB_VERSION = 1;
 
-function openDB(): Promise<IDBDatabase> {
+function dbName(slug: string): string {
+  return slug ? `${DB_BASE_NAME}-${slug}` : DB_BASE_NAME;
+}
+
+function openDB(slug: string): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    const request = indexedDB.open(dbName(slug), DB_VERSION);
     request.onupgradeneeded = () => {
       const db = request.result;
       if (!db.objectStoreNames.contains(EVENTS_STORE)) {
@@ -24,9 +28,9 @@ function openDB(): Promise<IDBDatabase> {
   });
 }
 
-export async function isStoreInitialized(): Promise<boolean> {
+export async function isStoreInitialized(slug: string): Promise<boolean> {
   try {
-    const db = await openDB();
+    const db = await openDB(slug);
     return new Promise((resolve) => {
       const tx = db.transaction(META_STORE, 'readonly');
       const store = tx.objectStore(META_STORE);
@@ -40,9 +44,9 @@ export async function isStoreInitialized(): Promise<boolean> {
   }
 }
 
-export async function setStoreInitialized(): Promise<void> {
+export async function setStoreInitialized(slug: string): Promise<void> {
   try {
-    const db = await openDB();
+    const db = await openDB(slug);
     return new Promise((resolve) => {
       const tx = db.transaction(META_STORE, 'readwrite');
       const store = tx.objectStore(META_STORE);
@@ -55,9 +59,9 @@ export async function setStoreInitialized(): Promise<void> {
   }
 }
 
-export async function loadStoredEvents(): Promise<TimelineEvent[]> {
+export async function loadStoredEvents(slug: string): Promise<TimelineEvent[]> {
   try {
-    const db = await openDB();
+    const db = await openDB(slug);
     return new Promise((resolve) => {
       const tx = db.transaction(EVENTS_STORE, 'readonly');
       const store = tx.objectStore(EVENTS_STORE);
@@ -71,9 +75,9 @@ export async function loadStoredEvents(): Promise<TimelineEvent[]> {
   }
 }
 
-export async function saveStoredEvents(events: TimelineEvent[]): Promise<void> {
+export async function saveStoredEvents(slug: string, events: TimelineEvent[]): Promise<void> {
   try {
-    const db = await openDB();
+    const db = await openDB(slug);
     return new Promise((resolve) => {
       const tx = db.transaction(EVENTS_STORE, 'readwrite');
       const store = tx.objectStore(EVENTS_STORE);
@@ -87,9 +91,9 @@ export async function saveStoredEvents(events: TimelineEvent[]): Promise<void> {
 }
 
 /** Clear events but keep the initialized flag (for "Delete all events"). */
-export async function clearStoredEvents(): Promise<void> {
+export async function clearStoredEvents(slug: string): Promise<void> {
   try {
-    const db = await openDB();
+    const db = await openDB(slug);
     return new Promise((resolve) => {
       const tx = db.transaction(EVENTS_STORE, 'readwrite');
       const store = tx.objectStore(EVENTS_STORE);
@@ -103,9 +107,9 @@ export async function clearStoredEvents(): Promise<void> {
 }
 
 /** Clear everything — events and initialized flag (for "Reload defaults"). */
-export async function clearStore(): Promise<void> {
+export async function clearStore(slug: string): Promise<void> {
   try {
-    const db = await openDB();
+    const db = await openDB(slug);
     return new Promise((resolve) => {
       const tx = db.transaction([EVENTS_STORE, META_STORE], 'readwrite');
       tx.objectStore(EVENTS_STORE).clear();

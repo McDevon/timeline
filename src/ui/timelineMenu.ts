@@ -16,9 +16,11 @@ export class TimelineMenu {
   private flyout: HTMLDivElement | null = null;
   private hideTimer = 0;
   private currentThemeId: string;
+  private slug: string;
 
-  constructor(callbacks: TimelineMenuCallbacks, initialShowTodayLine: boolean) {
-    this.currentThemeId = loadSavedTheme().id;
+  constructor(callbacks: TimelineMenuCallbacks, initialShowTodayLine: boolean, slug = '') {
+    this.slug = slug;
+    this.currentThemeId = loadSavedTheme(slug).id;
 
     this.el = document.createElement('div');
     this.el.className = 'timeline-menu collapsed';
@@ -189,7 +191,7 @@ export class TimelineMenu {
       rows[idx].classList.add('active');
     }
 
-    applyTheme(theme, callbacks.onThemeChange);
+    applyTheme(this.slug, theme, callbacks.onThemeChange);
   }
 
   private scheduleHide() {

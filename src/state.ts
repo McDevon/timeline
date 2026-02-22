@@ -13,7 +13,11 @@ interface SerializedState {
   showTodayLine?: boolean;
 }
 
-const STORAGE_KEY = 'timeline-state';
+const STORAGE_BASE = 'timeline-state';
+
+function storageKey(slug: string): string {
+  return slug ? `${STORAGE_BASE}-${slug}` : STORAGE_BASE;
+}
 
 /** Walk the event tree to build a name path from root to target. */
 export function eventToPath(target: TimelineEvent, events: TimelineEvent[]): EventPath | null {
@@ -43,6 +47,7 @@ export function pathToEvent(path: EventPath, events: TimelineEvent[]): TimelineE
 }
 
 export function saveState(
+  slug: string,
   viewport: Viewport,
   selection: TimelineSelection | null,
   hiddenEvents: Set<TimelineEvent>,
@@ -79,13 +84,14 @@ export function saveState(
   };
 
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    localStorage.setItem(storageKey(slug), JSON.stringify(state));
   } catch {
     // localStorage full or unavailable — silently ignore
   }
 }
 
 export function loadState(
+  slug: string,
   allEvents: TimelineEvent[],
 ): {
   viewport: Viewport;
@@ -96,7 +102,7 @@ export function loadState(
   showTodayLine: boolean;
 } | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(storageKey(slug));
     if (!raw) return null;
 
     const state: SerializedState = JSON.parse(raw);
