@@ -6,7 +6,7 @@
   },
   "star-trek": {
     "data": "/star_trek_events.json",
-    "theme": "midnight",
+    "theme": "slate",
     "title": "Star Trek Timeline"
   }
 }
