@@ -94,6 +94,22 @@
   background: var(--tl-destructive-confirm-hover-bg);
   border-color: var(--tl-destructive-hover-border);
 }
+.confirm-dialog input[type="text"] {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  margin-bottom: 16px;
+  border: 1px solid var(--tl-border);
+  border-radius: 4px;
+  background: var(--tl-page-bg);
+  color: var(--tl-text);
+  font-size: 14px;
+  font-family: sans-serif;
+  outline: none;
+}
+.confirm-dialog input[type="text"]:focus {
+  border-color: var(--tl-border-accent);
+}
 
 /* Help dialog */
 .help-dialog {

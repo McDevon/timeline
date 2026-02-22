@@ -16,6 +16,7 @@ import { TimelineMenu } from './ui/timelineMenu';
 import { EventMenu } from './ui/eventMenu';
 import { ContextMenu } from './ui/contextMenu';
 import { showConfirmDialog } from './ui/confirmDialog';
+import { showPromptDialog } from './ui/promptDialog';
 import { showHelpDialog } from './ui/helpDialog';
 import { saveState, loadState, eventToPath, pathToEvent } from './state';
 import { UndoManager, UndoableState, captureSnapshot, resolvePathSet, getEventId } from './undo';
@@ -1057,6 +1058,99 @@ async function main() {
     reader.readAsText(file);
   }
 
+  function importIntoNewEvent(file: File) {
+    if (!file.name.endsWith('.json')) {
+      infoLog.show(`Cannot import "${file.name}": only .json files are supported`);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(reader.result as string);
+      } catch {
+        infoLog.show(`Invalid JSON in "${file.name}"`);
+        return;
+      }
+
+      const result = validateEvents(parsed);
+      if ('error' in result) {
+        infoLog.show(result.error);
+        return;
+      }
+
+      showPromptDialog('Name for the container event:', 'Event name', async (name) => {
+        // Compute container bounds from imported events
+        let earliestIso = '';
+        let latestIso = '';
+        let earliestYear = Infinity;
+        let latestYear = -Infinity;
+        let earliestApprox: [string, string] | undefined;
+        let latestApprox: [string, string] | undefined;
+
+        function walkBounds(list: TimelineEvent[]) {
+          for (const e of list) {
+            const startIso = e.startApprox ? e.startApprox[0] : e.start;
+            const startYear = dateToDecimalYear(startIso);
+            if (startYear < earliestYear) {
+              earliestYear = startYear;
+              earliestIso = e.start;
+              earliestApprox = e.startApprox;
+            }
+
+            const endIso = e.endApprox ? e.endApprox[1] : (e.end && e.end !== 'ongoing' ? e.end : e.start);
+            const endYear = dateToDecimalYear(endIso);
+            if (endYear > latestYear) {
+              latestYear = endYear;
+              latestIso = e.end && e.end !== 'ongoing' ? e.end : e.start;
+              latestApprox = e.endApprox;
+            }
+
+            if (e.nested) walkBounds(e.nested);
+          }
+        }
+
+        walkBounds(result.events);
+
+        const container: TimelineEvent = {
+          name,
+          start: earliestIso,
+          end: latestIso,
+          nested: result.events,
+        };
+        if (earliestApprox) container.startApprox = earliestApprox;
+        if (latestApprox) container.endApprox = latestApprox;
+
+        events.push(container);
+        await saveStoredEvents(events);
+        undoManager.push(snapshot());
+
+        relayout();
+        const fadingIn = new Set<TimelineEvent>();
+        fadingIn.add(container);
+        anim.layoutTransition = {
+          startTime: performance.now(),
+          fadingOut: [],
+          yOffsets: new Map(),
+          fadingIn,
+        };
+
+        eventListPanel?.addEvents([container], onToggleEvent, onHoverEvent, onSelectEvent);
+
+        const total = countEvents(container);
+        infoLog.show(`Created "${name}" with ${total - 1} event${total - 1 !== 1 ? 's' : ''}`);
+        requestRedraw();
+      });
+    };
+
+    reader.onerror = () => {
+      infoLog.show(`Failed to read "${file.name}"`);
+    };
+
+    reader.readAsText(file);
+  }
+
   // --- File drop handler ---
   let dropOverlay: HTMLDivElement | null = null;
   let dragCounter = 0;
@@ -1110,6 +1204,16 @@ async function main() {
       input.addEventListener('change', () => {
         const file = input.files?.[0];
         if (file) importEventsFromFile(file);
+      });
+      input.click();
+    },
+    onImportIntoEvent: () => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.json';
+      input.addEventListener('change', () => {
+        const file = input.files?.[0];
+        if (file) importIntoNewEvent(file);
       });
       input.click();
     },
