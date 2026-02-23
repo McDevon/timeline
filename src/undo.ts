@@ -50,7 +50,7 @@ export class UndoManager {
     this.pendingSnapshot = snapshot;
 
     clearTimeout(this.coalesceTimer);
-    this.coalesceTimer = window.setTimeout(() => {
+    this.coalesceTimer = setTimeout(() => {
       this.commitCoalesce();
     }, COALESCE_DELAY_MS);
   }
