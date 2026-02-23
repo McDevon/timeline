@@ -139,11 +139,11 @@
   background: var(--tl-list-highlight) !important;
 }
 .event-list-row.selected {
-  background: rgba(200, 154, 44, 0.15) !important;
+  background: var(--tl-selected-bg) !important;
 }
 .event-list-row.selected:hover,
 .event-list-row.selected.highlighted {
-  background: rgba(200, 154, 44, 0.25) !important;
+  background: var(--tl-selected-hover-bg) !important;
 }
 .event-list-row.hidden {
   opacity: 0.4;
@@ -520,5 +520,5 @@
   width: 14px;
   height: 14px;
   border-radius: 2px;
-  border: 1px solid rgba(128,128,128,0.3);
+  border: 1px solid var(--tl-border);
 }

@@ -22,6 +22,9 @@
   --tl-destructive-confirm-hover-bg: #4a1f1f;
   --tl-drop-overlay-bg: rgba(15,52,96,0.6);
   --tl-backdrop-bg: rgba(0,0,0,0.5);
+  --tl-selected-bg: rgba(200,154,44,0.15);
+  --tl-selected-hover-bg: rgba(200,154,44,0.25);
+  --tl-nested-indent-rgb: 255,255,255;
 }
 * {
   margin: 0;

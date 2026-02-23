@@ -26,37 +26,51 @@ export interface ReorderState {
   ghostY: number;
 }
 
-export type CanvasColors = typeof colors;
+export interface CanvasColors {
+  background: string;
+  axis: string;
+  axisText: string;
+  containerFill: string;
+  containerBorder: string;
+  containerText: string;
+  containerHoverFill: string;
+  containerHoverBorder: string;
+  containerSnapFill: string;
+  containerSnapBorder: string;
+  containerSelectedFill: string;
+  containerSelectedBorder: string;
+  barFill: string;
+  barBorder: string;
+  barText: string;
+  barHoverFill: string;
+  barHoverBorder: string;
+  barSnapFill: string;
+  barSnapBorder: string;
+  barSelectedFill: string;
+  barSelectedBorder: string;
+  todayLine: string;
+  todayText: string;
+  cursorLine: string;
+  cursorText: string;
+  selectionLine: string;
+  selectionText: string;
+  selectionFill: string;
+}
 
-let colors = {
-  background: "#1a1a2e",
-  axis: "#e0e0e0",
-  axisText: "#a0a0a0",
-  containerFill: "rgba(15, 52, 96, 0.25)",
-  containerBorder: "#0f3460",
-  containerText: "#e0e0e0",
-  containerHoverFill: "rgba(15, 52, 96, 0.4)",
-  containerHoverBorder: "#1a6ea0",
-  containerSnapFill: "rgba(15, 52, 96, 0.30)",
-  containerSnapBorder: "#124878",
-  containerSelectedFill: "rgba(80, 56, 12, 0.4)",
-  containerSelectedBorder: "#c89a2c",
-  barFill: "#0f3460",
-  barBorder: "#533483",
-  barText: "#e0e0e0",
-  barHoverFill: "#163d6e",
-  barHoverBorder: "#7b52ab",
-  barSnapFill: "#12395e",
-  barSnapBorder: "#634598",
-  barSelectedFill: "#4a3800",
-  barSelectedBorder: "#c89a2c",
-  todayLine: "rgba(255, 82, 82, 0.5)",
-  todayText: "rgba(255, 82, 82, 0.8)",
-  cursorLine: "rgba(255, 255, 255, 0.2)",
-  cursorText: "rgba(255, 255, 255, 0.6)",
-  selectionLine: "rgba(255, 255, 255, 0.5)",
-  selectionText: "rgba(255, 255, 255, 0.9)",
-  selectionFill: "rgba(255, 255, 255, 0.05)",
+// Placeholder defaults — overwritten by applyTheme() at startup
+let colors: CanvasColors = {
+  background: '', axis: '', axisText: '',
+  containerFill: '', containerBorder: '', containerText: '',
+  containerHoverFill: '', containerHoverBorder: '',
+  containerSnapFill: '', containerSnapBorder: '',
+  containerSelectedFill: '', containerSelectedBorder: '',
+  barFill: '', barBorder: '', barText: '',
+  barHoverFill: '', barHoverBorder: '',
+  barSnapFill: '', barSnapBorder: '',
+  barSelectedFill: '', barSelectedBorder: '',
+  todayLine: '', todayText: '',
+  cursorLine: '', cursorText: '',
+  selectionLine: '', selectionText: '', selectionFill: '',
 };
 
 export function setCanvasColors(newColors: CanvasColors) {

@@ -344,7 +344,8 @@ export class EventListPanel {
     const row = document.createElement('div');
     row.className = 'event-list-row';
     if (depth > 0) {
-      row.style.background = `rgba(255,255,255,${depth * 0.02})`;
+      const rgb = getComputedStyle(document.documentElement).getPropertyValue('--tl-nested-indent-rgb').trim();
+      row.style.background = `rgba(${rgb},${depth * 0.02})`;
     }
 
     const hasChildren = event.nested !== undefined && event.nested.length > 0;

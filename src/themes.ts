@@ -66,6 +66,9 @@ const MIDNIGHT: Theme = {
     '--tl-destructive-confirm-hover-bg': '#4a1f1f',
     '--tl-drop-overlay-bg': 'rgba(15,52,96,0.6)',
     '--tl-backdrop-bg': 'rgba(0,0,0,0.5)',
+    '--tl-selected-bg': 'rgba(200,154,44,0.15)',
+    '--tl-selected-hover-bg': 'rgba(200,154,44,0.25)',
+    '--tl-nested-indent-rgb': '255,255,255',
   },
 };
 
@@ -127,6 +130,9 @@ const PARCHMENT: Theme = {
     '--tl-destructive-confirm-hover-bg': '#e8c8c8',
     '--tl-drop-overlay-bg': 'rgba(139,105,20,0.3)',
     '--tl-backdrop-bg': 'rgba(0,0,0,0.3)',
+    '--tl-selected-bg': 'rgba(30,80,160,0.12)',
+    '--tl-selected-hover-bg': 'rgba(30,80,160,0.2)',
+    '--tl-nested-indent-rgb': '0,0,0',
   },
 };
 
@@ -188,6 +194,9 @@ const SLATE: Theme = {
     '--tl-destructive-confirm-hover-bg': '#4a2828',
     '--tl-drop-overlay-bg': 'rgba(91,155,213,0.3)',
     '--tl-backdrop-bg': 'rgba(0,0,0,0.5)',
+    '--tl-selected-bg': 'rgba(200,160,40,0.15)',
+    '--tl-selected-hover-bg': 'rgba(200,160,40,0.25)',
+    '--tl-nested-indent-rgb': '255,255,255',
   },
 };
 
@@ -249,6 +258,9 @@ const FOREST: Theme = {
     '--tl-destructive-confirm-hover-bg': '#4a2828',
     '--tl-drop-overlay-bg': 'rgba(74,122,58,0.4)',
     '--tl-backdrop-bg': 'rgba(0,0,0,0.5)',
+    '--tl-selected-bg': 'rgba(200,168,78,0.15)',
+    '--tl-selected-hover-bg': 'rgba(200,168,78,0.25)',
+    '--tl-nested-indent-rgb': '255,255,255',
   },
 };
 
@@ -310,6 +322,9 @@ const HIGH_CONTRAST: Theme = {
     '--tl-destructive-confirm-hover-bg': '#4d0000',
     '--tl-drop-overlay-bg': 'rgba(255,204,0,0.3)',
     '--tl-backdrop-bg': 'rgba(0,0,0,0.7)',
+    '--tl-selected-bg': 'rgba(0,160,255,0.2)',
+    '--tl-selected-hover-bg': 'rgba(0,160,255,0.3)',
+    '--tl-nested-indent-rgb': '255,255,255',
   },
 };
 
@@ -371,6 +386,9 @@ const FIRE_AND_ASH: Theme = {
     '--tl-destructive-confirm-hover-bg': '#e0c8c8',
     '--tl-drop-overlay-bg': 'rgba(140,32,32,0.25)',
     '--tl-backdrop-bg': 'rgba(0,0,0,0.35)',
+    '--tl-selected-bg': 'rgba(40,80,100,0.15)',
+    '--tl-selected-hover-bg': 'rgba(40,80,100,0.22)',
+    '--tl-nested-indent-rgb': '0,0,0',
   },
 };
 
