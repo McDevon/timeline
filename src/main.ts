@@ -28,6 +28,8 @@ import { AnimationManager, easeInOut, LAYOUT_ANIM_MS } from './animation';
 import { toSnakeCase, countEvents, removeEvent, findParent, collectDescendants, isDescendantOf, getSiblings, uniqueSiblingName, deduplicateSiblingNames } from './eventActions';
 import { findSiblingInfo, findSiblingLayoutItems, findParentLayoutItem, buildRefPositions, computeDropIndex } from './timeline/reorder';
 import { resolveTimeline } from './timeline-config';
+import { readJsonFile, exportToFile } from './fileOps';
+import { capturePositions, computeOffsets } from './layoutTransition';
 
 function setupCanvas(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
   const dpr = window.devicePixelRatio || 1;
@@ -256,36 +258,6 @@ async function main() {
       } else if (item.y < visibleTop) {
         if (prevScroll !== undefined) state.scrollY = prevScroll;
         animateScroll(Math.max(item.y - LAYOUT.eventsStartY - 10, 0));
-      }
-    }
-  }
-
-  // Position capture: record absolute Y for every item at all depths.
-  function capturePositions(items: LayoutItem[], map: Map<TimelineEvent, number>) {
-    for (const item of items) {
-      map.set(item.event, item.y);
-      if (item.children.length > 0) capturePositions(item.children, map);
-    }
-  }
-
-  // Compute offsets relative to the parent's offset. The renderer applies
-  // ctx.translate on each level, so children inherit their parent's offset.
-  // Storing only the relative delta avoids double-counting.
-  function computeOffsets(
-    items: LayoutItem[],
-    oldPositions: Map<TimelineEvent, number>,
-    yOffsets: Map<TimelineEvent, number>,
-    parentOffset = 0,
-  ) {
-    for (const item of items) {
-      const oldY = oldPositions.get(item.event);
-      const absoluteOffset = oldY !== undefined ? oldY - item.y : 0;
-      const relativeOffset = absoluteOffset - parentOffset;
-      if (relativeOffset !== 0) {
-        yOffsets.set(item.event, relativeOffset);
-      }
-      if (item.children.length > 0) {
-        computeOffsets(item.children, oldPositions, yOffsets, absoluteOffset);
       }
     }
   }
@@ -551,6 +523,19 @@ async function main() {
     state.lastMouseDownTime = now;
   });
 
+  function toggleZoom(event: TimelineEvent, item: LayoutItem) {
+    if (state.dblClickItem && event === state.dblClickItem.event && state.dblClickPrevViewport) {
+      animateZoom(state.dblClickPrevViewport);
+      state.dblClickPrevViewport = null;
+      state.dblClickItem = null;
+    } else {
+      state.dblClickPrevViewport = { ...(anim.animTo ?? state.viewport) };
+      state.dblClickItem = item;
+      const padding = (item.nominalEndYear - item.nominalStartYear) * 0.1;
+      animateZoom({ start: item.nominalStartYear - padding, end: item.nominalEndYear + padding });
+    }
+  }
+
   // Double-click to zoom into event (toggle back on second double-click)
   canvas.addEventListener('dblclick', (e) => {
     const rect = canvas.getBoundingClientRect();
@@ -567,19 +552,7 @@ async function main() {
     eventListPanel?.selectEvent(state.selectedItem?.event ?? null);
     if (state.selectedItem) eventMenu.show(state.selectedItem.event); else eventMenu.hide();
 
-    if (state.dblClickItem && hit.event === state.dblClickItem.event && state.dblClickPrevViewport) {
-      animateZoom(state.dblClickPrevViewport);
-      state.dblClickPrevViewport = null;
-      state.dblClickItem = null;
-    } else {
-      state.dblClickPrevViewport = { ...(anim.animTo ?? state.viewport) };
-      state.dblClickItem = hit;
-      const padding = (hit.nominalEndYear - hit.nominalStartYear) * 0.1;
-      animateZoom({
-        start: hit.nominalStartYear - padding,
-        end: hit.nominalEndYear + padding,
-      });
-    }
+    toggleZoom(hit.event, hit);
   });
 
   // Event list panel — visibility toggles
@@ -687,23 +660,9 @@ async function main() {
   }
 
   function onDblClickEvent(event: TimelineEvent) {
-    if (event.end === undefined) return; // point events have no range to zoom into
+    if (event.end === undefined) return;
     const item = findLayoutItem(event, state.layout);
-    if (!item) return;
-
-    if (state.dblClickItem && event === state.dblClickItem.event && state.dblClickPrevViewport) {
-      animateZoom(state.dblClickPrevViewport);
-      state.dblClickPrevViewport = null;
-      state.dblClickItem = null;
-    } else {
-      state.dblClickPrevViewport = { ...(anim.animTo ?? state.viewport) };
-      state.dblClickItem = item;
-      const padding = (item.nominalEndYear - item.nominalStartYear) * 0.1;
-      animateZoom({
-        start: item.nominalStartYear - padding,
-        end: item.nominalEndYear + padding,
-      });
-    }
+    if (item) toggleZoom(event, item);
   }
 
   function getParentCandidates(event: TimelineEvent) {
@@ -750,14 +709,7 @@ async function main() {
       onHoverEvent(event);
     },
     onExport: (event) => {
-      const json = JSON.stringify(event, null, 2);
-      const blob = new Blob([json], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = toSnakeCase(event.name) + '.json';
-      a.click();
-      URL.revokeObjectURL(url);
+      exportToFile(event, toSnakeCase(event.name) + '.json');
       const count = countEvents(event);
       infoLog.show(`Exported "${event.name}"${count > 1 ? ` with ${count - 1} sub-events` : ''}`);
     },
@@ -865,14 +817,7 @@ async function main() {
     },
     onDelete: deleteEvent,
     onExport: (event) => {
-      const json = JSON.stringify(event, null, 2);
-      const blob = new Blob([json], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = toSnakeCase(event.name) + '.json';
-      a.click();
-      URL.revokeObjectURL(url);
+      exportToFile(event, toSnakeCase(event.name) + '.json');
       const count = countEvents(event);
       infoLog.show(`Exported "${event.name}"${count > 1 ? ` with ${count - 1} sub-events` : ''}`);
     },
@@ -959,48 +904,128 @@ async function main() {
   });
 
   // --- Event import (shared by drop handler and menu) ---
-  function importEventsFromFile(file: File) {
-    if (!file.name.endsWith('.json')) {
-      infoLog.show(`Cannot import "${file.name}": only .json files are supported`);
-      return;
+  async function importEventsFromFile(file: File) {
+    const read = await readJsonFile(file);
+    if ('error' in read) { infoLog.show(read.error); return; }
+
+    const result = validateEvents(read.data);
+    if ('error' in result) { infoLog.show(result.error); return; }
+
+    deduplicateSiblingNames(result.events);
+    const newEvents: TimelineEvent[] = [];
+    for (const ie of result.events) {
+      ie.name = uniqueSiblingName(ie.name, state.events);
+      newEvents.push(ie);
     }
 
-    const reader = new FileReader();
-    reader.onload = async () => {
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(reader.result as string);
-      } catch {
-        infoLog.show(`Invalid JSON in "${file.name}"`);
-        return;
+    state.events.push(...newEvents);
+    await saveStoredEvents(slug, state.events);
+    undoManager.push(snapshot());
+    relayout();
+
+    anim.layoutTransition = {
+      startTime: performance.now(),
+      fadingOut: [],
+      yOffsets: new Map(),
+      fadingIn: new Set(newEvents),
+    };
+
+    eventListPanel?.addEvents(newEvents, onToggleEvent, onHoverEvent, onSelectEvent);
+    infoLog.show(`Added ${newEvents.length} event${newEvents.length !== 1 ? 's' : ''} from "${file.name}"`);
+    requestRedraw();
+  }
+
+  async function loadEventsFromFile(file: File) {
+    const read = await readJsonFile(file);
+    if ('error' in read) { infoLog.show(read.error); return; }
+
+    const result = validateEvents(read.data);
+    if ('error' in result) { infoLog.show(result.error); return; }
+
+    deduplicateSiblingNames(result.events);
+    const count = result.events.reduce((n, e) => n + countEvents(e), 0);
+    showConfirmDialog(
+      `Replace all current events with ${count} event${count !== 1 ? 's' : ''} from "${file.name}"? This cannot be undone.`,
+      async () => {
+        state.events.length = 0;
+        state.events.push(...result.events);
+        state.hiddenEvents.clear();
+        state.collapsedEvents.clear();
+        state.eventOrders.clear();
+        await saveStoredEvents(slug, state.events);
+        state.hoveredItem = null;
+        state.selectedItem = null;
+        eventMenu.hide();
+        state.dblClickPrevViewport = null;
+        state.dblClickItem = null;
+        relayout();
+        undoManager.init(snapshot());
+        eventListPanel?.rebuild(state.events, onToggleEvent, onHoverEvent, onSelectEvent, state.hiddenEvents, onContextMenu);
+        requestRedraw();
+        infoLog.show(`Loaded ${count} event${count !== 1 ? 's' : ''} from "${file.name}"`);
+      },
+    );
+  }
+
+  async function importIntoNewEvent(file: File) {
+    const read = await readJsonFile(file);
+    if ('error' in read) { infoLog.show(read.error); return; }
+
+    const result = validateEvents(read.data);
+    if ('error' in result) { infoLog.show(result.error); return; }
+
+    deduplicateSiblingNames(result.events);
+
+    showPromptDialog('Name for the container event:', 'Event name', async (rawName) => {
+      const name = uniqueSiblingName(rawName, state.events);
+      // Compute container bounds from imported events
+      let earliestIso = '';
+      let latestIso = '';
+      let earliestYear = Infinity;
+      let latestYear = -Infinity;
+      let earliestApprox: [string, string] | undefined;
+      let latestApprox: [string, string] | undefined;
+
+      function walkBounds(list: TimelineEvent[]) {
+        for (const e of list) {
+          const startIso = e.startApprox ? e.startApprox[0] : e.start;
+          const startYear = dateToDecimalYear(startIso);
+          if (startYear < earliestYear) {
+            earliestYear = startYear;
+            earliestIso = e.start;
+            earliestApprox = e.startApprox;
+          }
+
+          const endIso = e.endApprox ? e.endApprox[1] : (e.end && e.end !== 'ongoing' ? e.end : e.start);
+          const endYear = dateToDecimalYear(endIso);
+          if (endYear > latestYear) {
+            latestYear = endYear;
+            latestIso = e.end && e.end !== 'ongoing' ? e.end : e.start;
+            latestApprox = e.endApprox;
+          }
+
+          if (e.nested) walkBounds(e.nested);
+        }
       }
 
-      const result = validateEvents(parsed);
-      if ('error' in result) {
-        infoLog.show(result.error);
-        return;
-      }
+      walkBounds(result.events);
 
-      // Ensure unique sibling names within imported data and against existing events
-      deduplicateSiblingNames(result.events);
-      const newEvents: TimelineEvent[] = [];
-      for (const ie of result.events) {
-        ie.name = uniqueSiblingName(ie.name, state.events);
-        newEvents.push(ie);
-      }
+      const container: TimelineEvent = {
+        name,
+        start: earliestIso,
+        end: latestIso,
+        nested: result.events,
+      };
+      if (earliestApprox) container.startApprox = earliestApprox;
+      if (latestApprox) container.endApprox = latestApprox;
 
-      // Add to main events array and persist
-      state.events.push(...newEvents);
+      state.events.push(container);
       await saveStoredEvents(slug, state.events);
-
-      // Snapshot after import for undo
       undoManager.push(snapshot());
 
-      // Recompute layout with fade-in animation for new events
       relayout();
-
       const fadingIn = new Set<TimelineEvent>();
-      for (const ne of newEvents) fadingIn.add(ne);
+      fadingIn.add(container);
       anim.layoutTransition = {
         startTime: performance.now(),
         fadingOut: [],
@@ -1008,168 +1033,12 @@ async function main() {
         fadingIn,
       };
 
-      // Update event list panel
-      eventListPanel?.addEvents(newEvents, onToggleEvent, onHoverEvent, onSelectEvent);
+      eventListPanel?.addEvents([container], onToggleEvent, onHoverEvent, onSelectEvent);
 
-      infoLog.show(`Added ${newEvents.length} event${newEvents.length !== 1 ? 's' : ''} from "${file.name}"`);
+      const total = countEvents(container);
+      infoLog.show(`Created "${name}" with ${total - 1} event${total - 1 !== 1 ? 's' : ''}`);
       requestRedraw();
-    };
-
-    reader.onerror = () => {
-      infoLog.show(`Failed to read "${file.name}"`);
-    };
-
-    reader.readAsText(file);
-  }
-
-  function loadEventsFromFile(file: File) {
-    if (!file.name.endsWith('.json')) {
-      infoLog.show(`Cannot load "${file.name}": only .json files are supported`);
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = async () => {
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(reader.result as string);
-      } catch {
-        infoLog.show(`Invalid JSON in "${file.name}"`);
-        return;
-      }
-
-      const result = validateEvents(parsed);
-      if ('error' in result) {
-        infoLog.show(result.error);
-        return;
-      }
-
-      deduplicateSiblingNames(result.events);
-      const count = result.events.reduce((n, e) => n + countEvents(e), 0);
-      showConfirmDialog(
-        `Replace all current events with ${count} event${count !== 1 ? 's' : ''} from "${file.name}"? This cannot be undone.`,
-        async () => {
-          state.events.length = 0;
-          state.events.push(...result.events);
-          state.hiddenEvents.clear();
-          state.collapsedEvents.clear();
-          state.eventOrders.clear();
-          await saveStoredEvents(slug, state.events);
-          state.hoveredItem = null;
-          state.selectedItem = null;
-          eventMenu.hide();
-          state.dblClickPrevViewport = null;
-          state.dblClickItem = null;
-          relayout();
-          undoManager.init(snapshot());
-          eventListPanel?.rebuild(state.events, onToggleEvent, onHoverEvent, onSelectEvent, state.hiddenEvents, onContextMenu);
-          requestRedraw();
-          infoLog.show(`Loaded ${count} event${count !== 1 ? 's' : ''} from "${file.name}"`);
-        },
-      );
-    };
-
-    reader.onerror = () => {
-      infoLog.show(`Failed to read "${file.name}"`);
-    };
-
-    reader.readAsText(file);
-  }
-
-  function importIntoNewEvent(file: File) {
-    if (!file.name.endsWith('.json')) {
-      infoLog.show(`Cannot import "${file.name}": only .json files are supported`);
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = async () => {
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(reader.result as string);
-      } catch {
-        infoLog.show(`Invalid JSON in "${file.name}"`);
-        return;
-      }
-
-      const result = validateEvents(parsed);
-      if ('error' in result) {
-        infoLog.show(result.error);
-        return;
-      }
-
-      deduplicateSiblingNames(result.events);
-
-      showPromptDialog('Name for the container event:', 'Event name', async (rawName) => {
-        const name = uniqueSiblingName(rawName, state.events);
-        // Compute container bounds from imported events
-        let earliestIso = '';
-        let latestIso = '';
-        let earliestYear = Infinity;
-        let latestYear = -Infinity;
-        let earliestApprox: [string, string] | undefined;
-        let latestApprox: [string, string] | undefined;
-
-        function walkBounds(list: TimelineEvent[]) {
-          for (const e of list) {
-            const startIso = e.startApprox ? e.startApprox[0] : e.start;
-            const startYear = dateToDecimalYear(startIso);
-            if (startYear < earliestYear) {
-              earliestYear = startYear;
-              earliestIso = e.start;
-              earliestApprox = e.startApprox;
-            }
-
-            const endIso = e.endApprox ? e.endApprox[1] : (e.end && e.end !== 'ongoing' ? e.end : e.start);
-            const endYear = dateToDecimalYear(endIso);
-            if (endYear > latestYear) {
-              latestYear = endYear;
-              latestIso = e.end && e.end !== 'ongoing' ? e.end : e.start;
-              latestApprox = e.endApprox;
-            }
-
-            if (e.nested) walkBounds(e.nested);
-          }
-        }
-
-        walkBounds(result.events);
-
-        const container: TimelineEvent = {
-          name,
-          start: earliestIso,
-          end: latestIso,
-          nested: result.events,
-        };
-        if (earliestApprox) container.startApprox = earliestApprox;
-        if (latestApprox) container.endApprox = latestApprox;
-
-        state.events.push(container);
-        await saveStoredEvents(slug, state.events);
-        undoManager.push(snapshot());
-
-        relayout();
-        const fadingIn = new Set<TimelineEvent>();
-        fadingIn.add(container);
-        anim.layoutTransition = {
-          startTime: performance.now(),
-          fadingOut: [],
-          yOffsets: new Map(),
-          fadingIn,
-        };
-
-        eventListPanel?.addEvents([container], onToggleEvent, onHoverEvent, onSelectEvent);
-
-        const total = countEvents(container);
-        infoLog.show(`Created "${name}" with ${total - 1} event${total - 1 !== 1 ? 's' : ''}`);
-        requestRedraw();
-      });
-    };
-
-    reader.onerror = () => {
-      infoLog.show(`Failed to read "${file.name}"`);
-    };
-
-    reader.readAsText(file);
+    });
   }
 
   // --- File drop handler ---
@@ -1249,14 +1118,7 @@ async function main() {
       input.click();
     },
     onExport: () => {
-      const json = JSON.stringify(state.events, null, 2);
-      const blob = new Blob([json], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'timeline-events.json';
-      a.click();
-      URL.revokeObjectURL(url);
+      exportToFile(state.events, 'timeline-events.json');
       infoLog.show(`Exported ${state.events.length} events`);
     },
     onDeleteAll: () => {

@@ -15,6 +15,7 @@ These phases from the original plan are done and no longer tracked here:
 - **Enforce unique sibling event names** — `uniqueSiblingName`, `getSiblings`, `deduplicateSiblingNames` in eventActions.ts. Enforced at new event creation, import, import-into-event, load-from-file, move (2 places), rename (blur validation via `onCommitRename`). 15 new tests (171 total).
 - **Consolidate state into a single object** — All state in main.ts flattened into `const state = { ... }`. `PersistableState` interface in state.ts. `commit()` helper replaces repeated post-mutation ceremony (relayout/redraw/save/undo). `commitEdit()` for event property edits. ~15 mutation sites simplified.
 - **Move all colors into the theme system** — Added `--tl-selected-bg`, `--tl-selected-hover-bg`, `--tl-nested-indent-rgb` to all 6 themes. Replaced 3 hardcoded CSS colors in panels.css and 1 in eventList.ts. Replaced `CanvasColors` type alias with explicit interface and empty-string placeholder defaults in renderer.ts (overwritten by `applyTheme()` at startup).
+- **Extract remaining logic from main.ts** — New `fileOps.ts` (`readJsonFile`, `exportToFile`), new `layoutTransition.ts` (`capturePositions`, `computeOffsets`). 3 import functions converted to async/await. 3 export sites simplified. Double-click zoom deduplicated via `toggleZoom` helper. main.ts reduced by ~165 lines.
 
 ## Phase 1: Enforce unique sibling event names
 
