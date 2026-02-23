@@ -353,7 +353,7 @@ export class EventListPanel {
     // Arrow (left) — covers indentation area for a larger click target
     const arrow = document.createElement('div');
     arrow.className = 'event-list-arrow' + (hasChildren ? '' : ' placeholder');
-    arrow.style.paddingLeft = `${10 + depth * 16}px`;
+    arrow.style.paddingLeft = `${14 + depth * 16}px`;
     arrow.style.paddingRight = '4px';
     const arrowIcon = document.createElement('span');
     arrowIcon.className = 'event-list-arrow-icon';
@@ -372,10 +372,13 @@ export class EventListPanel {
     info.appendChild(name);
     info.appendChild(dates);
 
-    // Checkbox (right)
+    // Checkbox (right) — outer div is the tall click target, inner span is the visible box
     const check = document.createElement('div');
     check.className = 'event-list-check';
-    check.textContent = '\u2713';
+    const checkBox = document.createElement('span');
+    checkBox.className = 'event-list-check-box';
+    checkBox.textContent = '\u2713';
+    check.appendChild(checkBox);
 
     row.appendChild(arrow);
     row.appendChild(info);
@@ -398,7 +401,7 @@ export class EventListPanel {
     row.addEventListener('click', () => { onSelect(event); });
 
     // Double-click → zoom to event (but not when double-clicking the checkbox)
-    row.addEventListener('dblclick', (e) => { if (e.target !== check) this.onDblClick?.(event); });
+    row.addEventListener('dblclick', (e) => { if (!check.contains(e.target as Node)) this.onDblClick?.(event); });
 
     // Hover sync
     row.addEventListener('mouseenter', () => { onHover(event); });

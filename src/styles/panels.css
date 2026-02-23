@@ -107,7 +107,7 @@
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  padding: 6px 10px;
+  padding: 0 10px 0 0;
   cursor: pointer;
 }
 .event-list-arrow {
@@ -150,9 +150,15 @@
 }
 .event-list-check {
   flex-shrink: 0;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.event-list-check-box {
   width: 16px;
   height: 16px;
-  margin-top: 1px;
   border: 1px solid var(--tl-border);
   border-radius: 3px;
   background: transparent;
@@ -163,13 +169,14 @@
   line-height: 1;
   color: var(--tl-check-color);
 }
-.event-list-row.hidden .event-list-check {
+.event-list-row.hidden .event-list-check-box {
   border-color: var(--tl-check-hidden-border);
   color: transparent;
 }
 .event-list-info {
   flex: 1;
   min-width: 0;
+  padding: 6px 0;
 }
 .event-list-name {
   white-space: nowrap;
