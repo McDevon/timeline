@@ -311,8 +311,9 @@ export function setupInput(config: InputConfig): InputHandlers {
   // --- Mouse drag + click ---
   type DragState =
     | { mode: 'none' }
+    | { mode: 'undecided'; mouseDownX: number; mouseDownY: number; startViewport: Viewport; reorderCandidate: LayoutItem }
     | { mode: 'axis-selecting'; mouseDownX: number; mouseDownY: number; anchorYear: number; didDrag: boolean }
-    | { mode: 'panning'; mouseDownX: number; mouseDownY: number; lastMouseX: number; didDrag: boolean; decided: boolean; startViewport: Viewport; reorderCandidate: LayoutItem | null }
+    | { mode: 'panning'; mouseDownX: number; mouseDownY: number; lastMouseX: number; didDrag: boolean; startViewport: Viewport }
     | { mode: 'reordering'; item: LayoutItem; startViewport: Viewport }
     | { mode: 'zooming'; mouseDownX: number; mouseDownY: number; anchorYear: number; startViewport: Viewport; didDrag: boolean };
 
@@ -416,18 +417,26 @@ export function setupInput(config: InputConfig): InputHandlers {
       updateCursorLine(-1, LAYOUT.eventsStartY);
       canvas.style.cursor = 'ew-resize';
     } else {
-      // Events region — start panning (may pivot to reorder)
+      // Events region — undecided if item under cursor, else straight to panning
       const hit = hitTest(x, y, getLayout(), getViewport(), canvas.clientWidth, getScrollY());
-      drag = {
-        mode: 'panning',
-        mouseDownX: e.clientX,
-        mouseDownY: e.clientY,
-        lastMouseX: e.clientX,
-        didDrag: false,
-        decided: false,
-        startViewport: { ...getViewport() },
-        reorderCandidate: hit,
-      };
+      if (hit) {
+        drag = {
+          mode: 'undecided',
+          mouseDownX: e.clientX,
+          mouseDownY: e.clientY,
+          startViewport: { ...getViewport() },
+          reorderCandidate: hit,
+        };
+      } else {
+        drag = {
+          mode: 'panning',
+          mouseDownX: e.clientX,
+          mouseDownY: e.clientY,
+          lastMouseX: e.clientX,
+          didDrag: false,
+          startViewport: { ...getViewport() },
+        };
+      }
       updateCursorLine(-1, LAYOUT.eventsStartY);
       canvas.style.cursor = 'grabbing';
     }
@@ -472,6 +481,41 @@ export function setupInput(config: InputConfig): InputHandlers {
       return;
     }
 
+    if (drag.mode === 'undecided') {
+      const dist = Math.hypot(e.clientX - drag.mouseDownX, e.clientY - drag.mouseDownY);
+      if (dist >= REORDER_DECISION_THRESHOLD) {
+        const absDx = Math.abs(e.clientX - drag.mouseDownX);
+        const absDy = Math.abs(e.clientY - drag.mouseDownY);
+        if (absDy > absDx) {
+          // Vertical — pivot to reorder
+          const item = drag.reorderCandidate;
+          drag = { mode: 'reordering', item, startViewport: drag.startViewport };
+          tooltip.hide();
+          canvas.style.cursor = 'ns-resize';
+          lastClientY = e.clientY;
+          const rect = canvas.getBoundingClientRect();
+          onReorderMove(item, e.clientY - rect.top + getScrollY());
+          startAutoScroll();
+          scheduleRedraw();
+        } else {
+          // Horizontal — transition to panning
+          const sv = drag.startViewport;
+          drag = {
+            mode: 'panning',
+            mouseDownX: drag.mouseDownX,
+            mouseDownY: drag.mouseDownY,
+            lastMouseX: e.clientX,
+            didDrag: true,
+            startViewport: sv,
+          };
+          const dx = drag.mouseDownX - e.clientX;
+          setViewport(panViewport(sv, dx, canvas.clientWidth));
+          scheduleRedraw();
+        }
+      }
+      return;
+    }
+
     if (drag.mode === 'reordering') {
       lastClientY = e.clientY;
       const rect = canvas.getBoundingClientRect();
@@ -486,34 +530,9 @@ export function setupInput(config: InputConfig): InputHandlers {
       drag.lastMouseX = e.clientX;
 
       const dist = Math.hypot(e.clientX - drag.mouseDownX, e.clientY - drag.mouseDownY);
-
-      // Direction decision: after threshold, check if vertical drag on an event
-      if (!drag.decided && dist >= REORDER_DECISION_THRESHOLD && drag.reorderCandidate !== null) {
-        const absDx = Math.abs(e.clientX - drag.mouseDownX);
-        const absDy = Math.abs(e.clientY - drag.mouseDownY);
-        if (absDy > absDx) {
-          // Pivot to reorder mode
-          const item = drag.reorderCandidate;
-          setViewport(drag.startViewport);
-          drag = { mode: 'reordering', item, startViewport: drag.startViewport };
-          tooltip.hide();
-          canvas.style.cursor = 'ns-resize';
-          lastClientY = e.clientY;
-          const rect = canvas.getBoundingClientRect();
-          onReorderMove(item, e.clientY - rect.top + getScrollY());
-          startAutoScroll();
-          scheduleRedraw();
-          return;
-        }
-        // Horizontal — confirm pan
-        drag.decided = true;
-        drag.reorderCandidate = null;
-      }
-
       if (dist >= CLICK_THRESHOLD) drag.didDrag = true;
 
-      const viewport = getViewport();
-      setViewport(panViewport(viewport, dx, canvas.clientWidth));
+      setViewport(panViewport(getViewport(), dx, canvas.clientWidth));
       scheduleRedraw();
       return;
     }
@@ -582,7 +601,7 @@ export function setupInput(config: InputConfig): InputHandlers {
       }
       // If didDrag, range was already committed during mousemove
       scheduleRedraw();
-    } else if ((state.mode === 'panning' || state.mode === 'zooming') && !state.didDrag) {
+    } else if (state.mode === 'undecided' || ((state.mode === 'panning' || state.mode === 'zooming') && !state.didDrag)) {
       // Click in events area (not drag)
       const rect = canvas.getBoundingClientRect();
       const x = e.clientX - rect.left;
@@ -702,6 +721,11 @@ export function setupInput(config: InputConfig): InputHandlers {
     }
     if (e.key === 'Escape' && drag.mode === 'zooming') {
       setViewport(drag.startViewport);
+      drag = { mode: 'none' };
+      canvas.style.cursor = getHovered() ? 'pointer' : 'grab';
+      scheduleRedraw();
+    }
+    if (e.key === 'Escape' && drag.mode === 'undecided') {
       drag = { mode: 'none' };
       canvas.style.cursor = getHovered() ? 'pointer' : 'grab';
       scheduleRedraw();
