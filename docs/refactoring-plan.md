@@ -13,6 +13,7 @@ These phases from the original plan are done and no longer tracked here:
 - **Move CSS out of index.html** — Split into `styles/base.css`, `panels.css`, `dialogs.css`, `controls.css`
 - **Add tests for pure functions** — 156 tests across 6 test files (time, validate, layout, viewport, snap, eventActions)
 - **Enforce unique sibling event names** — `uniqueSiblingName`, `getSiblings`, `deduplicateSiblingNames` in eventActions.ts. Enforced at new event creation, import, import-into-event, load-from-file, move (2 places), rename (blur validation via `onCommitRename`). 15 new tests (171 total).
+- **Consolidate state into a single object** — All state in main.ts flattened into `const state = { ... }`. `PersistableState` interface in state.ts. `commit()` helper replaces repeated post-mutation ceremony (relayout/redraw/save/undo). `commitEdit()` for event property edits. ~15 mutation sites simplified.
 
 ## Phase 1: Enforce unique sibling event names
 

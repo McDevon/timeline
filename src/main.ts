@@ -72,32 +72,66 @@ async function main() {
     showAlertDialog(`Timeline "/${config.unknownSlug}" not found. Showing default timeline.`);
   }
 
-  // Visibility, collapse, and ordering state
-  const hiddenEvents = new Set<TimelineEvent>();
-  const collapsedEvents = new Set<TimelineEvent>();
-  const eventOrders = new Map<string, string[]>();
-
   // Restore saved state
   const saved = loadState(slug, events);
+
+  const state = {
+    // Data (persisted to IndexedDB)
+    events,
+    hiddenEvents: new Set<TimelineEvent>(),
+    collapsedEvents: new Set<TimelineEvent>(),
+    eventOrders: new Map<string, string[]>(),
+
+    // View (persisted to localStorage)
+    viewport: (saved?.viewport ?? computeFullRange(events)) as Viewport,
+    scrollY: 0,
+    selection: (saved?.selection ?? null) as TimelineSelection | null,
+    showTodayLine: saved?.showTodayLine ?? true,
+
+    // Transient interaction
+    selectedItem: null as LayoutItem | null,
+    hoveredItem: null as LayoutItem | null,
+    snapState: { highlightYears: new Set<number>(), cursorDetail: null, selStartDetail: null, selEndDetail: null } as SnapState,
+    cursorX: -1,
+
+    // Reorder
+    reorderState: null as ReorderState | null,
+    reorderOriginalOrders: null as Map<string, string[]> | null,
+    reorderRefPositions: null as { center: number; bottom: number }[] | null,
+    reorderLastIndex: -1,
+
+    // Double-click zoom toggle
+    dblClickPrevViewport: null as Viewport | null,
+    dblClickItem: null as LayoutItem | null,
+
+    // Pre-click snapshot
+    preClickSelection: null as TimelineSelection | null,
+    preClickSelectedItem: null as LayoutItem | null,
+    preClickSnapOverrides: { anchor: null, extend: null } as { anchor: SnapDetail | null; extend: SnapDetail | null },
+    lastMouseDownTime: 0,
+
+    // Derived
+    layout: [] as LayoutItem[],
+  };
+
   if (saved) {
-    saved.hiddenEvents.forEach(e => hiddenEvents.add(e));
-    saved.collapsedEvents.forEach(e => collapsedEvents.add(e));
-    for (const [k, v] of saved.eventOrders) eventOrders.set(k, v);
+    saved.hiddenEvents.forEach(e => state.hiddenEvents.add(e));
+    saved.collapsedEvents.forEach(e => state.collapsedEvents.add(e));
+    for (const [k, v] of saved.eventOrders) state.eventOrders.set(k, v);
   }
 
-  let layout: LayoutItem[] = computeLayout(
-    events,
+  state.layout = computeLayout(
+    state.events,
     LAYOUT.eventsStartY,
-    collapsedEvents,
-    eventOrders,
-    hiddenEvents,
+    state.collapsedEvents,
+    state.eventOrders,
+    state.hiddenEvents,
   );
 
   function relayout() {
-    layout = computeLayout(events, LAYOUT.eventsStartY, collapsedEvents, eventOrders, hiddenEvents);
-    // Clamp scroll if layout shrank
+    state.layout = computeLayout(state.events, LAYOUT.eventsStartY, state.collapsedEvents, state.eventOrders, state.hiddenEvents);
     const max = computeMaxScrollY();
-    if (view.scrollY > max) view.scrollY = max;
+    if (state.scrollY > max) state.scrollY = max;
   }
 
   // Undo/redo
@@ -105,41 +139,45 @@ async function main() {
   let skipCoalesce = false;
 
   function snapshot() {
-    return captureSnapshot(events, hiddenEvents, collapsedEvents, eventOrders);
+    return captureSnapshot(state.events, state.hiddenEvents, state.collapsedEvents, state.eventOrders);
   }
 
-  // --- View state ---
-  const view = {
-    viewport: (saved?.viewport ?? computeFullRange(events)) as Viewport,
-    scrollY: 0,
-  };
-
   const anim = new AnimationManager();
-
-  // --- Selection state ---
-  const sel = {
-    selection: (saved?.selection ?? null) as TimelineSelection | null,
-    selectedItem: null as LayoutItem | null,
-    hoveredItem: null as LayoutItem | null,
-    snapState: { highlightYears: new Set<number>(), cursorDetail: null, selStartDetail: null, selEndDetail: null } as SnapState,
-  };
-
-  // --- UI state ---
-  const ui = {
-    cursorX: -1,
-    showTodayLine: saved?.showTodayLine ?? true,
-  };
-
-  let dblClickPrevViewport: Viewport | null = null;
-  let dblClickItem: LayoutItem | null = null;
-  let preClickSelection: TimelineSelection | null = null;
-  let preClickSelectedItem: LayoutItem | null = null;
-  let preClickSnapOverrides: { anchor: SnapDetail | null; extend: SnapDetail | null } = { anchor: null, extend: null };
-  let lastMouseDownTime = 0;
   let eventListPanel: EventListPanel | null = null;
 
+  interface CommitOptions {
+    relayout?: boolean;
+    saveEvents?: boolean;
+    undo?: boolean;
+    undoCoalesce?: string;
+    rebuildList?: boolean;
+  }
+
+  function commit(opts: CommitOptions = {}) {
+    if (opts.relayout) relayout();
+    if (opts.rebuildList) {
+      eventListPanel?.rebuild(state.events, onToggleEvent, onHoverEvent, onSelectEvent, state.hiddenEvents, onContextMenu);
+    }
+    if (opts.saveEvents) saveStoredEvents(slug, state.events);
+    if (opts.undo) undoManager.push(snapshot());
+    else if (opts.undoCoalesce) {
+      if (!skipCoalesce) undoManager.pushCoalesced(opts.undoCoalesce, snapshot());
+    }
+    requestRedraw();
+  }
+
+  /** Shared pattern for event property edits (start, end, approx). */
+  function commitEdit(event: TimelineEvent, tag: string) {
+    const prevScroll = state.scrollY;
+    relayout();
+    reselectEvent(event, prevScroll);
+    requestRedraw();
+    saveStoredEvents(slug, state.events);
+    if (!skipCoalesce) undoManager.pushCoalesced(tag, snapshot());
+  }
+
   function computeMaxScrollY(): number {
-    const maxY = computeMaxLayoutY(layout);
+    const maxY = computeMaxLayoutY(state.layout);
     const canvasHeight = canvas.getBoundingClientRect().height;
     return Math.max(0, maxY - canvasHeight + 100);
   }
@@ -156,7 +194,7 @@ async function main() {
   }
 
   function setHoveredItem(item: LayoutItem | null) {
-    sel.hoveredItem = item;
+    state.hoveredItem = item;
     eventListPanel?.highlightEvent(item?.event ?? null);
   }
 
@@ -166,21 +204,21 @@ async function main() {
   function draw() {
     rafId = 0;
 
-    const { viewport, scrollY, transition, needsFrame } = anim.tick(view.viewport, view.scrollY);
-    view.viewport = viewport;
-    view.scrollY = scrollY;
+    const { viewport, scrollY, transition, needsFrame } = anim.tick(state.viewport, state.scrollY);
+    state.viewport = viewport;
+    state.scrollY = scrollY;
     if (needsFrame) rafId = requestAnimationFrame(draw);
 
     const ctx = setupCanvas(canvas);
     const rect = canvas.getBoundingClientRect();
-    render(ctx, rect.width, rect.height, layout, view.viewport, sel.hoveredItem, sel.selectedItem, ui.cursorX, sel.selection, sel.snapState, view.scrollY, ui.showTodayLine, transition, reorderState ?? undefined);
+    render(ctx, rect.width, rect.height, state.layout, state.viewport, state.hoveredItem, state.selectedItem, state.cursorX, state.selection, state.snapState, state.scrollY, state.showTodayLine, transition, state.reorderState ?? undefined);
   }
 
   let saveTimer = 0;
   function scheduleSave() {
     clearTimeout(saveTimer);
     saveTimer = window.setTimeout(() => {
-      saveState(slug, view.viewport, sel.selection, hiddenEvents, collapsedEvents, events, eventOrders, ui.showTodayLine);
+      saveState(slug, state);
     }, 500);
   }
 
@@ -192,31 +230,31 @@ async function main() {
   }
 
   function animateZoom(target: Viewport) {
-    anim.animateZoom(view.viewport, target);
+    anim.animateZoom(state.viewport, target);
     requestRedraw();
   }
 
   function animateScroll(target: number) {
-    anim.animateScroll(view.scrollY, target, computeMaxScrollY());
+    anim.animateScroll(state.scrollY, target, computeMaxScrollY());
     requestRedraw();
   }
 
   /** After relayout, re-find and re-select the event, scrolling into view if needed. */
   function reselectEvent(event: TimelineEvent, prevScroll?: number) {
-    const item = findLayoutItem(event, layout);
-    sel.selectedItem = item;
+    const item = findLayoutItem(event, state.layout);
+    state.selectedItem = item;
     if (item) {
       const rect = canvas.getBoundingClientRect();
       // Use pre-relayout scroll to detect if the event moved out of the old view
-      const checkScroll = prevScroll ?? view.scrollY;
+      const checkScroll = prevScroll ?? state.scrollY;
       const visibleTop = checkScroll + LAYOUT.eventsStartY;
       const visibleBottom = checkScroll + rect.height;
       if (item.y + item.height > visibleBottom) {
         // Restore pre-clamp scroll so animation starts from the right place
-        if (prevScroll !== undefined) view.scrollY = prevScroll;
+        if (prevScroll !== undefined) state.scrollY = prevScroll;
         animateScroll(item.y + item.height - rect.height + 20);
       } else if (item.y < visibleTop) {
-        if (prevScroll !== undefined) view.scrollY = prevScroll;
+        if (prevScroll !== undefined) state.scrollY = prevScroll;
         animateScroll(Math.max(item.y - LAYOUT.eventsStartY - 10, 0));
       }
     }
@@ -255,32 +293,32 @@ async function main() {
   // Collapse toggle handler
   function onCollapseToggle(event: TimelineEvent) {
     const oldPositions = new Map<TimelineEvent, number>();
-    capturePositions(layout, oldPositions);
+    capturePositions(state.layout, oldPositions);
 
     const fadingOut: LayoutItem[] = [];
     const fadingIn = new Set<TimelineEvent>();
-    const wasCollapsed = collapsedEvents.has(event);
+    const wasCollapsed = state.collapsedEvents.has(event);
 
     if (!wasCollapsed) {
       // Collapsing — capture children for fade-out
-      const container = findLayoutItem(event, layout);
+      const container = findLayoutItem(event, state.layout);
       if (container) {
         for (const child of container.children) fadingOut.push(child);
       }
-      collapsedEvents.add(event);
+      state.collapsedEvents.add(event);
     } else {
-      collapsedEvents.delete(event);
+      state.collapsedEvents.delete(event);
     }
 
     relayout();
 
     // Compute Y offsets for animated items
     const yOffsets = new Map<TimelineEvent, number>();
-    computeOffsets(layout, oldPositions, yOffsets);
+    computeOffsets(state.layout, oldPositions, yOffsets);
 
     // Mark newly visible children as fading in
     if (wasCollapsed) {
-      const container = findLayoutItem(event, layout);
+      const container = findLayoutItem(event, state.layout);
       if (container) {
         for (const child of container.children) fadingIn.add(child.event);
       }
@@ -290,11 +328,11 @@ async function main() {
 
     // Clear state referencing now-hidden children
     if (!wasCollapsed) {
-      if (sel.hoveredItem && sel.hoveredItem.event !== event && isDescendantOf(sel.hoveredItem.event, event)) {
+      if (state.hoveredItem && state.hoveredItem.event !== event && isDescendantOf(state.hoveredItem.event, event)) {
         setHoveredItem(null);
       }
-      if (sel.selectedItem && sel.selectedItem.event !== event && isDescendantOf(sel.selectedItem.event, event)) {
-        sel.selectedItem = null;
+      if (state.selectedItem && state.selectedItem.event !== event && isDescendantOf(state.selectedItem.event, event)) {
+        state.selectedItem = null;
         eventListPanel?.selectEvent(null);
         eventMenu.hide();
       }
@@ -304,25 +342,18 @@ async function main() {
     requestRedraw();
   }
 
-  // --- Reorder drag ---
-  let reorderState: ReorderState | null = null;
-  let reorderOriginalOrders: Map<string, string[]> | null = null;
-  let reorderLastIndex = -1;
-  /** Stable reference positions for drop index computation (dragged item removed from flow). */
-  let reorderRefPositions: { center: number; bottom: number }[] | null = null;
-
   function onReorderMove(item: LayoutItem, cursorY: number) {
     // Save original orders for cancel on first move
-    if (!reorderOriginalOrders) {
-      reorderOriginalOrders = new Map(eventOrders);
+    if (!state.reorderOriginalOrders) {
+      state.reorderOriginalOrders = new Map(state.eventOrders);
     }
 
-    const { siblings, parentPath } = findSiblingInfo(item.event, events, hiddenEvents);
+    const { siblings, parentPath } = findSiblingInfo(item.event, state.events, state.hiddenEvents);
 
     // Clamp ghostY to parent bounds for nested events
     let ghostY = cursorY;
     if (parentPath !== '[]') {
-      const parentItem = findParentLayoutItem(item.event, layout);
+      const parentItem = findParentLayoutItem(item.event, state.layout);
       if (parentItem) {
         const minY = parentItem.y + 30; // containerHeaderHeight + padding
         const maxY = parentItem.y + parentItem.height - 6;
@@ -330,40 +361,40 @@ async function main() {
       }
     }
 
-    reorderState = { draggedEvent: item.event, ghostY };
+    state.reorderState = { draggedEvent: item.event, ghostY };
 
     // Initialize order for this level if needed
-    if (!eventOrders.has(parentPath)) {
+    if (!state.eventOrders.has(parentPath)) {
       const defaultOrder = [...siblings]
         .sort((a, b) => dateToDecimalYear(a.start) - dateToDecimalYear(b.start))
         .map(e => e.name);
-      eventOrders.set(parentPath, defaultOrder);
+      state.eventOrders.set(parentPath, defaultOrder);
     }
 
     // Build stable reference rows on first move: remove dragged item from
     // the order, relayout to get positions without it, capture those, then
     // restore. This ensures drop boundaries don't shift during the drag.
-    if (!reorderRefPositions) {
-      const order = eventOrders.get(parentPath)!;
+    if (!state.reorderRefPositions) {
+      const order = state.eventOrders.get(parentPath)!;
       const originalIndex = order.indexOf(item.event.name);
       const withoutDragged = order.filter(n => n !== item.event.name);
-      eventOrders.set(parentPath, withoutDragged);
+      state.eventOrders.set(parentPath, withoutDragged);
       relayout();
-      reorderRefPositions = buildRefPositions(item, layout);
+      state.reorderRefPositions = buildRefPositions(item, state.layout);
       // Restore dragged item at its original position
       const restored = [...withoutDragged];
       const restoreIndex = originalIndex >= 0 ? Math.min(originalIndex, withoutDragged.length) : withoutDragged.length;
       restored.splice(restoreIndex, 0, item.event.name);
-      eventOrders.set(parentPath, restored);
+      state.eventOrders.set(parentPath, restored);
       relayout();
     }
 
-    const dropIndex = computeDropIndex(reorderRefPositions, ghostY);
-    if (dropIndex !== reorderLastIndex) {
-      reorderLastIndex = dropIndex;
+    const dropIndex = computeDropIndex(state.reorderRefPositions, ghostY);
+    if (dropIndex !== state.reorderLastIndex) {
+      state.reorderLastIndex = dropIndex;
 
       // Capture current visual positions of siblings for animation
-      const siblingItems = findSiblingLayoutItems(item, layout);
+      const siblingItems = findSiblingLayoutItems(item, state.layout);
       const oldPositions = new Map<TimelineEvent, number>();
       for (const s of siblingItems) {
         let visualY = s.y;
@@ -379,7 +410,7 @@ async function main() {
       }
 
       // Rebuild order from current visual positions
-      const oldOrder = eventOrders.get(parentPath);
+      const oldOrder = state.eventOrders.get(parentPath);
       const oldIndexMap = oldOrder
         ? new Map(oldOrder.map((name, i) => [name, i]))
         : null;
@@ -411,11 +442,11 @@ async function main() {
         }
       }
 
-      eventOrders.set(parentPath, visualOrder);
+      state.eventOrders.set(parentPath, visualOrder);
       relayout();
 
       // Animate siblings to new positions
-      const newSiblings = findSiblingLayoutItems(item, layout);
+      const newSiblings = findSiblingLayoutItems(item, state.layout);
       const yOffsets = new Map<TimelineEvent, number>();
       for (const s of newSiblings) {
         const oldY = oldPositions.get(s.event);
@@ -431,23 +462,22 @@ async function main() {
   }
 
   function onReorderEnd(_item: LayoutItem) {
-    reorderState = null;
-    reorderOriginalOrders = null;
-    reorderLastIndex = -1;
-    reorderRefPositions = null;
-    undoManager.push(snapshot());
-    requestRedraw();
+    state.reorderState = null;
+    state.reorderOriginalOrders = null;
+    state.reorderLastIndex = -1;
+    state.reorderRefPositions = null;
+    commit({ undo: true });
   }
 
   function onReorderCancel() {
-    if (reorderOriginalOrders) {
-      eventOrders.clear();
-      for (const [k, v] of reorderOriginalOrders) eventOrders.set(k, v);
-      reorderOriginalOrders = null;
+    if (state.reorderOriginalOrders) {
+      state.eventOrders.clear();
+      for (const [k, v] of state.reorderOriginalOrders) state.eventOrders.set(k, v);
+      state.reorderOriginalOrders = null;
     }
-    reorderState = null;
-    reorderLastIndex = -1;
-    reorderRefPositions = null;
+    state.reorderState = null;
+    state.reorderLastIndex = -1;
+    state.reorderRefPositions = null;
     relayout();
     requestRedraw();
   }
@@ -455,37 +485,37 @@ async function main() {
   // Wire up input
   const inputHandlers = setupInput({
     canvas,
-    getViewport: () => view.viewport,
+    getViewport: () => state.viewport,
     setViewport: (v: Viewport) => {
-      const spanBefore = view.viewport.end - view.viewport.start;
+      const spanBefore = state.viewport.end - state.viewport.start;
       const spanAfter = v.end - v.start;
       if (Math.abs(spanAfter - spanBefore) > 1e-6) {
-        dblClickPrevViewport = null;
-        dblClickItem = null;
+        state.dblClickPrevViewport = null;
+        state.dblClickItem = null;
       }
-      view.viewport = v;
+      state.viewport = v;
     },
-    getLayout: () => layout,
-    getHovered: () => sel.hoveredItem,
+    getLayout: () => state.layout,
+    getHovered: () => state.hoveredItem,
     setHovered: setHoveredItem,
     setSelected: (item: LayoutItem | null) => {
-      sel.selectedItem = item;
+      state.selectedItem = item;
       eventListPanel?.selectEvent(item?.event ?? null);
       if (item) eventMenu.show(item.event); else eventMenu.hide();
     },
-    setCursorX: (x: number) => { ui.cursorX = x; },
-    getSelection: () => sel.selection,
-    setSelection: (s: TimelineSelection | null) => { sel.selection = s; },
-    setSnapState: (state: SnapState) => { sel.snapState = state; },
+    setCursorX: (x: number) => { state.cursorX = x; },
+    getSelection: () => state.selection,
+    setSelection: (s: TimelineSelection | null) => { state.selection = s; },
+    setSnapState: (s: SnapState) => { state.snapState = s; },
     onCollapseToggle,
     onReorderMove,
     onReorderEnd,
     onReorderCancel,
-    getScrollY: () => view.scrollY,
-    setScrollY: (y: number) => { view.scrollY = y; },
+    getScrollY: () => state.scrollY,
+    setScrollY: (y: number) => { state.scrollY = y; },
     getMaxScrollY: computeMaxScrollY,
     requestRedraw,
-    getShowTodayLine: () => ui.showTodayLine,
+    getShowTodayLine: () => state.showTodayLine,
     onContextMenu,
   });
 
@@ -501,24 +531,24 @@ async function main() {
   const ZOOM_DELTA = 120; // equivalent to one scroll wheel tick
   document.getElementById('zoom-in')!.addEventListener('click', () => {
     const center = canvas.clientWidth / 2;
-    const base = anim.animTo ?? view.viewport;
+    const base = anim.animTo ?? state.viewport;
     animateZoom(zoomViewport(base, center, canvas.clientWidth, -ZOOM_DELTA));
   });
   document.getElementById('zoom-out')!.addEventListener('click', () => {
     const center = canvas.clientWidth / 2;
-    const base = anim.animTo ?? view.viewport;
+    const base = anim.animTo ?? state.viewport;
     animateZoom(zoomViewport(base, center, canvas.clientWidth, ZOOM_DELTA));
   });
 
   // Snapshot selection state on first mousedown of a potential double-click
   canvas.addEventListener('mousedown', () => {
     const now = performance.now();
-    if (now - lastMouseDownTime > 500) {
-      preClickSelection = sel.selection ? { ...sel.selection } : null;
-      preClickSelectedItem = sel.selectedItem;
-      preClickSnapOverrides = inputHandlers.getSelectionOverrides();
+    if (now - state.lastMouseDownTime > 500) {
+      state.preClickSelection = state.selection ? { ...state.selection } : null;
+      state.preClickSelectedItem = state.selectedItem;
+      state.preClickSnapOverrides = inputHandlers.getSelectionOverrides();
     }
-    lastMouseDownTime = now;
+    state.lastMouseDownTime = now;
   });
 
   // Double-click to zoom into event (toggle back on second double-click)
@@ -526,24 +556,24 @@ async function main() {
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    const hit = hitTest(x, y, layout, view.viewport, canvas.clientWidth, view.scrollY);
+    const hit = hitTest(x, y, state.layout, state.viewport, canvas.clientWidth, state.scrollY);
 
     if (!hit || hit.event.end === undefined || e.ctrlKey || e.metaKey) return;
 
     // Restore selection state from before the double-click
-    sel.selection = preClickSelection;
-    sel.selectedItem = preClickSelectedItem;
-    inputHandlers.restoreSelectionOverrides(preClickSnapOverrides.anchor, preClickSnapOverrides.extend);
-    eventListPanel?.selectEvent(sel.selectedItem?.event ?? null);
-    if (sel.selectedItem) eventMenu.show(sel.selectedItem.event); else eventMenu.hide();
+    state.selection = state.preClickSelection;
+    state.selectedItem = state.preClickSelectedItem;
+    inputHandlers.restoreSelectionOverrides(state.preClickSnapOverrides.anchor, state.preClickSnapOverrides.extend);
+    eventListPanel?.selectEvent(state.selectedItem?.event ?? null);
+    if (state.selectedItem) eventMenu.show(state.selectedItem.event); else eventMenu.hide();
 
-    if (dblClickItem && hit.event === dblClickItem.event && dblClickPrevViewport) {
-      animateZoom(dblClickPrevViewport);
-      dblClickPrevViewport = null;
-      dblClickItem = null;
+    if (state.dblClickItem && hit.event === state.dblClickItem.event && state.dblClickPrevViewport) {
+      animateZoom(state.dblClickPrevViewport);
+      state.dblClickPrevViewport = null;
+      state.dblClickItem = null;
     } else {
-      dblClickPrevViewport = { ...(anim.animTo ?? view.viewport) };
-      dblClickItem = hit;
+      state.dblClickPrevViewport = { ...(anim.animTo ?? state.viewport) };
+      state.dblClickItem = hit;
       const padding = (hit.nominalEndYear - hit.nominalStartYear) * 0.1;
       animateZoom({
         start: hit.nominalStartYear - padding,
@@ -556,23 +586,23 @@ async function main() {
   function onToggleEvent(event: TimelineEvent, visible: boolean) {
     // Capture old Y positions
     const oldPositions = new Map<TimelineEvent, number>();
-    capturePositions(layout, oldPositions);
+    capturePositions(state.layout, oldPositions);
 
     // Capture items about to be hidden
     const fadingOut: LayoutItem[] = [];
     if (!visible) {
-      const hiding = findLayoutItem(event, layout);
+      const hiding = findLayoutItem(event, state.layout);
       if (hiding) fadingOut.push(hiding);
     }
 
     // Update hidden set and recompute layout
-    if (visible) hiddenEvents.delete(event);
-    else hiddenEvents.add(event);
+    if (visible) state.hiddenEvents.delete(event);
+    else state.hiddenEvents.add(event);
     relayout();
 
     // Compute Y offsets for items that moved
     const yOffsets = new Map<TimelineEvent, number>();
-    computeOffsets(layout, oldPositions, yOffsets);
+    computeOffsets(state.layout, oldPositions, yOffsets);
 
     // Items fading in
     const fadingIn = new Set<TimelineEvent>();
@@ -583,15 +613,15 @@ async function main() {
 
     // Clear hovered/selected if they reference the hidden event
     if (!visible) {
-      if (sel.hoveredItem && isDescendantOf(sel.hoveredItem.event, event)) setHoveredItem(null);
-      if (sel.selectedItem && isDescendantOf(sel.selectedItem.event, event)) {
-        sel.selectedItem = null;
+      if (state.hoveredItem && isDescendantOf(state.hoveredItem.event, event)) setHoveredItem(null);
+      if (state.selectedItem && isDescendantOf(state.selectedItem.event, event)) {
+        state.selectedItem = null;
         eventListPanel?.selectEvent(null);
         eventMenu.hide();
       }
-      if (dblClickItem && isDescendantOf(dblClickItem.event, event)) {
-        dblClickPrevViewport = null;
-        dblClickItem = null;
+      if (state.dblClickItem && isDescendantOf(state.dblClickItem.event, event)) {
+        state.dblClickPrevViewport = null;
+        state.dblClickItem = null;
       }
     }
 
@@ -603,12 +633,12 @@ async function main() {
     if (event === null) {
       setHoveredItem(null);
     } else {
-      setHoveredItem(findLayoutItem(event, layout));
+      setHoveredItem(findLayoutItem(event, state.layout));
     }
     requestRedraw();
   }
 
-  /** Pan and scroll so the given layout item is visible, accounting for UI panel occlusion. */
+  /** Pan and scroll so the given state.layout item is visible, accounting for UI panel occlusion. */
   function scrollItemIntoView(item: LayoutItem) {
     const rect = canvas.getBoundingClientRect();
 
@@ -616,7 +646,7 @@ async function main() {
     // Account for UI panels overlaying the left side of the canvas:
     // - events list panel (always)
     // - event menu (only when expanded)
-    const vp = anim.animTo ?? view.viewport;
+    const vp = anim.animTo ?? state.viewport;
     const canvasWidth = canvas.clientWidth;
     const occludedRight = eventMenu.isExpanded()
       ? eventMenu.getRightEdge() - rect.left
@@ -634,20 +664,20 @@ async function main() {
     }
 
     // Vertical: scroll if event is not visible
-    const visibleTop = view.scrollY + LAYOUT.eventsStartY;
-    const visibleBottom = view.scrollY + rect.height;
+    const visibleTop = state.scrollY + LAYOUT.eventsStartY;
+    const visibleBottom = state.scrollY + rect.height;
     const itemTop = item.y;
     const itemBottom = item.y + item.height;
     if (itemBottom > visibleBottom) {
-      view.scrollY = Math.min(itemBottom - rect.height + 20, computeMaxScrollY());
+      state.scrollY = Math.min(itemBottom - rect.height + 20, computeMaxScrollY());
     } else if (itemTop < visibleTop) {
-      view.scrollY = Math.max(itemTop - LAYOUT.eventsStartY - 10, 0);
+      state.scrollY = Math.max(itemTop - LAYOUT.eventsStartY - 10, 0);
     }
   }
 
   function onSelectEvent(event: TimelineEvent) {
-    const item = findLayoutItem(event, layout);
-    sel.selectedItem = item;
+    const item = findLayoutItem(event, state.layout);
+    state.selectedItem = item;
     eventListPanel?.selectEvent(event);
     eventMenu.show(event);
 
@@ -658,16 +688,16 @@ async function main() {
 
   function onDblClickEvent(event: TimelineEvent) {
     if (event.end === undefined) return; // point events have no range to zoom into
-    const item = findLayoutItem(event, layout);
+    const item = findLayoutItem(event, state.layout);
     if (!item) return;
 
-    if (dblClickItem && event === dblClickItem.event && dblClickPrevViewport) {
-      animateZoom(dblClickPrevViewport);
-      dblClickPrevViewport = null;
-      dblClickItem = null;
+    if (state.dblClickItem && event === state.dblClickItem.event && state.dblClickPrevViewport) {
+      animateZoom(state.dblClickPrevViewport);
+      state.dblClickPrevViewport = null;
+      state.dblClickItem = null;
     } else {
-      dblClickPrevViewport = { ...(anim.animTo ?? view.viewport) };
-      dblClickItem = item;
+      state.dblClickPrevViewport = { ...(anim.animTo ?? state.viewport) };
+      state.dblClickItem = item;
       const padding = (item.nominalEndYear - item.nominalStartYear) * 0.1;
       animateZoom({
         start: item.nominalStartYear - padding,
@@ -691,7 +721,7 @@ async function main() {
         if (e.nested) walk(e.nested, depth + 1);
       }
     }
-    walk(events, 0);
+    walk(state.events, 0);
     return result;
   }
 
@@ -701,23 +731,19 @@ async function main() {
       eventMenu.expand();
     },
     onChangeParent: (event, newParent) => {
-      removeEvent(events, event);
+      removeEvent(state.events, event);
       if (newParent === null) {
-        events.push(event);
+        state.events.push(event);
       } else {
         if (!newParent.nested) newParent.nested = [];
         newParent.nested.push(event);
       }
-      const destSiblings = newParent?.nested ?? events;
+      const destSiblings = newParent?.nested ?? state.events;
       const unique = uniqueSiblingName(event.name, destSiblings, event);
       if (unique !== event.name) {
         event.name = unique;
       }
-      relayout();
-      requestRedraw();
-      eventListPanel?.rebuild(events, onToggleEvent, onHoverEvent, onSelectEvent, hiddenEvents, onContextMenu);
-      saveStoredEvents(slug, events);
-      undoManager.push(snapshot());
+      commit({ relayout: true, saveEvents: true, undo: true, rebuildList: true });
       infoLog.show(`Moved "${event.name}" to ${newParent ? `"${newParent.name}"` : 'top level'}`);
     },
     onHoverEvent: (event) => {
@@ -737,28 +763,25 @@ async function main() {
     },
     onDelete: deleteEvent,
     getParentCandidates,
-    getCurrentParent: (event) => findParent(events, event),
+    getCurrentParent: (event) => findParent(state.events, event),
   });
 
   function onContextMenu(event: TimelineEvent, x: number, y: number) {
     contextMenu.show(event, x, y);
   }
 
-  eventListPanel = new EventListPanel(events, onToggleEvent, onHoverEvent, onSelectEvent, hiddenEvents, onDblClickEvent, onContextMenu);
+  eventListPanel = new EventListPanel(state.events, onToggleEvent, onHoverEvent, onSelectEvent, state.hiddenEvents, onDblClickEvent, onContextMenu);
 
   // --- Event editing helpers ---
   function deleteEvent(event: TimelineEvent) {
-    removeEvent(events, event);
-    hiddenEvents.delete(event);
-    collapsedEvents.delete(event);
-    sel.selectedItem = null;
+    removeEvent(state.events, event);
+    state.hiddenEvents.delete(event);
+    state.collapsedEvents.delete(event);
+    state.selectedItem = null;
     eventMenu.hide();
     eventListPanel?.selectEvent(null);
     eventListPanel?.removeEvent(event);
-    relayout();
-    requestRedraw();
-    saveStoredEvents(slug, events);
-    undoManager.push(snapshot());
+    commit({ relayout: true, saveEvents: true, undo: true });
     infoLog.show(`Deleted "${event.name}"`);
   }
 
@@ -766,21 +789,15 @@ async function main() {
     onRename: (event, name) => {
       event.name = name;
       eventListPanel?.updateEventName(event);
-      relayout();
-      requestRedraw();
-      saveStoredEvents(slug, events);
-      if (!skipCoalesce) undoManager.pushCoalesced(`rename:${getEventId(event)}`, snapshot());
+      commitEdit(event, `rename:${getEventId(event)}`);
     },
     onCommitRename: (event, name) => {
-      const siblings = getSiblings(event, events);
+      const siblings = getSiblings(event, state.events);
       const unique = uniqueSiblingName(name, siblings, event);
       if (unique !== name) {
         event.name = unique;
         eventListPanel?.updateEventName(event);
-        relayout();
-        requestRedraw();
-        saveStoredEvents(slug, events);
-        undoManager.push(snapshot());
+        commit({ relayout: true, saveEvents: true, undo: true });
         infoLog.show(`Renamed to "${unique}" to avoid duplicate name`);
         return unique;
       }
@@ -788,17 +805,11 @@ async function main() {
     },
     onEditInfo: (event, info) => {
       event.info = info || undefined;
-      saveStoredEvents(slug, events);
-      if (!skipCoalesce) undoManager.pushCoalesced(`info:${getEventId(event)}`, snapshot());
+      commit({ saveEvents: true, undoCoalesce: `info:${getEventId(event)}` });
     },
     onChangeStart: (event, start) => {
       event.start = start;
-      const prevScroll = view.scrollY;
-      relayout();
-      reselectEvent(event, prevScroll);
-      requestRedraw();
-      saveStoredEvents(slug, events);
-      if (!skipCoalesce) undoManager.pushCoalesced(`start:${getEventId(event)}`, snapshot());
+      commitEdit(event, `start:${getEventId(event)}`);
     },
     onChangeEnd: (event, end) => {
       if (end === undefined) {
@@ -807,32 +818,17 @@ async function main() {
       } else {
         event.end = end;
       }
-      const prevScroll = view.scrollY;
-      relayout();
-      reselectEvent(event, prevScroll);
-      requestRedraw();
-      saveStoredEvents(slug, events);
-      if (!skipCoalesce) undoManager.pushCoalesced(`end:${getEventId(event)}`, snapshot());
+      commitEdit(event, `end:${getEventId(event)}`);
     },
     onChangeStartApprox: (event, approx) => {
       if (approx === undefined) delete event.startApprox;
       else event.startApprox = approx;
-      const prevScroll = view.scrollY;
-      relayout();
-      reselectEvent(event, prevScroll);
-      requestRedraw();
-      saveStoredEvents(slug, events);
-      if (!skipCoalesce) undoManager.pushCoalesced(`startApprox:${getEventId(event)}`, snapshot());
+      commitEdit(event, `startApprox:${getEventId(event)}`);
     },
     onChangeEndApprox: (event, approx) => {
       if (approx === undefined) delete event.endApprox;
       else event.endApprox = approx;
-      const prevScroll = view.scrollY;
-      relayout();
-      reselectEvent(event, prevScroll);
-      requestRedraw();
-      saveStoredEvents(slug, events);
-      if (!skipCoalesce) undoManager.pushCoalesced(`endApprox:${getEventId(event)}`, snapshot());
+      commitEdit(event, `endApprox:${getEventId(event)}`);
     },
     onTypeChange: () => {
       skipCoalesce = true;
@@ -846,29 +842,25 @@ async function main() {
     },
     onChangeParent: (event, newParent) => {
       // Remove from current location
-      removeEvent(events, event);
+      removeEvent(state.events, event);
 
       // Add to new location
       if (newParent === null) {
-        events.push(event);
+        state.events.push(event);
       } else {
         if (!newParent.nested) newParent.nested = [];
         newParent.nested.push(event);
       }
 
       // Ensure unique name at destination
-      const destSiblings = newParent?.nested ?? events;
+      const destSiblings = newParent?.nested ?? state.events;
       const unique = uniqueSiblingName(event.name, destSiblings, event);
       if (unique !== event.name) {
         event.name = unique;
       }
 
       // Update UI
-      relayout();
-      requestRedraw();
-      eventListPanel?.rebuild(events, onToggleEvent, onHoverEvent, onSelectEvent, hiddenEvents, onContextMenu);
-      saveStoredEvents(slug, events);
-      undoManager.push(snapshot());
+      commit({ relayout: true, saveEvents: true, undo: true, rebuildList: true });
       infoLog.show(`Moved "${event.name}" to ${newParent ? `"${newParent.name}"` : 'top level'}`);
     },
     onDelete: deleteEvent,
@@ -888,7 +880,7 @@ async function main() {
       return event.nested !== undefined && event.nested.length > 0;
     },
     getParentCandidates,
-    getCurrentParent: (event) => findParent(events, event),
+    getCurrentParent: (event) => findParent(state.events, event),
   });
 
   // --- New event button ---
@@ -902,8 +894,8 @@ async function main() {
 
   newEventBtn.addEventListener('click', () => {
     // 1. Determine parent
-    const parent = (sel.selectedItem && sel.selectedItem.event.end !== undefined)
-      ? sel.selectedItem.event : null;
+    const parent = (state.selectedItem && state.selectedItem.event.end !== undefined)
+      ? state.selectedItem.event : null;
 
     // 2. Determine date/type
     let start: string;
@@ -914,10 +906,10 @@ async function main() {
       ? (parent.end === 'ongoing' ? dateToDecimalYear(new Date().toISOString().slice(0, 10)) : dateToDecimalYear(parent.end!))
       : null;
 
-    if (sel.selection && sel.selection.start !== sel.selection.end) {
+    if (state.selection && state.selection.start !== state.selection.end) {
       // Range selection
-      let selStart = sel.selection.start;
-      let selEnd = sel.selection.end;
+      let selStart = state.selection.start;
+      let selEnd = state.selection.end;
       if (parent && parentStart !== null && parentEnd !== null) {
         // Clamp to parent range if overlapping
         if (selStart < parentEnd && selEnd > parentStart) {
@@ -927,21 +919,21 @@ async function main() {
       }
       start = decimalYearToIso(selStart);
       end = decimalYearToIso(selEnd);
-    } else if (sel.selection && sel.selection.start === sel.selection.end) {
+    } else if (state.selection && state.selection.start === state.selection.end) {
       // Single cursor point
-      start = decimalYearToIso(sel.selection.start);
+      start = decimalYearToIso(state.selection.start);
     } else {
       // No cursor/selection — use center of parent or viewport
       if (parent && parentStart !== null && parentEnd !== null) {
         start = decimalYearToIso((parentStart + parentEnd) / 2);
       } else {
-        const vp = anim.animTo ?? view.viewport;
+        const vp = anim.animTo ?? state.viewport;
         start = decimalYearToIso((vp.start + vp.end) / 2);
       }
     }
 
     // 3. Create event
-    const siblings = parent?.nested ?? events;
+    const siblings = parent?.nested ?? state.events;
     const newEvent: TimelineEvent = { name: uniqueSiblingName('New event', siblings), start };
     if (end !== undefined) newEvent.end = end;
 
@@ -950,25 +942,20 @@ async function main() {
       if (!parent.nested) parent.nested = [];
       parent.nested.push(newEvent);
     } else {
-      events.push(newEvent);
+      state.events.push(newEvent);
     }
 
     // 5. Update
-    relayout();
-    requestRedraw();
-    saveStoredEvents(slug, events);
-    eventListPanel?.rebuild(events, onToggleEvent, onHoverEvent, onSelectEvent, hiddenEvents, onContextMenu);
+    commit({ relayout: true, saveEvents: true, undo: true, rebuildList: true });
 
     // 6. Select, scroll into view, and edit
-    const item = findLayoutItem(newEvent, layout);
-    sel.selectedItem = item;
+    const item = findLayoutItem(newEvent, state.layout);
+    state.selectedItem = item;
     eventListPanel?.selectEvent(newEvent);
     eventMenu.show(newEvent);
     eventMenu.focusName();
     if (item) scrollItemIntoView(item);
     requestRedraw();
-
-    undoManager.push(snapshot());
   });
 
   // --- Event import (shared by drop handler and menu) ---
@@ -998,13 +985,13 @@ async function main() {
       deduplicateSiblingNames(result.events);
       const newEvents: TimelineEvent[] = [];
       for (const ie of result.events) {
-        ie.name = uniqueSiblingName(ie.name, events);
+        ie.name = uniqueSiblingName(ie.name, state.events);
         newEvents.push(ie);
       }
 
       // Add to main events array and persist
-      events.push(...newEvents);
-      await saveStoredEvents(slug, events);
+      state.events.push(...newEvents);
+      await saveStoredEvents(slug, state.events);
 
       // Snapshot after import for undo
       undoManager.push(snapshot());
@@ -1062,20 +1049,20 @@ async function main() {
       showConfirmDialog(
         `Replace all current events with ${count} event${count !== 1 ? 's' : ''} from "${file.name}"? This cannot be undone.`,
         async () => {
-          events.length = 0;
-          events.push(...result.events);
-          hiddenEvents.clear();
-          collapsedEvents.clear();
-          eventOrders.clear();
-          await saveStoredEvents(slug, events);
-          sel.hoveredItem = null;
-          sel.selectedItem = null;
+          state.events.length = 0;
+          state.events.push(...result.events);
+          state.hiddenEvents.clear();
+          state.collapsedEvents.clear();
+          state.eventOrders.clear();
+          await saveStoredEvents(slug, state.events);
+          state.hoveredItem = null;
+          state.selectedItem = null;
           eventMenu.hide();
-          dblClickPrevViewport = null;
-          dblClickItem = null;
+          state.dblClickPrevViewport = null;
+          state.dblClickItem = null;
           relayout();
           undoManager.init(snapshot());
-          eventListPanel?.rebuild(events, onToggleEvent, onHoverEvent, onSelectEvent, hiddenEvents, onContextMenu);
+          eventListPanel?.rebuild(state.events, onToggleEvent, onHoverEvent, onSelectEvent, state.hiddenEvents, onContextMenu);
           requestRedraw();
           infoLog.show(`Loaded ${count} event${count !== 1 ? 's' : ''} from "${file.name}"`);
         },
@@ -1114,7 +1101,7 @@ async function main() {
       deduplicateSiblingNames(result.events);
 
       showPromptDialog('Name for the container event:', 'Event name', async (rawName) => {
-        const name = uniqueSiblingName(rawName, events);
+        const name = uniqueSiblingName(rawName, state.events);
         // Compute container bounds from imported events
         let earliestIso = '';
         let latestIso = '';
@@ -1156,8 +1143,8 @@ async function main() {
         if (earliestApprox) container.startApprox = earliestApprox;
         if (latestApprox) container.endApprox = latestApprox;
 
-        events.push(container);
-        await saveStoredEvents(slug, events);
+        state.events.push(container);
+        await saveStoredEvents(slug, state.events);
         undoManager.push(snapshot());
 
         relayout();
@@ -1262,7 +1249,7 @@ async function main() {
       input.click();
     },
     onExport: () => {
-      const json = JSON.stringify(events, null, 2);
+      const json = JSON.stringify(state.events, null, 2);
       const blob = new Blob([json], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -1270,21 +1257,21 @@ async function main() {
       a.download = 'timeline-events.json';
       a.click();
       URL.revokeObjectURL(url);
-      infoLog.show(`Exported ${events.length} events`);
+      infoLog.show(`Exported ${state.events.length} events`);
     },
     onDeleteAll: () => {
       showConfirmDialog('Delete all events? This cannot be undone.', async () => {
-        events.length = 0;
-        hiddenEvents.clear();
-        collapsedEvents.clear();
-        eventOrders.clear();
+        state.events.length = 0;
+        state.hiddenEvents.clear();
+        state.collapsedEvents.clear();
+        state.eventOrders.clear();
         await clearStoredEvents(slug);
         eventListPanel?.clear();
-        sel.hoveredItem = null;
-        sel.selectedItem = null;
+        state.hoveredItem = null;
+        state.selectedItem = null;
         eventMenu.hide();
-        dblClickPrevViewport = null;
-        dblClickItem = null;
+        state.dblClickPrevViewport = null;
+        state.dblClickItem = null;
         relayout();
         undoManager.init(snapshot());
         requestRedraw();
@@ -1300,70 +1287,70 @@ async function main() {
       });
     },
     onToggleTodayLine: (show) => {
-      ui.showTodayLine = show;
+      state.showTodayLine = show;
       requestRedraw();
     },
     onThemeChange: () => requestRedraw(),
-  }, ui.showTodayLine, slug);
+  }, state.showTodayLine, slug);
 
   // --- Undo/redo ---
   undoManager.init(snapshot());
 
-  function restoreFromSnapshot(state: UndoableState): void {
+  function restoreFromSnapshot(snap: UndoableState): void {
     // Capture selected event identity before replacing state
-    const selectedPath = sel.selectedItem
-      ? eventToPath(sel.selectedItem.event, events)
+    const selectedPath = state.selectedItem
+      ? eventToPath(state.selectedItem.event, state.events)
       : null;
 
     // Cancel in-progress animations
     anim.cancelAll();
-    reorderState = null;
-    reorderOriginalOrders = null;
-    reorderRefPositions = null;
+    state.reorderState = null;
+    state.reorderOriginalOrders = null;
+    state.reorderRefPositions = null;
 
     // Replace events array
-    events.length = 0;
-    events.push(...structuredClone(state.events));
+    state.events.length = 0;
+    state.events.push(...structuredClone(snap.events));
 
     // Rebuild hidden/collapsed sets from paths
-    hiddenEvents.clear();
-    for (const e of resolvePathSet(state.hiddenPaths, events)) hiddenEvents.add(e);
+    state.hiddenEvents.clear();
+    for (const e of resolvePathSet(snap.hiddenPaths, state.events)) state.hiddenEvents.add(e);
 
-    collapsedEvents.clear();
-    for (const e of resolvePathSet(state.collapsedPaths, events)) collapsedEvents.add(e);
+    state.collapsedEvents.clear();
+    for (const e of resolvePathSet(snap.collapsedPaths, state.events)) state.collapsedEvents.add(e);
 
     // Replace event orders
-    eventOrders.clear();
-    for (const [k, v] of state.eventOrders) eventOrders.set(k, [...v]);
+    state.eventOrders.clear();
+    for (const [k, v] of snap.eventOrders) state.eventOrders.set(k, [...v]);
 
     // Recompute layout
     relayout();
 
     // Attempt to re-select by path
     if (selectedPath) {
-      const event = pathToEvent(selectedPath, events);
+      const event = pathToEvent(selectedPath, state.events);
       if (event) {
-        const item = findLayoutItem(event, layout);
-        sel.selectedItem = item;
+        const item = findLayoutItem(event, state.layout);
+        state.selectedItem = item;
         eventListPanel?.selectEvent(event);
         eventMenu.show(event);
       } else {
-        sel.selectedItem = null;
+        state.selectedItem = null;
         eventListPanel?.selectEvent(null);
         eventMenu.hide();
       }
     } else {
-      sel.selectedItem = null;
+      state.selectedItem = null;
       eventListPanel?.selectEvent(null);
       eventMenu.hide();
     }
 
-    sel.hoveredItem = null;
+    state.hoveredItem = null;
     inputHandlers.restoreSelectionOverrides(null, null);
 
     // Rebuild event list and redraw
-    eventListPanel?.rebuild(events, onToggleEvent, onHoverEvent, onSelectEvent, hiddenEvents, onContextMenu);
-    saveStoredEvents(slug, events);
+    eventListPanel?.rebuild(state.events, onToggleEvent, onHoverEvent, onSelectEvent, state.hiddenEvents, onContextMenu);
+    saveStoredEvents(slug, state.events);
     requestRedraw();
   }
 
@@ -1373,14 +1360,14 @@ async function main() {
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
 
     // Skip during active reorder drag
-    if (reorderState !== null) return;
+    if (state.reorderState !== null) return;
 
     // Undo: Cmd+Z or Ctrl+Z
     if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === 'z') {
       e.preventDefault();
-      const state = undoManager.undo();
-      if (state) {
-        restoreFromSnapshot(state);
+      const snap = undoManager.undo();
+      if (snap) {
+        restoreFromSnapshot(snap);
         infoLog.show('Undo');
       }
       return;
@@ -1390,18 +1377,18 @@ async function main() {
     if (((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'z') ||
         (e.ctrlKey && !e.metaKey && e.key === 'y')) {
       e.preventDefault();
-      const state = undoManager.redo();
-      if (state) {
-        restoreFromSnapshot(state);
+      const snap = undoManager.redo();
+      if (snap) {
+        restoreFromSnapshot(snap);
         infoLog.show('Redo');
       }
       return;
     }
 
     // Delete/Backspace: delete selected event
-    if ((e.key === 'Delete' || e.key === 'Backspace') && sel.selectedItem) {
+    if ((e.key === 'Delete' || e.key === 'Backspace') && state.selectedItem) {
       e.preventDefault();
-      const event = sel.selectedItem.event;
+      const event = state.selectedItem.event;
       showConfirmDialog(`Delete "${event.name}"?`, () => deleteEvent(event));
       return;
     }
@@ -1415,7 +1402,7 @@ async function main() {
   draw();
   window.addEventListener('resize', () => {
     const max = computeMaxScrollY();
-    if (view.scrollY > max) view.scrollY = max;
+    if (state.scrollY > max) state.scrollY = max;
     requestRedraw();
   });
 }

@@ -46,45 +46,46 @@ export function pathToEvent(path: EventPath, events: TimelineEvent[]): TimelineE
   return null;
 }
 
-export function saveState(
-  slug: string,
-  viewport: Viewport,
-  selection: TimelineSelection | null,
-  hiddenEvents: Set<TimelineEvent>,
-  collapsedEvents: Set<TimelineEvent>,
-  allEvents: TimelineEvent[],
-  eventOrders?: Map<string, string[]>,
-  showTodayLine?: boolean,
-): void {
+export interface PersistableState {
+  viewport: Viewport;
+  selection: TimelineSelection | null;
+  hiddenEvents: Set<TimelineEvent>;
+  collapsedEvents: Set<TimelineEvent>;
+  events: TimelineEvent[];
+  eventOrders: Map<string, string[]>;
+  showTodayLine: boolean;
+}
+
+export function saveState(slug: string, s: PersistableState): void {
   const hiddenEventPaths: EventPath[] = [];
-  for (const e of hiddenEvents) {
-    const path = eventToPath(e, allEvents);
+  for (const e of s.hiddenEvents) {
+    const path = eventToPath(e, s.events);
     if (path) hiddenEventPaths.push(path);
   }
 
   const collapsedEventPaths: EventPath[] = [];
-  for (const e of collapsedEvents) {
-    const path = eventToPath(e, allEvents);
+  for (const e of s.collapsedEvents) {
+    const path = eventToPath(e, s.events);
     if (path) collapsedEventPaths.push(path);
   }
 
   const serializedOrders: Record<string, string[]> | undefined =
-    eventOrders && eventOrders.size > 0
-      ? Object.fromEntries(eventOrders)
+    s.eventOrders.size > 0
+      ? Object.fromEntries(s.eventOrders)
       : undefined;
 
-  const state: SerializedState = {
+  const serialized: SerializedState = {
     version: 1,
-    viewport: { start: viewport.start, end: viewport.end },
-    selection,
+    viewport: { start: s.viewport.start, end: s.viewport.end },
+    selection: s.selection,
     hiddenEventPaths,
     collapsedEventPaths,
     eventOrders: serializedOrders,
-    showTodayLine,
+    showTodayLine: s.showTodayLine,
   };
 
   try {
-    localStorage.setItem(storageKey(slug), JSON.stringify(state));
+    localStorage.setItem(storageKey(slug), JSON.stringify(serialized));
   } catch {
     // localStorage full or unavailable — silently ignore
   }
