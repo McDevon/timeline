@@ -129,6 +129,39 @@ describe('computeLayout', () => {
     expect(layout[0].y).not.toBe(layout[1].y);
   });
 
+  it('packs events into gaps above when possible', () => {
+    // A, B, C overlap each other and stack vertically.
+    // D only overlaps C — it should fit in the gap at the top
+    // where A sits, not below everything.
+    const events = [
+      makeEvent('A', '2000', '2010'),
+      makeEvent('B', '2005', '2015'),
+      makeEvent('C', '2008', '2018'),
+      makeEvent('D', '2016', '2025'), // only overlaps C, not A or B
+    ];
+    const layout = computeLayout(events, startY);
+    // D should be packed into the first available gap (y = startY),
+    // not stacked below C
+    expect(layout[3].event.name).toBe('D');
+    expect(layout[3].y).toBe(startY);
+  });
+
+  it('does not pack into gaps when custom order is active', () => {
+    // Same events as above, but with a custom order — should use
+    // simple stacking to preserve predictable drag-reorder behavior.
+    const events = [
+      makeEvent('A', '2000', '2010'),
+      makeEvent('B', '2005', '2015'),
+      makeEvent('C', '2008', '2018'),
+      makeEvent('D', '2016', '2025'),
+    ];
+    const orders = new Map([['[]', ['A', 'B', 'C', 'D']]]);
+    const layout = computeLayout(events, startY, undefined, orders);
+    // D should be stacked below C, not packed into the gap at the top
+    expect(layout[3].event.name).toBe('D');
+    expect(layout[3].y).toBeGreaterThan(layout[2].y);
+  });
+
   it('detects overflow when child extends beyond parent range', () => {
     const child = makeEvent('C', '1990', '2015');
     const parent = makeEvent('P', '2000', '2010', [child]);

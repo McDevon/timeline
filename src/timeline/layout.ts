@@ -93,8 +93,8 @@ function computeOverlaps(events: { event: TimelineEvent; startYear: number; endY
 
 /**
  * Find the minimum Y position past all conflicting items.
- * Returns max(bottom + gap) across all conflicting items, so the result
- * depends only on already-placed items — not on the new item's height.
+ * Simple stacking: always places below everything.
+ * Used when custom ordering is active to preserve predictable visual order.
  */
 function findMinY(conflicting: PlacedItem[], gap: number): number {
   let y = 0;
@@ -102,6 +102,40 @@ function findMinY(conflicting: PlacedItem[], gap: number): number {
     y = Math.max(y, item.relativeY + item.height + gap);
   }
   return y;
+}
+
+/**
+ * Find the minimum Y position where an item of the given height fits
+ * without overlapping any conflicting items.
+ * Scans from top to bottom for the first gap large enough.
+ * Used for initial layout (no custom ordering) to pack events efficiently.
+ * Conflicting array must be sorted by relativeY (ascending).
+ */
+function findMinYPacked(conflicting: PlacedItem[], gap: number, itemHeight: number): number {
+  if (conflicting.length === 0) return 0;
+
+  // Try placing at y=0, before the first conflicting item
+  if (conflicting[0].relativeY >= itemHeight + gap) {
+    return 0;
+  }
+
+  // Track running max bottom — conflicting items can overlap in Y
+  // (they don't conflict with each other in time, only with the new item)
+  let maxBottom = conflicting[0].relativeY + conflicting[0].height;
+
+  // Try gaps between consecutive conflicting items
+  for (let i = 0; i < conflicting.length - 1; i++) {
+    maxBottom = Math.max(maxBottom, conflicting[i].relativeY + conflicting[i].height);
+    const candidateY = maxBottom + gap;
+    const nextTop = conflicting[i + 1].relativeY;
+    if (candidateY + itemHeight + gap <= nextTop) {
+      return candidateY;
+    }
+  }
+
+  // Place after all conflicting items
+  maxBottom = Math.max(maxBottom, conflicting[conflicting.length - 1].relativeY + conflicting[conflicting.length - 1].height);
+  return maxBottom + gap;
 }
 
 /**
@@ -290,7 +324,9 @@ function placeLevel(
     }
     conflicting.sort((a, b) => a.relativeY - b.relativeY);
 
-    const y = findMinY(conflicting, gap);
+    const y = customOrder
+      ? findMinY(conflicting, gap)
+      : findMinYPacked(conflicting, gap, item.height);
 
     const placedItem: PlacedItem = {
       event: item.event,
