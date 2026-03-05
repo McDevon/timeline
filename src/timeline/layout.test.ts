@@ -162,6 +162,29 @@ describe('computeLayout', () => {
     expect(layout[3].y).toBeGreaterThan(layout[2].y);
   });
 
+  it('places tall container first for more compact mixed-height layout', () => {
+    // Container P overlaps both A and B. A and B don't overlap each other.
+    // Height-descending places P first at y=0, then A and B share the row below.
+    // Start-year would place A first, then P below, then B below P — taller stack.
+    const child1 = makeEvent('C1', '2002', '2006');
+    const child2 = makeEvent('C2', '2008', '2014');
+    const container = makeEvent('P', '2000', '2015', [child1, child2]);
+    const barA = makeEvent('A', '2000', '2010');
+    const barB = makeEvent('B', '2012', '2020');
+
+    const layout = computeLayout([container, barA, barB], startY);
+
+    const containerItem = layout.find(l => l.event.name === 'P')!;
+    const barAItem = layout.find(l => l.event.name === 'A')!;
+    const barBItem = layout.find(l => l.event.name === 'B')!;
+
+    // Container should be at the top (placed first by height-desc)
+    expect(containerItem.y).toBe(startY);
+    // A and B should be on the same row below (they don't overlap in time)
+    expect(barAItem.y).toBe(barBItem.y);
+    expect(barAItem.y).toBeGreaterThan(containerItem.y);
+  });
+
   it('detects overflow when child extends beyond parent range', () => {
     const child = makeEvent('C', '1990', '2015');
     const parent = makeEvent('P', '2000', '2010', [child]);

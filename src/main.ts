@@ -335,10 +335,21 @@ async function main() {
 
     state.reorderState = { draggedEvent: item.event, ghostY };
 
-    // Initialize order for this level if needed
+    // Initialize order for this level if needed.
+    // Use current visual Y positions so the layout doesn't jump when
+    // switching from optimized gap-filling to simple stacking.
     if (!state.eventOrders.has(parentPath)) {
+      const siblingYMap = new Map<string, number>();
+      for (const s of findSiblingLayoutItems(item, state.layout)) {
+        siblingYMap.set(s.event.name, s.y);
+      }
       const defaultOrder = [...siblings]
-        .sort((a, b) => dateToDecimalYear(a.start) - dateToDecimalYear(b.start))
+        .sort((a, b) => {
+          const ya = siblingYMap.get(a.name) ?? 0;
+          const yb = siblingYMap.get(b.name) ?? 0;
+          if (ya !== yb) return ya - yb;
+          return dateToDecimalYear(a.start) - dateToDecimalYear(b.start);
+        })
         .map(e => e.name);
       state.eventOrders.set(parentPath, defaultOrder);
     }

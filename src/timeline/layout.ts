@@ -39,6 +39,26 @@ export interface LayoutItem {
   overflowEnd?: number;
 }
 
+/** Internal: a sized event ready for placement (output of Phase 1). */
+interface SizedItem {
+  event: TimelineEvent;
+  startYear: number;
+  endYear: number;
+  nominalStartYear: number;
+  nominalEndYear: number;
+  approxStartRange?: [number, number];
+  approxEndRange?: [number, number];
+  overlapStart?: number;
+  overlapEnd?: number;
+  height: number;
+  isContainer: boolean;
+  isCollapsed: boolean;
+  isPoint: boolean;
+  placedChildren: PlacedItem[];
+  overflowStart?: number;
+  overflowEnd?: number;
+}
+
 /** Internal: an event placed at a relative Y within its level. */
 interface PlacedItem {
   event: TimelineEvent;
@@ -158,6 +178,59 @@ function sortByCustomOrder<T extends { event: TimelineEvent; startYear: number }
 }
 
 /**
+ * Sort and place sized items using first-fit gap filling.
+ * Runs Phases 3+4 with the given comparator.
+ */
+function placeWithOrder(
+  sized: SizedItem[],
+  overlaps: OverlapGraph,
+  comparator: (a: SizedItem, b: SizedItem) => number,
+  gap: number,
+): { items: PlacedItem[]; totalHeight: number } {
+  const sorted = [...sized].sort(comparator);
+
+  const placedMap = new Map<TimelineEvent, PlacedItem>();
+  const placed: PlacedItem[] = [];
+
+  for (const item of sorted) {
+    const neighbors = overlaps.get(item.event) ?? new Set();
+    const conflicting: PlacedItem[] = [];
+    for (const n of neighbors) {
+      const p = placedMap.get(n);
+      if (p) conflicting.push(p);
+    }
+    conflicting.sort((a, b) => a.relativeY - b.relativeY);
+
+    const y = findMinYPacked(conflicting, gap, item.height);
+
+    placed.push({
+      event: item.event,
+      startYear: item.startYear,
+      endYear: item.endYear,
+      nominalStartYear: item.nominalStartYear,
+      nominalEndYear: item.nominalEndYear,
+      approxStartRange: item.approxStartRange,
+      approxEndRange: item.approxEndRange,
+      relativeY: y,
+      height: item.height,
+      isContainer: item.isContainer,
+      isCollapsed: item.isCollapsed,
+      isPoint: item.isPoint,
+      placedChildren: item.placedChildren,
+      overflowStart: item.overflowStart,
+      overflowEnd: item.overflowEnd,
+    });
+    placedMap.set(item.event, placed[placed.length - 1]);
+  }
+
+  const totalHeight = placed.length > 0
+    ? Math.max(...placed.map(p => p.relativeY + p.height))
+    : 0;
+
+  return { items: placed, totalHeight };
+}
+
+/**
  * Recursively compute sizes and place events at a given level.
  *
  * Four phases:
@@ -184,7 +257,7 @@ function placeLevel(
     : events;
 
   // Phase 1: compute heights (recursively for containers)
-  const sized = visibleEvents.map(event => {
+  const sized: SizedItem[] = visibleEvents.map(event => {
     const nominalStart = dateToDecimalYear(event.start);
     const isOngoing = event.end === 'ongoing';
     const nominalEnd = isOngoing
@@ -303,58 +376,75 @@ function placeLevel(
   // Phase 2: compute overlap graph from time ranges
   const overlaps = computeOverlaps(sized);
 
-  // Phase 3: sort by custom order or start time
+  // Phase 3+4: sort and place
   const orderKey = JSON.stringify(parentPath ?? []);
   const customOrder = eventOrders?.get(orderKey);
-  const sorted = customOrder
-    ? sortByCustomOrder(sized, customOrder)
-    : [...sized].sort((a, b) => a.startYear - b.startYear);
 
-  // Phase 4: place events using overlap graph
-  const placedMap = new Map<TimelineEvent, PlacedItem>();
-  const placed: PlacedItem[] = [];
+  // Custom order: single pass with simple stacking (preserves drag-reorder behavior)
+  if (customOrder) {
+    const sorted = sortByCustomOrder(sized, customOrder);
+    const placedMap = new Map<TimelineEvent, PlacedItem>();
+    const placed: PlacedItem[] = [];
 
-  for (const item of sorted) {
-    // Find already-placed items that overlap this one in time
-    const neighbors = overlaps.get(item.event) ?? new Set();
-    const conflicting: PlacedItem[] = [];
-    for (const n of neighbors) {
-      const p = placedMap.get(n);
-      if (p) conflicting.push(p);
+    for (const item of sorted) {
+      const neighbors = overlaps.get(item.event) ?? new Set();
+      const conflicting: PlacedItem[] = [];
+      for (const n of neighbors) {
+        const p = placedMap.get(n);
+        if (p) conflicting.push(p);
+      }
+      conflicting.sort((a, b) => a.relativeY - b.relativeY);
+
+      const y = findMinY(conflicting, gap);
+
+      placed.push({
+        event: item.event,
+        startYear: item.startYear,
+        endYear: item.endYear,
+        nominalStartYear: item.nominalStartYear,
+        nominalEndYear: item.nominalEndYear,
+        approxStartRange: item.approxStartRange,
+        approxEndRange: item.approxEndRange,
+        relativeY: y,
+        height: item.height,
+        isContainer: item.isContainer,
+        isCollapsed: item.isCollapsed,
+        isPoint: item.isPoint,
+        placedChildren: item.placedChildren,
+        overflowStart: item.overflowStart,
+        overflowEnd: item.overflowEnd,
+      });
+      placedMap.set(item.event, placed[placed.length - 1]);
     }
-    conflicting.sort((a, b) => a.relativeY - b.relativeY);
 
-    const y = customOrder
-      ? findMinY(conflicting, gap)
-      : findMinYPacked(conflicting, gap, item.height);
+    const totalHeight = placed.length > 0
+      ? Math.max(...placed.map(p => p.relativeY + p.height))
+      : 0;
 
-    const placedItem: PlacedItem = {
-      event: item.event,
-      startYear: item.startYear,
-      endYear: item.endYear,
-      nominalStartYear: item.nominalStartYear,
-      nominalEndYear: item.nominalEndYear,
-      approxStartRange: item.approxStartRange,
-      approxEndRange: item.approxEndRange,
-      relativeY: y,
-      height: item.height,
-      isContainer: item.isContainer,
-      isCollapsed: item.isCollapsed,
-      isPoint: item.isPoint,
-      placedChildren: item.placedChildren,
-      overflowStart: 'overflowStart' in item ? (item as { overflowStart?: number }).overflowStart : undefined,
-      overflowEnd: 'overflowEnd' in item ? (item as { overflowEnd?: number }).overflowEnd : undefined,
-    };
-
-    placedMap.set(item.event, placedItem);
-    placed.push(placedItem);
+    return { items: placed, totalHeight };
   }
 
-  const totalHeight = placed.length > 0
-    ? Math.max(...placed.map(p => p.relativeY + p.height))
-    : 0;
+  // Default: try multiple sort orders with gap filling, pick the most compact.
+  // Skip multi-pass when all items have the same height (common for nested children).
+  const byStartYear = (a: SizedItem, b: SizedItem) => a.startYear - b.startYear;
 
-  return { items: placed, totalHeight };
+  const hasVariedHeights = sized.length > 1 && sized.some(s => s.height !== sized[0].height);
+  if (!hasVariedHeights) {
+    const result = placeWithOrder(sized, overlaps, byStartYear, gap);
+    result.items.sort((a, b) => a.startYear - b.startYear);
+    return result;
+  }
+
+  const byHeightDesc = (a: SizedItem, b: SizedItem) =>
+    b.height - a.height || a.startYear - b.startYear;
+
+  const result1 = placeWithOrder(sized, overlaps, byStartYear, gap);
+  const result2 = placeWithOrder(sized, overlaps, byHeightDesc, gap);
+
+  // Pick the more compact result; start-year wins ties for visual stability
+  const best = result2.totalHeight < result1.totalHeight ? result2 : result1;
+  best.items.sort((a, b) => a.startYear - b.startYear);
+  return best;
 }
 
 /**
