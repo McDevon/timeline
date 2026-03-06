@@ -541,9 +541,12 @@ function drawContainer(
     ctx.textAlign = "left";
 
     const labelY = item.y + item.height / 2;
-    const labelX = item.approxStartRange
-      ? Math.max(x1 + 6, yearToX(item.approxStartRange[1], viewport, canvasWidth) + 6)
-      : x1 + 6;
+    let labelX = x1 + 6;
+    if (item.approxStartRange) {
+      const nominalX = yearToX(item.nominalStartYear, viewport, canvasWidth);
+      const tw = ctx.measureText(item.event.name).width;
+      labelX = Math.max(x1 + 6, Math.min(nominalX + 6, x1 + boxWidth - tw - 6));
+    }
     ctx.save();
     ctx.beginPath();
     ctx.rect(x1, item.y, boxWidth, item.height);
@@ -558,9 +561,12 @@ function drawContainer(
     ctx.textAlign = "left";
 
     const labelY = item.y + 12;
-    const labelX = item.approxStartRange
-      ? Math.max(x1 + 8, yearToX(item.approxStartRange[1], viewport, canvasWidth) + 8)
-      : x1 + 8;
+    let labelX = x1 + 8;
+    if (item.approxStartRange) {
+      const nominalX = yearToX(item.nominalStartYear, viewport, canvasWidth);
+      const tw = ctx.measureText(item.event.name).width;
+      labelX = Math.max(x1 + 8, Math.min(nominalX + 8, x1 + boxWidth - tw - 8));
+    }
     ctx.save();
     ctx.beginPath();
     const clipLeft = item.overflowStart !== undefined
@@ -760,10 +766,12 @@ function drawBar(
     ctx.textBaseline = "middle";
     ctx.textAlign = "left";
 
-    // Position label in the solid region for approx events
-    const labelX = item.approxStartRange
-      ? Math.max(x1 + 6, yearToX(item.approxStartRange[1], viewport, canvasWidth) + 6)
-      : x1 + 6;
+    let labelX = x1 + 6;
+    if (item.approxStartRange) {
+      const nominalX = yearToX(item.nominalStartYear, viewport, canvasWidth);
+      const tw = ctx.measureText(item.event.name).width;
+      labelX = Math.max(x1 + 6, Math.min(nominalX + 6, x2 - tw - 6));
+    }
 
     ctx.save();
     ctx.beginPath();
