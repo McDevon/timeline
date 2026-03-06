@@ -102,6 +102,9 @@ async function main() {
     reorderRefPositions: null as { center: number; bottom: number }[] | null,
     reorderLastIndex: -1,
 
+    // Collapse-all toggle
+    collapseAllSaved: null as Set<TimelineEvent> | null,
+
     // Double-click zoom toggle
     dblClickPrevViewport: null as Viewport | null,
     dblClickItem: null as LayoutItem | null,
@@ -271,6 +274,9 @@ async function main() {
     const fadingIn = new Set<TimelineEvent>();
     const wasCollapsed = state.collapsedEvents.has(event);
 
+    // Individual toggle overrides collapse-all saved state
+    state.collapseAllSaved?.delete(event);
+
     if (!wasCollapsed) {
       // Collapsing — capture children for fade-out
       const container = findLayoutItem(event, state.layout);
@@ -311,6 +317,76 @@ async function main() {
     }
 
     undoManager.push(snapshot());
+    requestRedraw();
+  }
+
+  /** Collect top-level collapsible events (range events). */
+  function topLevelCollapsibleEvents(): TimelineEvent[] {
+    return state.events.filter(e => e.end !== undefined);
+  }
+
+  function toggleCollapseAll() {
+    const oldPositions = new Map<TimelineEvent, number>();
+    capturePositions(state.layout, oldPositions);
+
+    const fadingOut: LayoutItem[] = [];
+    const fadingIn = new Set<TimelineEvent>();
+
+    if (state.collapseAllSaved === null) {
+      // Enter collapse-all: save currently expanded top-level events, collapse them
+      const collapsible = topLevelCollapsibleEvents();
+      state.collapseAllSaved = new Set<TimelineEvent>();
+      for (const e of collapsible) {
+        if (!state.collapsedEvents.has(e)) {
+          state.collapseAllSaved.add(e);
+          // Capture children for fade-out animation
+          const container = findLayoutItem(e, state.layout);
+          if (container) {
+            for (const child of container.children) fadingOut.push(child);
+          }
+        }
+        state.collapsedEvents.add(e);
+      }
+    } else {
+      // Leave collapse-all: restore saved expanded events
+      for (const e of state.collapseAllSaved) {
+        state.collapsedEvents.delete(e);
+      }
+      state.collapseAllSaved = null;
+    }
+
+    relayout();
+
+    const yOffsets = new Map<TimelineEvent, number>();
+    computeOffsets(state.layout, oldPositions, yOffsets);
+
+    // Mark newly visible children as fading in
+    if (state.collapseAllSaved === null) {
+      // We just restored — find newly visible children
+      const collectFadingIn = (items: LayoutItem[]) => {
+        for (const item of items) {
+          if (item.isContainer && !item.isCollapsed) {
+            for (const child of item.children) fadingIn.add(child.event);
+          }
+          if (item.children) collectFadingIn(item.children);
+        }
+      };
+      collectFadingIn(state.layout);
+    }
+
+    anim.layoutTransition = (fadingOut.length > 0 || yOffsets.size > 0 || fadingIn.size > 0)
+      ? { startTime: performance.now(), fadingOut, yOffsets, fadingIn }
+      : null;
+
+    // Clear selection if the selected event is no longer visible (nested inside a collapsed parent)
+    if (state.selectedItem && !findLayoutItem(state.selectedItem.event, state.layout)) {
+      state.selectedItem = null;
+      eventListPanel?.selectEvent(null);
+      eventMenu.hide();
+    }
+
+    undoManager.push(snapshot());
+    infoLog.show(state.collapseAllSaved !== null ? 'Collapsed all' : 'Restored collapse state');
     requestRedraw();
   }
 
@@ -740,6 +816,7 @@ async function main() {
     removeEvent(state.events, event);
     state.hiddenEvents.delete(event);
     state.collapsedEvents.delete(event);
+    state.collapseAllSaved?.delete(event);
     state.selectedItem = null;
     eventMenu.hide();
     eventListPanel?.selectEvent(null);
@@ -962,6 +1039,7 @@ async function main() {
         state.events.push(...result.events);
         state.hiddenEvents.clear();
         state.collapsedEvents.clear();
+        state.collapseAllSaved = null;
         state.eventOrders.clear();
         await saveStoredEvents(slug, state.events);
         state.hoveredItem = null;
@@ -1137,6 +1215,7 @@ async function main() {
         state.events.length = 0;
         state.hiddenEvents.clear();
         state.collapsedEvents.clear();
+        state.collapseAllSaved = null;
         state.eventOrders.clear();
         await clearStoredEvents(slug);
         eventListPanel?.clear();
@@ -1175,11 +1254,12 @@ async function main() {
       ? eventToPath(state.selectedItem.event, state.events)
       : null;
 
-    // Cancel in-progress animations
+    // Cancel in-progress animations and transient state
     anim.cancelAll();
     state.reorderState = null;
     state.reorderOriginalOrders = null;
     state.reorderRefPositions = null;
+    state.collapseAllSaved = null;
 
     // Replace events array
     state.events.length = 0;
@@ -1255,6 +1335,13 @@ async function main() {
         restoreFromSnapshot(snap);
         infoLog.show('Redo');
       }
+      return;
+    }
+
+    // Collapse/expand all: M
+    if (e.key === 'm' || e.key === 'M') {
+      e.preventDefault();
+      toggleCollapseAll();
       return;
     }
 

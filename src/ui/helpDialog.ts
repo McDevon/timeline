@@ -18,6 +18,7 @@ const SHORTCUTS: [string, string][] = [
   ["Zoom into event", "Double-click a range event"],
   ["Zoom back out", "Double-click the same event again"],
   ["Collapse / expand group", "Ctrl/\u2318 + click a group event"],
+  ["Collapse / expand all", "M"],
   ["Reorder events", "Drag an event vertically"],
   ["Undo", "Ctrl/\u2318 + Z"],
   ["Redo", "Ctrl + Y or \u2318 + Shift + Z"],
