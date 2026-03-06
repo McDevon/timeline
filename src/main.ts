@@ -123,6 +123,14 @@ async function main() {
     saved.hiddenEvents.forEach(e => state.hiddenEvents.add(e));
     saved.collapsedEvents.forEach(e => state.collapsedEvents.add(e));
     for (const [k, v] of saved.eventOrders) state.eventOrders.set(k, v);
+  } else if (config.compact) {
+    state.collapseAllSaved = new Set<TimelineEvent>();
+    for (const e of state.events) {
+      if (e.end !== undefined || e.startApprox !== undefined) {
+        state.collapsedEvents.add(e);
+        state.collapseAllSaved.add(e);
+      }
+    }
   }
 
   state.layout = computeLayout(

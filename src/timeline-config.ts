@@ -4,6 +4,7 @@ export interface TimelineConfig {
   fallbackUrl: string;
   defaultTheme?: string;
   title?: string;
+  compact?: boolean;
   unknownSlug?: string;
 }
 
@@ -11,6 +12,7 @@ interface TimelineEntry {
   data: string;
   theme?: string;
   title?: string;
+  compact?: boolean;
 }
 
 export async function resolveTimeline(): Promise<TimelineConfig> {
@@ -32,6 +34,7 @@ export async function resolveTimeline(): Promise<TimelineConfig> {
           fallbackUrl: '/events.example.json',
           defaultTheme: entry.theme,
           title: entry.title,
+          compact: entry.compact,
         };
       }
     }

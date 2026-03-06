@@ -23,6 +23,7 @@ On startup, the app reads `location.pathname` and looks up the slug in `public/t
 | `data` | Yes | Path to the JSON data file in `public/` |
 | `theme` | No | Default theme ID (used on first visit only; user can change it) |
 | `title` | No | Browser tab title |
+| `compact` | No | If `true`, all collapsible events start collapsed on first visit |
 
 The root path `/` is implicit — it loads `/events.json` with the default Midnight theme.
 

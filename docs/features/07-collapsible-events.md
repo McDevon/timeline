@@ -52,6 +52,27 @@ New `onCollapseToggle` callback parameter. In the panning mouseUp handler, ctrl/
 - `onCollapseToggle()` handler manages the set, captures animation data, calls `relayout()`
 - Clears hovered/selected if they reference a now-hidden child
 
+## Collapse / Expand All
+
+Pressing **M** toggles collapsing all top-level collapsible events (range events and uncertain point events with `startApprox`).
+
+### Toggle behavior
+
+- **First press** (enter collapse-all): saves which events were expanded, then collapses all collapsible events.
+- **Second press** (leave collapse-all): restores the saved events to expanded, leaving any events that were individually toggled in the meantime unchanged.
+
+### Individual overrides
+
+If the user Ctrl/Cmd+clicks an event (or toggles it via the event list panel) while in collapse-all mode, that event is removed from the saved set. Pressing M again will not re-expand it — its manually chosen state is preserved.
+
+### State lifetime
+
+`collapseAllSaved` is transient (not persisted, not part of undo snapshots). It is cleared on: undo/redo, file load, reload defaults, and delete all.
+
+### Compact flag
+
+Timelines can opt into starting collapsed by setting `"compact": true` in `timelines.json`. On first open (no saved state), all collapsible top-level events are collapsed automatically. Once the user changes any state, normal persistence takes over.
+
 ## Edge Cases
 
 | Case | Behavior |
