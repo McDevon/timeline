@@ -67,7 +67,7 @@ If the user Ctrl/Cmd+clicks an event (or toggles it via the event list panel) wh
 
 ### State lifetime
 
-`collapseAllSaved` is transient (not persisted, not part of undo snapshots). It is cleared on: undo/redo, file load, reload defaults, and delete all.
+`collapseAllSaved` is not persisted to localStorage but is included in undo snapshots so that undo/redo correctly restores the collapse-all toggle state. It is cleared on: file load, reload defaults, and delete all.
 
 ### Compact flag
 

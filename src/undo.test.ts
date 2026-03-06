@@ -14,6 +14,7 @@ function makeSnapshot(label: string): UndoableState {
     events: [makeEvent(label, '2000')],
     hiddenPaths: [],
     collapsedPaths: [],
+    collapseAllSavedPaths: null,
     eventOrders: new Map(),
   };
 }
@@ -173,7 +174,7 @@ describe('UndoManager', () => {
 describe('captureSnapshot', () => {
   it('deep-clones events', () => {
     const events = [makeEvent('A', '2000')];
-    const snap = captureSnapshot(events, new Set(), new Set(), new Map());
+    const snap = captureSnapshot(events, new Set(), new Set(), new Map(), null);
     events[0].name = 'mutated';
     expect(snap.events[0].name).toBe('A');
   });
@@ -183,7 +184,7 @@ describe('captureSnapshot', () => {
     const parent = makeEvent('Parent', '1800', '2000', [child]);
     const events = [parent];
     const hidden = new Set([child]);
-    const snap = captureSnapshot(events, hidden, new Set(), new Map());
+    const snap = captureSnapshot(events, hidden, new Set(), new Map(), null);
     expect(snap.hiddenPaths).toEqual([['Parent', 'Child']]);
   });
 
@@ -192,15 +193,43 @@ describe('captureSnapshot', () => {
     const parent = makeEvent('Parent', '1800', '2000', [child]);
     const events = [parent];
     const collapsed = new Set([parent]);
-    const snap = captureSnapshot(events, new Set(), collapsed, new Map());
+    const snap = captureSnapshot(events, new Set(), collapsed, new Map(), null);
     expect(snap.collapsedPaths).toEqual([['Parent']]);
   });
 
   it('deep-clones event orders', () => {
     const orders = new Map([['key', ['A', 'B']]]);
-    const snap = captureSnapshot([makeEvent('A', '2000')], new Set(), new Set(), orders);
+    const snap = captureSnapshot([makeEvent('A', '2000')], new Set(), new Set(), orders, null);
     orders.get('key')!.push('C');
     expect(snap.eventOrders.get('key')).toEqual(['A', 'B']);
+  });
+
+  it('stores collapseAllSavedPaths as null when not in collapse-all mode', () => {
+    const events = [makeEvent('A', '2000')];
+    const snap = captureSnapshot(events, new Set(), new Set(), new Map(), null);
+    expect(snap.collapseAllSavedPaths).toBeNull();
+  });
+
+  it('converts collapseAllSaved events to paths', () => {
+    const child = makeEvent('Child', '1900');
+    const parent = makeEvent('Parent', '1800', '2000', [child]);
+    const events = [parent];
+    const collapseAllSaved = new Set([parent]);
+    const snap = captureSnapshot(events, new Set(), new Set([parent]), new Map(), collapseAllSaved);
+    expect(snap.collapseAllSavedPaths).toEqual([['Parent']]);
+  });
+
+  it('round-trips collapseAllSaved through snapshot and resolve', () => {
+    const a = makeEvent('A', '2000', '2010');
+    const b = makeEvent('B', '2005', '2015');
+    const events = [a, b];
+    const collapseAllSaved = new Set([a, b]);
+    const snap = captureSnapshot(events, new Set(), new Set([a, b]), new Map(), collapseAllSaved);
+
+    // Simulate undo: resolve paths against fresh (cloned) events
+    const restored = resolvePathSet(snap.collapseAllSavedPaths!, snap.events);
+    expect(restored.size).toBe(2);
+    expect(snap.events.filter(e => restored.has(e)).map(e => e.name).sort()).toEqual(['A', 'B']);
   });
 });
 

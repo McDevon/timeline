@@ -152,7 +152,7 @@ async function main() {
   let skipCoalesce = false;
 
   function snapshot() {
-    return captureSnapshot(state.events, state.hiddenEvents, state.collapsedEvents, state.eventOrders);
+    return captureSnapshot(state.events, state.hiddenEvents, state.collapsedEvents, state.eventOrders, state.collapseAllSaved);
   }
 
   const anim = new AnimationManager();
@@ -1286,7 +1286,6 @@ async function main() {
     state.reorderState = null;
     state.reorderOriginalOrders = null;
     state.reorderRefPositions = null;
-    state.collapseAllSaved = null;
 
     // Replace events array
     state.events.length = 0;
@@ -1298,6 +1297,13 @@ async function main() {
 
     state.collapsedEvents.clear();
     for (const e of resolvePathSet(snap.collapsedPaths, state.events)) state.collapsedEvents.add(e);
+
+    // Restore collapse-all saved state
+    if (snap.collapseAllSavedPaths !== null) {
+      state.collapseAllSaved = resolvePathSet(snap.collapseAllSavedPaths, state.events);
+    } else {
+      state.collapseAllSaved = null;
+    }
 
     // Replace event orders
     state.eventOrders.clear();

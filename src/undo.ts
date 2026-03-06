@@ -5,6 +5,7 @@ export interface UndoableState {
   events: TimelineEvent[];
   hiddenPaths: string[][];
   collapsedPaths: string[][];
+  collapseAllSavedPaths: string[][] | null;
   eventOrders: Map<string, string[]>;
 }
 
@@ -124,6 +125,7 @@ export function captureSnapshot(
   hiddenEvents: Set<TimelineEvent>,
   collapsedEvents: Set<TimelineEvent>,
   eventOrders: Map<string, string[]>,
+  collapseAllSaved: Set<TimelineEvent> | null,
 ): UndoableState {
   const hiddenPaths: string[][] = [];
   for (const e of hiddenEvents) {
@@ -137,6 +139,15 @@ export function captureSnapshot(
     if (path) collapsedPaths.push(path);
   }
 
+  let collapseAllSavedPaths: string[][] | null = null;
+  if (collapseAllSaved !== null) {
+    collapseAllSavedPaths = [];
+    for (const e of collapseAllSaved) {
+      const path = eventToPath(e, events);
+      if (path) collapseAllSavedPaths.push(path);
+    }
+  }
+
   const clonedOrders = new Map<string, string[]>();
   for (const [k, v] of eventOrders) {
     clonedOrders.set(k, [...v]);
@@ -146,6 +157,7 @@ export function captureSnapshot(
     events: structuredClone(events),
     hiddenPaths,
     collapsedPaths,
+    collapseAllSavedPaths,
     eventOrders: clonedOrders,
   };
 }
