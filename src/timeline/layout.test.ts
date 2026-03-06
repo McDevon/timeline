@@ -196,6 +196,17 @@ describe('computeLayout', () => {
     expect(container.overflowEnd).toBeGreaterThan(container.nominalEndYear);
   });
 
+  it('propagates grandchild overflow to grandparent container', () => {
+    const grandchild = makeEvent('GC', '2040', '2050');
+    const child = makeEvent('C', '2000', '2020', [grandchild]);
+    const parent = makeEvent('P', '1990', '2025', [child]);
+    const layout = computeLayout([parent], startY);
+    const container = layout[0];
+    // Grandchild extends to 2050, well beyond parent's 2025
+    expect(container.overflowEnd).toBeDefined();
+    expect(container.overflowEnd).toBeGreaterThanOrEqual(2050);
+  });
+
   it('computes correct nominalStartYear and nominalEndYear', () => {
     const events = [makeEvent('A', '2000-06', '2010-03')];
     const layout = computeLayout(events, startY);

@@ -345,12 +345,14 @@ function placeLevel(
     const { items: placedChildren, totalHeight: contentHeight } =
       placeLevel(event.nested, LAYOUT.childBarHeight, LAYOUT.rowGap, collapsedEvents, eventOrders, childPath, hiddenEvents);
 
-    // Compute overlap range that includes children extending beyond the parent
+    // Compute overlap range that includes children (and grandchildren) extending beyond the parent
     let overlapStart = base.startYear;
     let overlapEnd = base.endYear;
     for (const child of placedChildren) {
-      if (child.startYear < overlapStart) overlapStart = child.startYear;
-      if (child.endYear > overlapEnd) overlapEnd = child.endYear;
+      const childStart = child.overflowStart ?? child.startYear;
+      const childEnd = child.overflowEnd ?? child.endYear;
+      if (childStart < overlapStart) overlapStart = childStart;
+      if (childEnd > overlapEnd) overlapEnd = childEnd;
     }
 
     const height =

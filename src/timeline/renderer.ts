@@ -766,12 +766,35 @@ function drawBar(
     ctx.textBaseline = "middle";
     ctx.textAlign = "left";
 
+    // Diamond marker for point events with uncertainty (drawn before label so label renders on top)
+    const hasDiamond = item.event.end === undefined && item.approxStartRange;
+    if (hasDiamond) {
+      const nx = yearToX(item.nominalStartYear, viewport, canvasWidth);
+      const cy = item.y + item.height / 2;
+      const r = 3;
+      ctx.beginPath();
+      ctx.moveTo(nx, cy - r);
+      ctx.lineTo(nx + r, cy);
+      ctx.lineTo(nx, cy + r);
+      ctx.lineTo(nx - r, cy);
+      ctx.closePath();
+      ctx.fillStyle = fillColor;
+      ctx.fill();
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = lineWidth;
+      ctx.stroke();
+    }
+
     let labelX = x1 + 6;
     if (item.approxStartRange) {
       const nominalX = yearToX(item.nominalStartYear, viewport, canvasWidth);
+      // Offset past diamond marker for point events
+      const offset = hasDiamond ? 10 : 6;
       const tw = ctx.measureText(item.event.name).width;
-      labelX = Math.max(x1 + 6, Math.min(nominalX + 6, x2 - tw - 6));
+      labelX = Math.max(x1 + 6, Math.min(nominalX + offset, x2 - tw - 6));
     }
+
+    ctx.fillStyle = colors.barText;
 
     ctx.save();
     ctx.beginPath();
@@ -779,24 +802,6 @@ function drawBar(
     ctx.clip();
     ctx.fillText(item.event.name, labelX, item.y + item.height / 2);
     ctx.restore();
-  }
-
-  // Diamond marker for point events with uncertainty
-  if (item.event.end === undefined && item.approxStartRange) {
-    const nx = yearToX(item.nominalStartYear, viewport, canvasWidth);
-    const cy = item.y + item.height / 2;
-    const r = 3;
-    ctx.beginPath();
-    ctx.moveTo(nx, cy - r);
-    ctx.lineTo(nx + r, cy);
-    ctx.lineTo(nx, cy + r);
-    ctx.lineTo(nx - r, cy);
-    ctx.closePath();
-    ctx.fillStyle = fillColor;
-    ctx.fill();
-    ctx.strokeStyle = strokeColor;
-    ctx.lineWidth = lineWidth;
-    ctx.stroke();
   }
 }
 
