@@ -320,12 +320,31 @@ async function main() {
     requestRedraw();
   }
 
-  /** Collect top-level collapsible events (range events). */
+  /** Collect top-level collapsible events (range events and uncertain points). */
   function topLevelCollapsibleEvents(): TimelineEvent[] {
-    return state.events.filter(e => e.end !== undefined);
+    return state.events.filter(e => e.end !== undefined || e.startApprox !== undefined);
   }
 
   function toggleCollapseAll() {
+    // Lock in current visual order so collapsing doesn't rearrange items
+    // (the optimized packing may use a different sort for different heights)
+    const rootKey = '[]';
+    if (!state.eventOrders.has(rootKey)) {
+      const yMap = new Map<string, number>();
+      for (const item of state.layout) {
+        yMap.set(item.event.name, item.y);
+      }
+      const order = [...state.events]
+        .sort((a, b) => {
+          const ya = yMap.get(a.name) ?? 0;
+          const yb = yMap.get(b.name) ?? 0;
+          if (ya !== yb) return ya - yb;
+          return dateToDecimalYear(a.start) - dateToDecimalYear(b.start);
+        })
+        .map(e => e.name);
+      state.eventOrders.set(rootKey, order);
+    }
+
     const oldPositions = new Map<TimelineEvent, number>();
     capturePositions(state.layout, oldPositions);
 
