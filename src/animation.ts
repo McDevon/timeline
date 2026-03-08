@@ -8,6 +8,8 @@ export interface LayoutTransitionState {
   fadingOut: LayoutItem[];
   yOffsets: Map<TimelineEvent, number>;
   fadingIn: Set<TimelineEvent>;
+  /** Per-event start times for independent animation timing. */
+  startTimes?: Map<TimelineEvent, number>;
 }
 
 const ZOOM_ANIM_MS = 150;
@@ -74,15 +76,31 @@ export class AnimationManager {
     }
 
     if (this.layoutTransition) {
-      const elapsed = performance.now() - this.layoutTransition.startTime;
-      const lt = Math.min(elapsed / LAYOUT_ANIM_MS, 1);
+      const now = performance.now();
+      const globalElapsed = now - this.layoutTransition.startTime;
+      const globalLt = Math.min(globalElapsed / LAYOUT_ANIM_MS, 1);
+
+      // Pre-decay offsets using per-event start times (or global fallback)
+      const decayedOffsets = new Map<TimelineEvent, number>();
+      let anyActive = false;
+      for (const [event, offset] of this.layoutTransition.yOffsets) {
+        const eventStart = this.layoutTransition.startTimes?.get(event) ?? this.layoutTransition.startTime;
+        const eventElapsed = now - eventStart;
+        const eventLt = Math.min(eventElapsed / LAYOUT_ANIM_MS, 1);
+        const decayed = offset * (1 - easeInOut(eventLt));
+        if (Math.abs(decayed) > 0.1) {
+          decayedOffsets.set(event, decayed);
+          if (eventLt < 1) anyActive = true;
+        }
+      }
+
       transition = {
         fadingOut: this.layoutTransition.fadingOut,
-        yOffsets: this.layoutTransition.yOffsets,
+        yOffsets: decayedOffsets,
         fadingIn: this.layoutTransition.fadingIn,
-        progress: easeInOut(lt),
+        progress: easeInOut(globalLt),
       };
-      if (lt < 1) needsFrame = true;
+      if (anyActive || globalLt < 1) needsFrame = true;
       else this.layoutTransition = null;
     }
 

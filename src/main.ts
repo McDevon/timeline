@@ -634,15 +634,18 @@ async function main() {
     // Capture visual positions (for animation blending if targets change)
     const oldVisual = new Map<TimelineEvent, number>();
     const transition = anim.layoutTransition;
-    const progress = transition
-      ? easeInOut(Math.min((performance.now() - transition.startTime) / LAYOUT_ANIM_MS, 1))
-      : 1;
-    function captureVisual(items: LayoutItem[], inheritedOffset: number) {
+    const now = performance.now();
+    function captureVisual(items: LayoutItem[], inheritedDecayed: number) {
       for (const it of items) {
-        const ownRelOffset = transition?.yOffsets.get(it.event) ?? 0;
-        const ownAbsOffset = inheritedOffset + ownRelOffset;
-        oldVisual.set(it.event, it.y + ownAbsOffset * (1 - progress));
-        if (it.children.length > 0) captureVisual(it.children, ownAbsOffset);
+        const origOffset = transition?.yOffsets.get(it.event) ?? 0;
+        let ownDecayed = 0;
+        if (origOffset !== 0 && transition) {
+          const eventStart = transition.startTimes?.get(it.event) ?? transition.startTime;
+          const eventProgress = easeInOut(Math.min((now - eventStart) / LAYOUT_ANIM_MS, 1));
+          ownDecayed = origOffset * (1 - eventProgress);
+        }
+        oldVisual.set(it.event, it.y + inheritedDecayed + ownDecayed);
+        if (it.children.length > 0) captureVisual(it.children, inheritedDecayed + ownDecayed);
       }
     }
     captureVisual(state.layout, 0);
@@ -655,14 +658,47 @@ async function main() {
     const targetsChanged = hasTargetChanged(state.layout, prevTargets);
 
     if (targetsChanged) {
-      const yOffsets = new Map<TimelineEvent, number>();
-      computeOffsets(state.layout, oldVisual, yOffsets);
-      if (yOffsets.size > 0) {
+      const now = performance.now();
+      const newOffsets = new Map<TimelineEvent, number>();
+      computeOffsets(state.layout, oldVisual, newOffsets);
+
+      // Merge: keep existing animation for events whose targets didn't change,
+      // start fresh animation only for events whose targets moved.
+      const existing = anim.layoutTransition;
+      const mergedOffsets = new Map<TimelineEvent, number>();
+      const mergedStartTimes = new Map<TimelineEvent, number>();
+
+      function mergeWalk(items: LayoutItem[]) {
+        for (const it of items) {
+          const prev = prevTargets.get(it.event);
+          const changed = prev !== undefined && Math.abs(prev - it.y) > 0.5;
+
+          if (changed) {
+            const off = newOffsets.get(it.event);
+            if (off && Math.abs(off) > 0.1) {
+              mergedOffsets.set(it.event, off);
+              mergedStartTimes.set(it.event, now);
+            }
+          } else if (existing) {
+            const existingOff = existing.yOffsets.get(it.event);
+            if (existingOff) {
+              mergedOffsets.set(it.event, existingOff);
+              mergedStartTimes.set(it.event, existing.startTimes?.get(it.event) ?? existing.startTime);
+            }
+          }
+
+          if (it.children.length > 0) mergeWalk(it.children);
+        }
+      }
+      mergeWalk(state.layout);
+
+      if (mergedOffsets.size > 0) {
         anim.layoutTransition = {
-          startTime: performance.now(),
+          startTime: Math.min(...mergedStartTimes.values()),
           fadingOut: [],
-          yOffsets,
+          yOffsets: mergedOffsets,
           fadingIn: new Set(),
+          startTimes: mergedStartTimes,
         };
       } else {
         anim.layoutTransition = null;

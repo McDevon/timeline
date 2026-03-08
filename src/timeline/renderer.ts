@@ -863,7 +863,7 @@ function drawLayoutItem(
 
   if (hasTransitionEffect) {
     ctx.save();
-    if (yOffset) ctx.translate(0, yOffset * (1 - transition!.progress));
+    if (yOffset) ctx.translate(0, yOffset);
     if (isFadingIn) ctx.globalAlpha = transition!.progress;
   }
 
