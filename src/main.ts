@@ -88,7 +88,7 @@ async function main() {
     viewport: (saved?.viewport ?? computeFullRange(events)) as Viewport,
     scrollY: 0,
     selection: (saved?.selection ?? null) as TimelineSelection | null,
-    showTodayLine: saved?.showTodayLine ?? true,
+    showTodayLine: saved?.showTodayLine ?? config.showTodayLine ?? true,
 
     // Transient interaction
     selectedItem: null as LayoutItem | null,

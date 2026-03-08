@@ -5,6 +5,7 @@ export interface TimelineConfig {
   defaultTheme?: string;
   title?: string;
   compact?: boolean;
+  showTodayLine?: boolean;
   unknownSlug?: string;
 }
 
@@ -13,6 +14,7 @@ interface TimelineEntry {
   theme?: string;
   title?: string;
   compact?: boolean;
+  showTodayLine?: boolean;
 }
 
 export async function resolveTimeline(): Promise<TimelineConfig> {
@@ -35,6 +37,7 @@ export async function resolveTimeline(): Promise<TimelineConfig> {
           defaultTheme: entry.theme,
           title: entry.title,
           compact: entry.compact,
+          showTodayLine: entry.showTodayLine,
         };
       }
     }

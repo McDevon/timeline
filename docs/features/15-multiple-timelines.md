@@ -24,6 +24,7 @@ On startup, the app reads `location.pathname` and looks up the slug in `public/t
 | `theme` | No | Default theme ID (used on first visit only; user can change it) |
 | `title` | No | Browser tab title |
 | `compact` | No | If `true`, all collapsible events start collapsed on first visit |
+| `showTodayLine` | No | Default state for the "show today indicator" toggle (default: `true`) |
 
 The root path `/` is implicit — it loads `/events.json` with the default Midnight theme.
 
