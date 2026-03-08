@@ -20,7 +20,7 @@ import { showPromptDialog } from './ui/promptDialog';
 import { showHelpDialog } from './ui/helpDialog';
 import { saveState, loadState, eventToPath, pathToEvent } from './state';
 import { UndoManager, UndoableState, captureSnapshot, resolvePathSet, getEventId } from './undo';
-import { dateToDecimalYear, decimalYearToIso } from './data/time';
+import { dateToDecimalYear, decimalYearToIso, shiftIsoDate } from './data/time';
 import { isStoreInitialized, setStoreInitialized, loadStoredEvents, saveStoredEvents, clearStoredEvents, clearStore } from './data/store';
 import { validateEvents } from './data/validate';
 import { loadSavedTheme, applyTheme } from './themes';
@@ -89,6 +89,8 @@ async function main() {
     scrollY: 0,
     selection: (saved?.selection ?? null) as TimelineSelection | null,
     showTodayLine: saved?.showTodayLine ?? config.showTodayLine ?? true,
+    sketchMode: saved?.sketchMode ?? config.sketchMode ?? false,
+    sketchModeUnlocked: !!(saved?.sketchMode ?? config.sketchMode),
 
     // Transient interaction
     selectedItem: null as LayoutItem | null,
@@ -101,6 +103,11 @@ async function main() {
     reorderOriginalOrders: null as Map<string, string[]> | null,
     reorderRefPositions: null as { center: number; bottom: number }[] | null,
     reorderLastIndex: -1,
+
+    // Sketch mode
+    sketchOriginalDates: null as Map<TimelineEvent, { start: string; end?: string }> | null,
+    sketchPriorityEvent: null as TimelineEvent | null,
+    sketchSavedPositions: null as Map<TimelineEvent, number> | null,
 
     // Collapse-all toggle
     collapseAllSaved: null as Set<TimelineEvent> | null,
@@ -141,8 +148,8 @@ async function main() {
     state.hiddenEvents,
   );
 
-  function relayout() {
-    state.layout = computeLayout(state.events, LAYOUT.eventsStartY, state.collapsedEvents, state.eventOrders, state.hiddenEvents);
+  function relayout(priorityEvent?: TimelineEvent, pinnedY?: number, sketchHints?: Map<TimelineEvent, number>) {
+    state.layout = computeLayout(state.events, LAYOUT.eventsStartY, state.collapsedEvents, state.eventOrders, state.hiddenEvents, priorityEvent, pinnedY, sketchHints);
     const max = computeMaxScrollY();
     if (state.scrollY > max) state.scrollY = max;
   }
@@ -568,6 +575,127 @@ async function main() {
     requestRedraw();
   }
 
+  // --- Sketch mode callbacks ---
+  function collectOriginalDates(events: TimelineEvent[], map: Map<TimelineEvent, { start: string; end?: string }>) {
+    for (const e of events) {
+      map.set(e, { start: e.start, end: e.end });
+      if (e.nested) collectOriginalDates(e.nested, map);
+    }
+  }
+
+  function onSketchMove(item: LayoutItem, newStartYear: number, newEndYear: number) {
+    const event = item.event;
+
+    // Save original dates and all Y positions on first move
+    if (!state.sketchOriginalDates) {
+      const dates = new Map<TimelineEvent, { start: string; end?: string }>();
+      dates.set(event, { start: event.start, end: event.end });
+      if (event.nested) collectOriginalDates(event.nested, dates);
+      state.sketchOriginalDates = dates;
+      state.sketchPriorityEvent = event;
+      state.sketchSavedPositions = new Map();
+      capturePositions(state.layout, state.sketchSavedPositions);
+    }
+
+    const currentStartYear = dateToDecimalYear(event.start);
+    const deltaYears = newStartYear - currentStartYear;
+
+    // Update event dates
+    event.start = shiftIsoDate(event.start, deltaYears);
+    if (event.end !== undefined && event.end !== 'ongoing') {
+      const currentEndYear = dateToDecimalYear(event.end);
+      const endDelta = newEndYear - currentEndYear;
+      event.end = shiftIsoDate(event.end, endDelta);
+    }
+
+    // For container moves (duration unchanged), shift children
+    const duration = newEndYear - newStartYear;
+    const origDuration = (state.sketchPriorityEvent === event)
+      ? (item.nominalEndYear - item.nominalStartYear) // won't change during a move
+      : 0;
+
+    if (event.nested && event.nested.length > 0 && Math.abs(duration - origDuration) < 0.001) {
+      shiftChildren(event.nested, deltaYears);
+    }
+
+    // Recompute layout: pinned event stays at its row, others use hints
+    const pinnedY = state.sketchSavedPositions!.get(event);
+    relayout(event, pinnedY, state.sketchSavedPositions!);
+
+    requestRedraw();
+  }
+
+  function shiftChildren(children: TimelineEvent[], deltaYears: number) {
+    for (const child of children) {
+      child.start = shiftIsoDate(child.start, deltaYears);
+      if (child.end !== undefined && child.end !== 'ongoing') {
+        child.end = shiftIsoDate(child.end, deltaYears);
+      }
+      if (child.nested) {
+        shiftChildren(child.nested, deltaYears);
+      }
+    }
+  }
+
+  function onSketchEnd(_item: LayoutItem) {
+    // Capture frozen positions before final relayout
+    const oldPositions = new Map<TimelineEvent, number>();
+    capturePositions(state.layout, oldPositions);
+
+    state.sketchOriginalDates = null;
+    state.sketchPriorityEvent = null;
+    state.sketchSavedPositions = null;
+
+    // Relayout — events settle to natural Y positions
+    relayout();
+
+    // Animate the vertical settle
+    const yOffsets = new Map<TimelineEvent, number>();
+    computeOffsets(state.layout, oldPositions, yOffsets);
+    if (yOffsets.size > 0) {
+      anim.layoutTransition = {
+        startTime: performance.now(),
+        fadingOut: [],
+        yOffsets,
+        fadingIn: new Set(),
+      };
+    }
+
+    commit({ saveEvents: true, undo: true, rebuildList: true });
+  }
+
+  function onSketchCancel() {
+    if (state.sketchOriginalDates) {
+      // Capture frozen positions before restoring
+      const oldPositions = new Map<TimelineEvent, number>();
+      capturePositions(state.layout, oldPositions);
+
+      // Restore original dates without replacing event objects
+      for (const [event, dates] of state.sketchOriginalDates) {
+        event.start = dates.start;
+        event.end = dates.end;
+      }
+      state.sketchOriginalDates = null;
+      state.sketchPriorityEvent = null;
+      state.sketchSavedPositions = null;
+      relayout();
+
+      // Animate back to original positions
+      const yOffsets = new Map<TimelineEvent, number>();
+      computeOffsets(state.layout, oldPositions, yOffsets);
+      if (yOffsets.size > 0) {
+        anim.layoutTransition = {
+          startTime: performance.now(),
+          fadingOut: [],
+          yOffsets,
+          fadingIn: new Set(),
+        };
+      }
+
+      requestRedraw();
+    }
+  }
+
   // Wire up input
   const inputHandlers = setupInput({
     canvas,
@@ -603,6 +731,10 @@ async function main() {
     requestRedraw,
     getShowTodayLine: () => state.showTodayLine,
     onContextMenu,
+    getSketchMode: () => state.sketchMode,
+    onSketchMove,
+    onSketchEnd,
+    onSketchCancel,
   });
 
   // Info button
@@ -1202,7 +1334,7 @@ async function main() {
   });
 
   // --- Timeline menu ---
-  new TimelineMenu({
+  const timelineMenu = new TimelineMenu({
     onImport: () => {
       const input = document.createElement('input');
       input.type = 'file';
@@ -1269,8 +1401,13 @@ async function main() {
       state.showTodayLine = show;
       requestRedraw();
     },
+    onToggleSketchMode: (enabled) => {
+      state.sketchMode = enabled;
+      if (enabled) state.sketchModeUnlocked = true;
+      requestRedraw();
+    },
     onThemeChange: () => requestRedraw(),
-  }, state.showTodayLine, slug);
+  }, state.showTodayLine, state.sketchMode, slug);
 
   // --- Undo/redo ---
   undoManager.init(snapshot());
@@ -1345,8 +1482,9 @@ async function main() {
     const tag = document.activeElement?.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
 
-    // Skip during active reorder drag
+    // Skip during active reorder or sketch drag
     if (state.reorderState !== null) return;
+    if (state.sketchOriginalDates !== null) return;
 
     // Undo: Cmd+Z or Ctrl+Z
     if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === 'z') {
@@ -1383,6 +1521,16 @@ async function main() {
       e.preventDefault();
       const event = state.selectedItem.event;
       showConfirmDialog(`Delete "${event.name}"?`, () => deleteEvent(event));
+      return;
+    }
+
+    // S: toggle sketch mode (only after it's been enabled from the menu once)
+    if ((e.key === 's' || e.key === 'S') && !e.metaKey && !e.ctrlKey && state.sketchModeUnlocked) {
+      e.preventDefault();
+      state.sketchMode = !state.sketchMode;
+      timelineMenu.setSketchMode(state.sketchMode);
+      infoLog.show(state.sketchMode ? 'Sketch mode on' : 'Sketch mode off');
+      requestRedraw();
       return;
     }
   });

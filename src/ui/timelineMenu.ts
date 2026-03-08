@@ -6,6 +6,7 @@ export interface TimelineMenuCallbacks {
   onLoadFile: () => void;
   onExport: () => void;
   onToggleTodayLine: (show: boolean) => void;
+  onToggleSketchMode: (enabled: boolean) => void;
   onDeleteAll: () => void;
   onReloadDefaults: () => void;
   onThemeChange: () => void;
@@ -17,8 +18,9 @@ export class TimelineMenu {
   private hideTimer = 0;
   private currentThemeId: string;
   private slug: string;
+  private sketchCheckbox: HTMLInputElement | null = null;
 
-  constructor(callbacks: TimelineMenuCallbacks, initialShowTodayLine: boolean, slug = '') {
+  constructor(callbacks: TimelineMenuCallbacks, initialShowTodayLine: boolean, initialSketchMode: boolean, slug = '') {
     this.slug = slug;
     this.currentThemeId = loadSavedTheme(slug).id;
 
@@ -45,6 +47,9 @@ export class TimelineMenu {
     body.appendChild(this.createButton('Load events from file', false, callbacks.onLoadFile));
     body.appendChild(this.createButton('Export events', false, callbacks.onExport));
     body.appendChild(this.createCheckbox('Show today indicator', initialShowTodayLine, callbacks.onToggleTodayLine));
+    const sketchRow = this.createCheckbox('Sketch mode', initialSketchMode, callbacks.onToggleSketchMode);
+    this.sketchCheckbox = sketchRow.querySelector('input') as HTMLInputElement;
+    body.appendChild(sketchRow);
     body.appendChild(this.createThemeButton(callbacks));
     body.appendChild(this.createButton('Delete all events', true, callbacks.onDeleteAll));
     body.appendChild(this.createButton('Reload default events', true, callbacks.onReloadDefaults));
@@ -206,5 +211,10 @@ export class TimelineMenu {
       this.flyout.remove();
       this.flyout = null;
     }
+  }
+
+  /** Update the sketch mode checkbox from outside (e.g. keyboard shortcut). */
+  setSketchMode(enabled: boolean) {
+    if (this.sketchCheckbox) this.sketchCheckbox.checked = enabled;
   }
 }

@@ -177,6 +177,54 @@ export function decimalYearToIso(year: number): string {
 }
 
 /**
+ * Shift an ISO date by a delta in decimal years, preserving the precision
+ * of the original string (year-only, year-month, or full date).
+ */
+export function shiftIsoDate(iso: string, deltaYears: number): string {
+  const negative = iso.startsWith('-');
+  const rest = negative ? iso.slice(1) : iso;
+  const parts = rest.split('-');
+  const precision = parts.length;
+
+  const origDecimal = dateToDecimalYear(iso);
+  const newDecimal = origDecimal + deltaYears;
+
+  if (precision === 1) {
+    // Year-only: round to nearest integer year
+    const y = Math.round(newDecimal);
+    return y < 0 ? `${y}` : `${y}`;
+  }
+
+  // Year-month and full date: use day-of-year calendar math
+  const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  const newYear = Math.floor(newDecimal);
+  const fraction = newDecimal - newYear;
+  let dayOfYear = Math.round(fraction * 365) + 1;
+  dayOfYear = Math.max(1, Math.min(dayOfYear, 365));
+
+  let month = 0;
+  for (let i = 0; i < 12; i++) {
+    if (dayOfYear <= daysInMonth[i]) {
+      month = i + 1;
+      break;
+    }
+    dayOfYear -= daysInMonth[i];
+    month = i + 2;
+  }
+  month = Math.min(month, 12);
+
+  const absYear = Math.abs(newYear);
+  const prefix = newYear < 0 ? `-${absYear}` : `${absYear}`;
+
+  if (precision === 2) {
+    return `${prefix}-${String(month).padStart(2, '0')}`;
+  }
+
+  const day = Math.max(1, Math.min(dayOfYear, daysInMonth[month - 1]));
+  return `${prefix}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+/**
  * Format a decimal year difference as a human-readable magnitude string.
  * Precision adapts to the visible viewport span, not the distance itself.
  */

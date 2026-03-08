@@ -11,6 +11,7 @@ interface SerializedState {
   collapsedEventPaths: EventPath[];
   eventOrders?: Record<string, string[]>;
   showTodayLine?: boolean;
+  sketchMode?: boolean;
 }
 
 const STORAGE_BASE = 'timeline-state';
@@ -54,6 +55,7 @@ export interface PersistableState {
   events: TimelineEvent[];
   eventOrders: Map<string, string[]>;
   showTodayLine: boolean;
+  sketchMode: boolean;
 }
 
 export function saveState(slug: string, s: PersistableState): void {
@@ -82,6 +84,7 @@ export function saveState(slug: string, s: PersistableState): void {
     collapsedEventPaths,
     eventOrders: serializedOrders,
     showTodayLine: s.showTodayLine,
+    sketchMode: s.sketchMode,
   };
 
   try {
@@ -101,6 +104,7 @@ export function loadState(
   collapsedEvents: Set<TimelineEvent>;
   eventOrders: Map<string, string[]>;
   showTodayLine: boolean;
+  sketchMode: boolean;
 } | null {
   try {
     const raw = localStorage.getItem(storageKey(slug));
@@ -135,6 +139,7 @@ export function loadState(
       collapsedEvents,
       eventOrders,
       showTodayLine: state.showTodayLine ?? true,
+      sketchMode: state.sketchMode ?? false,
     };
   } catch {
     return null;

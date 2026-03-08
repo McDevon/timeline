@@ -6,6 +6,7 @@ export interface TimelineConfig {
   title?: string;
   compact?: boolean;
   showTodayLine?: boolean;
+  sketchMode?: boolean;
   unknownSlug?: string;
 }
 
@@ -15,6 +16,7 @@ interface TimelineEntry {
   title?: string;
   compact?: boolean;
   showTodayLine?: boolean;
+  sketchMode?: boolean;
 }
 
 export async function resolveTimeline(): Promise<TimelineConfig> {
@@ -38,6 +40,7 @@ export async function resolveTimeline(): Promise<TimelineConfig> {
           title: entry.title,
           compact: entry.compact,
           showTodayLine: entry.showTodayLine,
+          sketchMode: entry.sketchMode,
         };
       }
     }

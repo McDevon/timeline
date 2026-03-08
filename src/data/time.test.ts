@@ -8,6 +8,7 @@ import {
   decimalYearToIso,
   formatDecimalYearDelta,
   formatAxisLabel,
+  shiftIsoDate,
 } from './time';
 
 describe('dateToDecimalYear', () => {
@@ -257,5 +258,75 @@ describe('formatAxisLabel', () => {
 
   it('shows Jan for integer year when zoomed in', () => {
     expect(formatAxisLabel(2000, 1)).toBe('Jan 2000');
+  });
+});
+
+describe('shiftIsoDate', () => {
+  it('shifts year-only forward', () => {
+    expect(shiftIsoDate('2000', 5)).toBe('2005');
+  });
+
+  it('shifts year-only backward', () => {
+    expect(shiftIsoDate('2000', -3)).toBe('1997');
+  });
+
+  it('shifts year-only across zero', () => {
+    expect(shiftIsoDate('2', -5)).toBe('-3');
+  });
+
+  it('shifts negative year-only', () => {
+    expect(shiftIsoDate('-3000', 100)).toBe('-2900');
+  });
+
+  it('rounds year-only for fractional delta', () => {
+    expect(shiftIsoDate('2000', 0.3)).toBe('2000');
+    expect(shiftIsoDate('2000', 0.6)).toBe('2001');
+  });
+
+  it('shifts year-month preserving month precision', () => {
+    const result = shiftIsoDate('2000-06', 5);
+    expect(result).toMatch(/^\d+-\d{2}$/);
+    // 2000.41.. + 5 = 2005.41.. → should be around June 2005
+    expect(result).toBe('2005-06');
+  });
+
+  it('shifts year-month backward', () => {
+    const result = shiftIsoDate('2000-06', -1);
+    expect(result).toBe('1999-06');
+  });
+
+  it('shifts negative year-month', () => {
+    const result = shiftIsoDate('-3000-06', 10);
+    expect(result).toMatch(/-\d+-\d{2}$/);
+  });
+
+  it('shifts full date preserving day precision', () => {
+    const result = shiftIsoDate('2000-06-15', 5);
+    expect(result).toMatch(/^\d+-\d{2}-\d{2}$/);
+    // Should be approximately June 15, 2005
+    expect(result).toMatch(/^2005-06-/);
+  });
+
+  it('shifts full date backward', () => {
+    const result = shiftIsoDate('2000-03-01', -1);
+    expect(result).toMatch(/^1999-03-/);
+  });
+
+  it('shifts Jan 1 by integer years exactly', () => {
+    expect(shiftIsoDate('2000-01-01', 5)).toBe('2005-01-01');
+  });
+
+  it('shifts negative full date', () => {
+    const result = shiftIsoDate('-753-04-21', 100);
+    expect(result).toMatch(/^-653-04-/);
+  });
+
+  it('clamps day to valid range', () => {
+    // Shifting by a fractional amount should still produce a valid date
+    const result = shiftIsoDate('2000-01-31', 0.5);
+    expect(result).toMatch(/^\d+-\d{2}-\d{2}$/);
+    const day = parseInt(result.split('-').pop()!, 10);
+    expect(day).toBeGreaterThanOrEqual(1);
+    expect(day).toBeLessThanOrEqual(31);
   });
 });

@@ -1,11 +1,11 @@
 import { Viewport, panViewport, zoomViewport, xToYear, yearToX, MIN_SPAN, MAX_SPAN } from './viewport';
 import { LayoutItem } from './layout';
-import { TimelineSelection } from '../types';
+import { TimelineEvent, TimelineSelection } from '../types';
 import { hitTest } from './hitTest';
 import { Tooltip } from '../ui/tooltip';
 import { LAYOUT, chooseTickInterval } from './renderer';
 import { collectSnapTargets, findSnapYear, getSnapDetail, SnapDetail, SnapState } from './snap';
-import { todayDecimalYear, todayIsoDate, formatDate } from '../data/time';
+import { todayDecimalYear, todayIsoDate, formatDate, dateToDecimalYear } from '../data/time';
 
 export interface InputHandlers {
   destroy(): void;
@@ -35,6 +35,10 @@ export interface InputConfig {
   requestRedraw: () => void;
   getShowTodayLine?: () => boolean;
   onContextMenu?: (event: import('../types').TimelineEvent, x: number, y: number) => void;
+  getSketchMode?: () => boolean;
+  onSketchMove?: (item: LayoutItem, newStartYear: number, newEndYear: number) => void;
+  onSketchEnd?: (item: LayoutItem) => void;
+  onSketchCancel?: () => void;
 }
 
 const CLICK_THRESHOLD = 3; // pixels — movement under this is a click, not a drag
@@ -66,6 +70,10 @@ export function setupInput(config: InputConfig): InputHandlers {
     requestRedraw,
     getShowTodayLine,
     onContextMenu,
+    getSketchMode,
+    onSketchMove,
+    onSketchEnd,
+    onSketchCancel,
   } = config;
   const tooltip = new Tooltip();
 
@@ -79,9 +87,11 @@ export function setupInput(config: InputConfig): InputHandlers {
 
   // --- Snapping ---
   let modifierHeld = false;
+  let altHeld = false;
   let cachedLayout: LayoutItem[] | null = null;
   let eventSnapTargets: number[] = [];
   let snapTargetsCache: number[] = [];
+  let snapExcludeEvent: TimelineEvent | null = null;
 
   let cachedNowYear = 0;
   let cachedNowIso = '';
@@ -108,7 +118,7 @@ export function setupInput(config: InputConfig): InputHandlers {
       cachedLayout = layout;
       cachedNowYear = todayDecimalYear();
       cachedNowIso = todayIsoDate();
-      eventSnapTargets = collectSnapTargets(layout);
+      eventSnapTargets = collectSnapTargets(layout, snapExcludeEvent ?? undefined);
       if (!getShowTodayLine || getShowTodayLine()) {
         eventSnapTargets.push(cachedNowYear);
       }
@@ -222,7 +232,32 @@ export function setupInput(config: InputConfig): InputHandlers {
     requestRedraw();
   }
 
+  // --- Sketch mode edge detection ---
+  const EDGE_THRESHOLD_PX = 6;
+
+  function detectEdge(
+    canvasX: number,
+    item: LayoutItem,
+    viewport: Viewport,
+    canvasWidth: number,
+  ): 'start' | 'end' | 'body' {
+    if (item.isPoint) return 'body';
+    const startX = yearToX(item.nominalStartYear, viewport, canvasWidth);
+    const endX = yearToX(item.nominalEndYear, viewport, canvasWidth);
+    if (Math.abs(canvasX - startX) <= EDGE_THRESHOLD_PX) return 'start';
+    if (item.event.end === 'ongoing') return 'body'; // can't resize ongoing end
+    if (Math.abs(canvasX - endX) <= EDGE_THRESHOLD_PX) return 'end';
+    return 'body';
+  }
+
   // --- Wheel / trackpad ---
+  function sketchCursor(hit: LayoutItem | null): string {
+    if (!hit) return 'grab';
+    if (!getSketchMode || !getSketchMode()) return 'pointer';
+    const edge = detectEdge(cursorCanvasX, hit, getViewport(), canvas.clientWidth);
+    return edge === 'body' ? 'grab' : 'ew-resize';
+  }
+
   function updateHover() {
     if (cursorCanvasX < 0) return;
     const layout = getLayout();
@@ -231,7 +266,7 @@ export function setupInput(config: InputConfig): InputHandlers {
     const prev = getHovered();
     if (hit !== prev) {
       setHovered(hit);
-      canvas.style.cursor = hit ? 'pointer' : 'grab';
+      canvas.style.cursor = sketchCursor(hit);
       if (hit) {
         const rect = canvas.getBoundingClientRect();
         tooltip.show(hit.event, rect.left + cursorCanvasX, rect.top + cursorCanvasY);
@@ -311,11 +346,13 @@ export function setupInput(config: InputConfig): InputHandlers {
   // --- Mouse drag + click ---
   type DragState =
     | { mode: 'none' }
-    | { mode: 'undecided'; mouseDownX: number; mouseDownY: number; startViewport: Viewport; reorderCandidate: LayoutItem }
+    | { mode: 'undecided'; mouseDownX: number; mouseDownY: number; startViewport: Viewport; reorderCandidate: LayoutItem; edgeHint?: 'start' | 'end' | 'body' }
     | { mode: 'axis-selecting'; mouseDownX: number; mouseDownY: number; anchorYear: number; didDrag: boolean }
     | { mode: 'panning'; mouseDownX: number; mouseDownY: number; lastMouseX: number; didDrag: boolean; startViewport: Viewport }
     | { mode: 'reordering'; item: LayoutItem; startViewport: Viewport }
-    | { mode: 'zooming'; mouseDownX: number; mouseDownY: number; anchorYear: number; startViewport: Viewport; didDrag: boolean };
+    | { mode: 'zooming'; mouseDownX: number; mouseDownY: number; anchorYear: number; startViewport: Viewport; didDrag: boolean }
+    | { mode: 'sketch-moving'; item: LayoutItem; startViewport: Viewport; originalStartYear: number; originalEndYear: number; anchorYear: number }
+    | { mode: 'sketch-resizing'; item: LayoutItem; startViewport: Viewport; edge: 'start' | 'end'; originalStartYear: number; originalEndYear: number; anchorYear: number };
 
   let drag: DragState = { mode: 'none' };
   const REORDER_DECISION_THRESHOLD = 8;
@@ -420,12 +457,16 @@ export function setupInput(config: InputConfig): InputHandlers {
       // Events region — undecided if item under cursor, else straight to panning
       const hit = hitTest(x, y, getLayout(), getViewport(), canvas.clientWidth, getScrollY());
       if (hit) {
+        const edgeHint = getSketchMode?.()
+          ? detectEdge(x, hit, getViewport(), canvas.clientWidth)
+          : undefined;
         drag = {
           mode: 'undecided',
           mouseDownX: e.clientX,
           mouseDownY: e.clientY,
           startViewport: { ...getViewport() },
           reorderCandidate: hit,
+          edgeHint,
         };
       } else {
         drag = {
@@ -497,6 +538,46 @@ export function setupInput(config: InputConfig): InputHandlers {
           onReorderMove(item, e.clientY - rect.top + getScrollY());
           startAutoScroll();
           scheduleRedraw();
+        } else if (drag.edgeHint !== undefined) {
+          // Horizontal + sketch mode — start sketch operation
+          const item = drag.reorderCandidate;
+          const sv = drag.startViewport;
+          setViewport(sv); // restore viewport to pre-drag snapshot
+          const anchorYear = xToYear(drag.mouseDownX - canvas.getBoundingClientRect().left, sv, canvas.clientWidth);
+          tooltip.hide();
+
+          const origStart = dateToDecimalYear(item.event.start);
+          const origEnd = item.event.end !== undefined && item.event.end !== 'ongoing'
+            ? dateToDecimalYear(item.event.end) : origStart;
+
+          // Set up snap exclusion for the dragged event
+          snapExcludeEvent = item.event;
+          cachedLayout = null; // force snap cache rebuild
+
+          if (drag.edgeHint === 'body') {
+            drag = {
+              mode: 'sketch-moving',
+              item,
+              startViewport: sv,
+              originalStartYear: origStart,
+              originalEndYear: origEnd,
+              anchorYear,
+            };
+            canvas.style.cursor = 'grabbing';
+          } else {
+            drag = {
+              mode: 'sketch-resizing',
+              item,
+              startViewport: sv,
+              edge: drag.edgeHint,
+              originalStartYear: origStart,
+              originalEndYear: origEnd,
+              anchorYear,
+            };
+            canvas.style.cursor = 'ew-resize';
+          }
+          onSketchMove?.(item, origStart, origEnd);
+          scheduleRedraw();
         } else {
           // Horizontal — transition to panning
           const sv = drag.startViewport;
@@ -521,6 +602,99 @@ export function setupInput(config: InputConfig): InputHandlers {
       const rect = canvas.getBoundingClientRect();
       const canvasY = e.clientY - rect.top;
       onReorderMove(drag.item, canvasY + getScrollY());
+      scheduleRedraw();
+      return;
+    }
+
+    if (drag.mode === 'sketch-moving') {
+      altHeld = e.altKey;
+      const rect = canvas.getBoundingClientRect();
+      const cursorX = e.clientX - rect.left;
+      const currentYear = xToYear(cursorX, drag.startViewport, canvas.clientWidth);
+      const deltaYears = currentYear - drag.anchorYear;
+
+      let newStartYear = drag.originalStartYear + deltaYears;
+      let newEndYear = drag.originalEndYear + deltaYears;
+
+      // Apply snapping: snap whichever edge is closer to a snap target
+      if (!modifierHeld) {
+        const w = canvas.clientWidth;
+        const snappedStart = findBestSnap(yearToX(newStartYear, drag.startViewport, w));
+        const snappedEnd = findBestSnap(yearToX(newEndYear, drag.startViewport, w));
+        if (snappedStart !== null || snappedEnd !== null) {
+          const startDist = snappedStart !== null
+            ? Math.abs(yearToX(snappedStart, drag.startViewport, w) - yearToX(newStartYear, drag.startViewport, w))
+            : Infinity;
+          const endDist = snappedEnd !== null
+            ? Math.abs(yearToX(snappedEnd, drag.startViewport, w) - yearToX(newEndYear, drag.startViewport, w))
+            : Infinity;
+          if (startDist <= endDist && snappedStart !== null) {
+            const snapDelta = snappedStart - newStartYear;
+            newStartYear += snapDelta;
+            newEndYear += snapDelta;
+          } else if (snappedEnd !== null) {
+            const snapDelta = snappedEnd - newEndYear;
+            newStartYear += snapDelta;
+            newEndYear += snapDelta;
+          }
+        }
+      }
+
+      onSketchMove?.(drag.item, newStartYear, newEndYear);
+      scheduleRedraw();
+      return;
+    }
+
+    if (drag.mode === 'sketch-resizing') {
+      altHeld = e.altKey;
+      const rect = canvas.getBoundingClientRect();
+      const cursorX = e.clientX - rect.left;
+      const currentYear = xToYear(cursorX, drag.startViewport, canvas.clientWidth);
+      const deltaYears = currentYear - drag.anchorYear;
+
+      let newStartYear = drag.originalStartYear;
+      let newEndYear = drag.originalEndYear;
+
+      if (drag.edge === 'start') {
+        newStartYear = drag.originalStartYear + deltaYears;
+        if (altHeld) {
+          newEndYear = drag.originalEndYear - deltaYears;
+        }
+        // Snap the start edge
+        if (!modifierHeld) {
+          const snapped = findBestSnap(yearToX(newStartYear, drag.startViewport, canvas.clientWidth));
+          if (snapped !== null) {
+            const snapDelta = snapped - newStartYear;
+            newStartYear = snapped;
+            if (altHeld) newEndYear -= snapDelta;
+          }
+        }
+      } else {
+        newEndYear = drag.originalEndYear + deltaYears;
+        if (altHeld) {
+          newStartYear = drag.originalStartYear - deltaYears;
+        }
+        // Snap the end edge
+        if (!modifierHeld) {
+          const snapped = findBestSnap(yearToX(newEndYear, drag.startViewport, canvas.clientWidth));
+          if (snapped !== null) {
+            const snapDelta = snapped - newEndYear;
+            newEndYear = snapped;
+            if (altHeld) newStartYear -= snapDelta;
+          }
+        }
+      }
+
+      // Prevent inverted range
+      if (newStartYear > newEndYear) {
+        if (drag.edge === 'start') {
+          newStartYear = newEndYear;
+        } else {
+          newEndYear = newStartYear;
+        }
+      }
+
+      onSketchMove?.(drag.item, newStartYear, newEndYear);
       scheduleRedraw();
       return;
     }
@@ -565,7 +739,21 @@ export function setupInput(config: InputConfig): InputHandlers {
       cursorCanvasY = e.clientY - rect.top;
       updateCursorLine(cursorCanvasX, cursorCanvasY);
       updateHover();
-      canvas.style.cursor = getHovered() ? 'pointer' : 'grab';
+      canvas.style.cursor = sketchCursor(getHovered());
+      scheduleRedraw();
+      return;
+    }
+
+    if (state.mode === 'sketch-moving' || state.mode === 'sketch-resizing') {
+      snapExcludeEvent = null;
+      cachedLayout = null; // force snap cache rebuild
+      onSketchEnd?.(state.item);
+      const rect = canvas.getBoundingClientRect();
+      cursorCanvasX = e.clientX - rect.left;
+      cursorCanvasY = e.clientY - rect.top;
+      updateCursorLine(cursorCanvasX, cursorCanvasY);
+      updateHover();
+      canvas.style.cursor = sketchCursor(getHovered());
       scheduleRedraw();
       return;
     }
@@ -618,7 +806,7 @@ export function setupInput(config: InputConfig): InputHandlers {
         cursorCanvasY = y;
         updateCursorLine(cursorCanvasX, cursorCanvasY);
         updateHover();
-        canvas.style.cursor = getHovered() ? 'pointer' : 'grab';
+        canvas.style.cursor = sketchCursor(getHovered());
         scheduleRedraw();
         return;
       }
@@ -675,7 +863,7 @@ export function setupInput(config: InputConfig): InputHandlers {
     updateCursorLine(cursorCanvasX, cursorCanvasY);
     updateHover();
     const hovered = getHovered();
-    canvas.style.cursor = hovered ? 'pointer' : 'grab';
+    canvas.style.cursor = sketchCursor(hovered);
     scheduleRedraw();
   }
 
@@ -712,6 +900,14 @@ export function setupInput(config: InputConfig): InputHandlers {
   }
 
   function onKeyDown(e: KeyboardEvent) {
+    if (e.key === 'Escape' && (drag.mode === 'sketch-moving' || drag.mode === 'sketch-resizing')) {
+      snapExcludeEvent = null;
+      cachedLayout = null;
+      drag = { mode: 'none' };
+      onSketchCancel?.();
+      canvas.style.cursor = sketchCursor(getHovered());
+      scheduleRedraw();
+    }
     if (e.key === 'Escape' && drag.mode === 'reordering') {
       stopAutoScroll();
       drag = { mode: 'none' };
@@ -722,12 +918,12 @@ export function setupInput(config: InputConfig): InputHandlers {
     if (e.key === 'Escape' && drag.mode === 'zooming') {
       setViewport(drag.startViewport);
       drag = { mode: 'none' };
-      canvas.style.cursor = getHovered() ? 'pointer' : 'grab';
+      canvas.style.cursor = sketchCursor(getHovered());
       scheduleRedraw();
     }
     if (e.key === 'Escape' && drag.mode === 'undecided') {
       drag = { mode: 'none' };
-      canvas.style.cursor = getHovered() ? 'pointer' : 'grab';
+      canvas.style.cursor = sketchCursor(getHovered());
       scheduleRedraw();
     }
   }

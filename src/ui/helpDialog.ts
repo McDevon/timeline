@@ -20,6 +20,7 @@ const SHORTCUTS: [string, string][] = [
   ["Collapse / expand group", "Ctrl/\u2318 + click a group event"],
   ["Collapse / expand all", "M"],
   ["Reorder events", "Drag an event vertically"],
+  ["Toggle sketch mode", "S"],
   ["Undo", "Ctrl/\u2318 + Z"],
   ["Redo", "Ctrl + Y or \u2318 + Shift + Z"],
   ["Delete event", "Delete or backspace"],

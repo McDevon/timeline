@@ -125,6 +125,21 @@ function findMinY(conflicting: PlacedItem[], gap: number): number {
 }
 
 /**
+ * Try placing an item at its hinted Y position (from pre-drag layout).
+ * If the hinted position conflicts with any already-placed overlapping item,
+ * falls back to findMinYPacked to find the next available gap.
+ */
+function findYWithHint(conflicting: PlacedItem[], gap: number, itemHeight: number, hintY: number): number {
+  for (const c of conflicting) {
+    if (hintY < c.relativeY + c.height + gap && hintY + itemHeight + gap > c.relativeY) {
+      // Conflict — fall back to normal packing
+      return findMinYPacked(conflicting, gap, itemHeight);
+    }
+  }
+  return hintY;
+}
+
+/**
  * Find the minimum Y position where an item of the given height fits
  * without overlapping any conflicting items.
  * Scans from top to bottom for the first gap large enough.
@@ -186,8 +201,25 @@ function placeWithOrder(
   overlaps: OverlapGraph,
   comparator: (a: SizedItem, b: SizedItem) => number,
   gap: number,
+  priorityEvent?: TimelineEvent,
+  pinnedRelativeY?: number,
+  sketchHints?: Map<TimelineEvent, number>,
 ): { items: PlacedItem[]; totalHeight: number } {
-  const sorted = [...sized].sort(comparator);
+  const sorted = [...sized].sort((a, b) => {
+    if (priorityEvent) {
+      if (a.event === priorityEvent) return -1;
+      if (b.event === priorityEvent) return 1;
+    }
+    // In sketch mode, process by hinted Y (ascending) so higher events keep position
+    if (sketchHints) {
+      const aHint = sketchHints.get(a.event);
+      const bHint = sketchHints.get(b.event);
+      if (aHint !== undefined && bHint !== undefined) return aHint - bHint;
+      if (aHint !== undefined) return -1;
+      if (bHint !== undefined) return 1;
+    }
+    return comparator(a, b);
+  });
 
   const placedMap = new Map<TimelineEvent, PlacedItem>();
   const placed: PlacedItem[] = [];
@@ -201,7 +233,17 @@ function placeWithOrder(
     }
     conflicting.sort((a, b) => a.relativeY - b.relativeY);
 
-    const y = findMinYPacked(conflicting, gap, item.height);
+    let y: number;
+    if (pinnedRelativeY !== undefined && item.event === priorityEvent) {
+      y = pinnedRelativeY;
+    } else if (sketchHints) {
+      const hint = sketchHints.get(item.event);
+      y = hint !== undefined
+        ? findYWithHint(conflicting, gap, item.height, hint)
+        : findMinYPacked(conflicting, gap, item.height);
+    } else {
+      y = findMinYPacked(conflicting, gap, item.height);
+    }
 
     placed.push({
       event: item.event,
@@ -250,6 +292,9 @@ function placeLevel(
   eventOrders?: EventOrderMap,
   parentPath?: string[],
   hiddenEvents?: Set<TimelineEvent>,
+  priorityEvent?: TimelineEvent,
+  pinnedRelativeY?: number,
+  sketchHints?: Map<TimelineEvent, number>,
 ): { items: PlacedItem[]; totalHeight: number } {
   // Filter out hidden events at this level
   const visibleEvents = hiddenEvents
@@ -343,7 +388,7 @@ function placeLevel(
 
     const childPath = [...(parentPath ?? []), event.name];
     const { items: placedChildren, totalHeight: contentHeight } =
-      placeLevel(event.nested, LAYOUT.childBarHeight, LAYOUT.rowGap, collapsedEvents, eventOrders, childPath, hiddenEvents);
+      placeLevel(event.nested, LAYOUT.childBarHeight, LAYOUT.rowGap, collapsedEvents, eventOrders, childPath, hiddenEvents, priorityEvent);
 
     // Compute overlap range that includes children (and grandchildren) extending beyond the parent
     let overlapStart = base.startYear;
@@ -384,7 +429,32 @@ function placeLevel(
 
   // Custom order: single pass with simple stacking (preserves drag-reorder behavior)
   if (customOrder) {
-    const sorted = sortByCustomOrder(sized, customOrder);
+    const customSorted = sortByCustomOrder(sized, customOrder);
+    let sorted: SizedItem[];
+    if (priorityEvent && sketchHints) {
+      // Sketch mode: priority first, then by hinted Y ascending
+      const rest = customSorted.filter(s => s.event !== priorityEvent);
+      rest.sort((a, b) => {
+        const aHint = sketchHints.get(a.event);
+        const bHint = sketchHints.get(b.event);
+        if (aHint !== undefined && bHint !== undefined) return aHint - bHint;
+        if (aHint !== undefined) return -1;
+        if (bHint !== undefined) return 1;
+        return 0;
+      });
+      sorted = [
+        ...customSorted.filter(s => s.event === priorityEvent),
+        ...rest,
+      ];
+    } else if (priorityEvent) {
+      // Priority but no sketch: move priority event to front
+      sorted = [
+        ...customSorted.filter(s => s.event === priorityEvent),
+        ...customSorted.filter(s => s.event !== priorityEvent),
+      ];
+    } else {
+      sorted = customSorted;
+    }
     const placedMap = new Map<TimelineEvent, PlacedItem>();
     const placed: PlacedItem[] = [];
 
@@ -397,7 +467,17 @@ function placeLevel(
       }
       conflicting.sort((a, b) => a.relativeY - b.relativeY);
 
-      const y = findMinY(conflicting, gap);
+      let y: number;
+      if (pinnedRelativeY !== undefined && item.event === priorityEvent) {
+        y = pinnedRelativeY;
+      } else if (sketchHints) {
+        const hint = sketchHints.get(item.event);
+        y = hint !== undefined
+          ? findYWithHint(conflicting, gap, item.height, hint)
+          : findMinY(conflicting, gap);
+      } else {
+        y = findMinY(conflicting, gap);
+      }
 
       placed.push({
         event: item.event,
@@ -432,7 +512,14 @@ function placeLevel(
 
   const hasVariedHeights = sized.length > 1 && sized.some(s => s.height !== sized[0].height);
   if (!hasVariedHeights) {
-    const result = placeWithOrder(sized, overlaps, byStartYear, gap);
+    const result = placeWithOrder(sized, overlaps, byStartYear, gap, priorityEvent, pinnedRelativeY, sketchHints);
+    result.items.sort((a, b) => a.startYear - b.startYear);
+    return result;
+  }
+
+  // Skip multi-pass when sketch hints are active (hints determine positions)
+  if (sketchHints) {
+    const result = placeWithOrder(sized, overlaps, byStartYear, gap, priorityEvent, pinnedRelativeY, sketchHints);
     result.items.sort((a, b) => a.startYear - b.startYear);
     return result;
   }
@@ -440,8 +527,8 @@ function placeLevel(
   const byHeightDesc = (a: SizedItem, b: SizedItem) =>
     b.height - a.height || a.startYear - b.startYear;
 
-  const result1 = placeWithOrder(sized, overlaps, byStartYear, gap);
-  const result2 = placeWithOrder(sized, overlaps, byHeightDesc, gap);
+  const result1 = placeWithOrder(sized, overlaps, byStartYear, gap, priorityEvent, pinnedRelativeY);
+  const result2 = placeWithOrder(sized, overlaps, byHeightDesc, gap, priorityEvent, pinnedRelativeY);
 
   // Pick the more compact result; start-year wins ties for visual stability
   const best = result2.totalHeight < result1.totalHeight ? result2 : result1;
@@ -512,7 +599,19 @@ export function computeLayout(
   collapsedEvents?: Set<TimelineEvent>,
   eventOrders?: EventOrderMap,
   hiddenEvents?: Set<TimelineEvent>,
+  priorityEvent?: TimelineEvent,
+  pinnedY?: number,
+  sketchHints?: Map<TimelineEvent, number>,
 ): LayoutItem[] {
-  const { items } = placeLevel(events, LAYOUT.parentBarHeight, LAYOUT.itemGap, collapsedEvents, eventOrders, [], hiddenEvents);
+  const pinnedRelativeY = pinnedY !== undefined ? pinnedY - startY : undefined;
+  // Convert absolute Y hints to relative
+  let relativeHints: Map<TimelineEvent, number> | undefined;
+  if (sketchHints) {
+    relativeHints = new Map();
+    for (const [e, y] of sketchHints) {
+      relativeHints.set(e, y - startY);
+    }
+  }
+  const { items } = placeLevel(events, LAYOUT.parentBarHeight, LAYOUT.itemGap, collapsedEvents, eventOrders, [], hiddenEvents, priorityEvent, pinnedRelativeY, relativeHints);
   return toLayoutItems(items, startY);
 }

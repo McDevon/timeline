@@ -65,6 +65,25 @@ describe('collectSnapTargets', () => {
     const layout = [makeLayoutItem(e, 2000, 2000)];
     expect(collectSnapTargets(layout)).toEqual([2000]);
   });
+
+  it('excludes specified event from targets', () => {
+    const e1 = makeEvent('A', '2000', '2010');
+    const e2 = makeEvent('B', '2020', '2030');
+    const layout = [makeLayoutItem(e1, 2000, 2010), makeLayoutItem(e2, 2020, 2030)];
+    const targets = collectSnapTargets(layout, e1);
+    expect(targets).toEqual([2020, 2030]);
+  });
+
+  it('excludes event but keeps its children targets', () => {
+    const child = makeEvent('C', '2005', '2008');
+    const parent = makeEvent('P', '2000', '2010');
+    parent.nested = [child];
+    const childLayout = makeLayoutItem(child, 2005, 2008);
+    const parentLayout = makeLayoutItem(parent, 2000, 2010, [childLayout]);
+    const targets = collectSnapTargets([parentLayout], parent);
+    // Parent's own edges excluded, but child's edges kept
+    expect(targets).toEqual([2005, 2008]);
+  });
 });
 
 describe('findSnapYear', () => {

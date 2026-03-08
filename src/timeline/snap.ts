@@ -1,5 +1,6 @@
 import { LayoutItem } from './layout';
 import { Viewport, yearToX, xToYear } from './viewport';
+import { TimelineEvent } from '../types';
 import { formatDate, todayIsoDate } from '../data/time';
 
 const SNAP_THRESHOLD_PX = 10;
@@ -93,13 +94,15 @@ export function getSnapDetail(year: number, layout: LayoutItem[]): SnapDetail | 
  * Collect all snap target years from the layout tree.
  * Returns a sorted, deduplicated array of decimal years.
  */
-export function collectSnapTargets(layout: LayoutItem[]): number[] {
+export function collectSnapTargets(layout: LayoutItem[], excludeEvent?: TimelineEvent): number[] {
   const years = new Set<number>();
 
   function walk(items: LayoutItem[]) {
     for (const item of items) {
-      years.add(item.nominalStartYear);
-      years.add(item.nominalEndYear);
+      if (item.event !== excludeEvent) {
+        years.add(item.nominalStartYear);
+        years.add(item.nominalEndYear);
+      }
       if (item.children.length > 0) {
         walk(item.children);
       }

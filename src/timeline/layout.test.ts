@@ -215,4 +215,114 @@ describe('computeLayout', () => {
     expect(layout[0].nominalEndYear).toBeGreaterThan(2010);
     expect(layout[0].nominalEndYear).toBeLessThan(2011);
   });
+
+  it('gives priority event the first row when priorityEvent is set', () => {
+    // A and B overlap. Without priority, A (earlier start) gets row 0.
+    // With B as priority, B should get row 0.
+    const a = makeEvent('A', '2000', '2010');
+    const b = makeEvent('B', '2005', '2015');
+    const layout = computeLayout([a, b], startY, undefined, undefined, undefined, b);
+    const aItem = layout.find(l => l.event === a)!;
+    const bItem = layout.find(l => l.event === b)!;
+    expect(bItem.y).toBe(startY);
+    expect(aItem.y).toBeGreaterThan(bItem.y);
+  });
+
+  it('priority event works with custom order', () => {
+    // Custom order puts A first, but priority gives B the first row
+    const a = makeEvent('A', '2000', '2010');
+    const b = makeEvent('B', '2005', '2015');
+    const orders = new Map([['[]', ['A', 'B']]]);
+    const layout = computeLayout([a, b], startY, undefined, orders, undefined, b);
+    const aItem = layout.find(l => l.event === a)!;
+    const bItem = layout.find(l => l.event === b)!;
+    expect(bItem.y).toBe(startY);
+    expect(aItem.y).toBeGreaterThan(bItem.y);
+  });
+
+  it('pins priority event at pinnedY and packs others around it', () => {
+    // A and B overlap. Pin B at a specific Y (second row).
+    // A should pack into the first row, not overlap with B.
+    const a = makeEvent('A', '2000', '2010');
+    const b = makeEvent('B', '2005', '2015');
+    const bPinnedY = startY + 38; // second row position
+    const layout = computeLayout([a, b], startY, undefined, undefined, undefined, b, bPinnedY);
+    const aItem = layout.find(l => l.event === a)!;
+    const bItem = layout.find(l => l.event === b)!;
+    expect(bItem.y).toBe(bPinnedY);
+    // A should not overlap with B
+    expect(aItem.y + aItem.height).toBeLessThanOrEqual(bItem.y);
+  });
+
+  it('sketch hints keep non-conflicting events at their saved Y', () => {
+    // A on row 0, B on row 1 (they overlap). Drag C (non-overlapping) horizontally.
+    // A and B should stay at their original rows via sketch hints.
+    const a = makeEvent('A', '2000', '2010');
+    const b = makeEvent('B', '2005', '2015');
+    const c = makeEvent('C', '2020', '2030');
+
+    // First layout — get natural positions
+    const layout1 = computeLayout([a, b, c], startY);
+    const aY = layout1.find(l => l.event === a)!.y;
+    const bY = layout1.find(l => l.event === b)!.y;
+    const cY = layout1.find(l => l.event === c)!.y;
+
+    // Sketch layout — C is pinned, A and B have hints
+    const hints = new Map([[a, aY], [b, bY], [c, cY]]);
+    const layout2 = computeLayout([a, b, c], startY, undefined, undefined, undefined, c, cY, hints);
+    expect(layout2.find(l => l.event === a)!.y).toBe(aY);
+    expect(layout2.find(l => l.event === b)!.y).toBe(bY);
+    expect(layout2.find(l => l.event === c)!.y).toBe(cY);
+  });
+
+  it('sketch hints displace events that conflict with pinned event', () => {
+    // A and B don't overlap, both on row 0.
+    // Drag A so it overlaps with B. B should be displaced below A.
+    const a = makeEvent('A', '2000', '2010');
+    const b = makeEvent('B', '2015', '2025');
+
+    const layout1 = computeLayout([a, b], startY);
+    const aY = layout1.find(l => l.event === a)!.y;
+    const bY = layout1.find(l => l.event === b)!.y;
+    expect(aY).toBe(bY); // same row, no overlap
+
+    // Now simulate A being dragged to overlap with B (A: 2012-2022)
+    a.start = '2012';
+    a.end = '2022';
+    const hints = new Map([[a, aY], [b, bY]]);
+    const layout2 = computeLayout([a, b], startY, undefined, undefined, undefined, a, aY, hints);
+    expect(layout2.find(l => l.event === a)!.y).toBe(aY); // pinned
+    expect(layout2.find(l => l.event === b)!.y).toBeGreaterThan(aY); // displaced below
+  });
+
+  it('sketch hints let events return to saved Y when conflict resolves', () => {
+    // A and B overlap, on different rows. C doesn't overlap either.
+    // Drag C to overlap with A. A is pinned, B stays via hint.
+    // Then "drag" C away from A — B should stay at its hint position.
+    const a = makeEvent('A', '2000', '2010');
+    const b = makeEvent('B', '2005', '2015');
+    const c = makeEvent('C', '2020', '2030');
+
+    const layout1 = computeLayout([a, b, c], startY);
+    const aY = layout1.find(l => l.event === a)!.y;
+    const bY = layout1.find(l => l.event === b)!.y;
+    const cY = layout1.find(l => l.event === c)!.y;
+
+    const hints = new Map([[a, aY], [b, bY], [c, cY]]);
+
+    // C moves to overlap with B (same time range as B)
+    c.start = '2005';
+    c.end = '2015';
+    const layout2 = computeLayout([a, b, c], startY, undefined, undefined, undefined, c, bY, hints);
+    // C pinned at B's old row, B should be displaced
+    const bItem2 = layout2.find(l => l.event === b)!;
+    expect(bItem2.y).not.toBe(bY);
+
+    // C moves back to non-overlapping position
+    c.start = '2020';
+    c.end = '2030';
+    const layout3 = computeLayout([a, b, c], startY, undefined, undefined, undefined, c, cY, hints);
+    // B should return to its hint position
+    expect(layout3.find(l => l.event === b)!.y).toBe(bY);
+  });
 });
