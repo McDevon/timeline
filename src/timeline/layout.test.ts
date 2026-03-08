@@ -325,4 +325,44 @@ describe('computeLayout', () => {
     // B should return to its hint position
     expect(layout3.find(l => l.event === b)!.y).toBe(bY);
   });
+
+  it('sketch hints work for nested events inside a container', () => {
+    // Container P with children A and B that overlap. C is a separate top-level event.
+    // Drag child A horizontally — both children and the container should respect hints.
+    const a = makeEvent('A', '2002', '2006');
+    const b = makeEvent('B', '2004', '2008');
+    const parent = makeEvent('P', '2000', '2010', [a, b]);
+    const c = makeEvent('C', '2015', '2025');
+
+    // First layout — get natural positions
+    const layout1 = computeLayout([parent, c], startY);
+    const parentItem = layout1.find(l => l.event === parent)!;
+    const aItem = parentItem.children.find(l => l.event === a)!;
+    const bItem = parentItem.children.find(l => l.event === b)!;
+    const cItem = layout1.find(l => l.event === c)!;
+
+    // A and B should be on different rows (they overlap)
+    expect(aItem.y).not.toBe(bItem.y);
+
+    // Build hints from all absolute positions
+    const hints = new Map([
+      [parent, parentItem.y],
+      [a, aItem.y],
+      [b, bItem.y],
+      [c, cItem.y],
+    ]);
+
+    // Drag A so it no longer overlaps B — children should keep their hint positions
+    a.start = '2009';
+    a.end = '2010';
+    const layout2 = computeLayout([parent, c], startY, undefined, undefined, undefined, a, aItem.y, hints);
+    const parentItem2 = layout2.find(l => l.event === parent)!;
+    const aItem2 = parentItem2.children.find(l => l.event === a)!;
+    const bItem2 = parentItem2.children.find(l => l.event === b)!;
+
+    // A should be pinned at its original Y
+    expect(aItem2.y).toBe(aItem.y);
+    // B should stay at its hinted Y
+    expect(bItem2.y).toBe(bItem.y);
+  });
 });

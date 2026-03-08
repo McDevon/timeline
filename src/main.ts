@@ -576,6 +576,15 @@ async function main() {
   }
 
   // --- Sketch mode callbacks ---
+  function hasTargetChanged(items: LayoutItem[], prevTargets: Map<TimelineEvent, number>): boolean {
+    for (const it of items) {
+      const prev = prevTargets.get(it.event);
+      if (prev !== undefined && Math.abs(prev - it.y) > 0.5) return true;
+      if (it.children.length > 0 && hasTargetChanged(it.children, prevTargets)) return true;
+    }
+    return false;
+  }
+
   function collectOriginalDates(events: TimelineEvent[], map: Map<TimelineEvent, { start: string; end?: string }>) {
     for (const e of events) {
       map.set(e, { start: e.start, end: e.end });
@@ -618,9 +627,47 @@ async function main() {
       shiftChildren(event.nested, deltaYears);
     }
 
+    // Save layout positions before relayout (to detect if targets changed)
+    const prevTargets = new Map<TimelineEvent, number>();
+    capturePositions(state.layout, prevTargets);
+
+    // Capture visual positions (for animation blending if targets change)
+    const oldVisual = new Map<TimelineEvent, number>();
+    const transition = anim.layoutTransition;
+    const progress = transition
+      ? easeInOut(Math.min((performance.now() - transition.startTime) / LAYOUT_ANIM_MS, 1))
+      : 1;
+    function captureVisual(items: LayoutItem[], inheritedOffset: number) {
+      for (const it of items) {
+        const ownRelOffset = transition?.yOffsets.get(it.event) ?? 0;
+        const ownAbsOffset = inheritedOffset + ownRelOffset;
+        oldVisual.set(it.event, it.y + ownAbsOffset * (1 - progress));
+        if (it.children.length > 0) captureVisual(it.children, ownAbsOffset);
+      }
+    }
+    captureVisual(state.layout, 0);
+
     // Recompute layout: pinned event stays at its row, others use hints
     const pinnedY = state.sketchSavedPositions!.get(event);
     relayout(event, pinnedY, state.sketchSavedPositions!);
+
+    // Only start/restart animation when layout targets actually changed
+    const targetsChanged = hasTargetChanged(state.layout, prevTargets);
+
+    if (targetsChanged) {
+      const yOffsets = new Map<TimelineEvent, number>();
+      computeOffsets(state.layout, oldVisual, yOffsets);
+      if (yOffsets.size > 0) {
+        anim.layoutTransition = {
+          startTime: performance.now(),
+          fadingOut: [],
+          yOffsets,
+          fadingIn: new Set(),
+        };
+      } else {
+        anim.layoutTransition = null;
+      }
+    }
 
     requestRedraw();
   }

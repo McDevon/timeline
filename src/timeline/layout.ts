@@ -21,6 +21,9 @@ const LAYOUT = {
   itemGap: 8,
 };
 
+/** Offset from a container's Y to where its children content starts. */
+export const CONTAINER_CONTENT_OFFSET = LAYOUT.containerHeaderHeight + LAYOUT.containerPadding;
+
 export interface LayoutItem {
   event: TimelineEvent;
   startYear: number;
@@ -301,6 +304,12 @@ function placeLevel(
     ? events.filter(e => !hiddenEvents.has(e))
     : events;
 
+  // Derive pinnedRelativeY from sketch hints if the priority event is at this level
+  if (priorityEvent && sketchHints && visibleEvents.includes(priorityEvent)) {
+    const hint = sketchHints.get(priorityEvent);
+    if (hint !== undefined) pinnedRelativeY = hint;
+  }
+
   // Phase 1: compute heights (recursively for containers)
   const sized: SizedItem[] = visibleEvents.map(event => {
     const nominalStart = dateToDecimalYear(event.start);
@@ -388,7 +397,7 @@ function placeLevel(
 
     const childPath = [...(parentPath ?? []), event.name];
     const { items: placedChildren, totalHeight: contentHeight } =
-      placeLevel(event.nested, LAYOUT.childBarHeight, LAYOUT.rowGap, collapsedEvents, eventOrders, childPath, hiddenEvents, priorityEvent);
+      placeLevel(event.nested, LAYOUT.childBarHeight, LAYOUT.rowGap, collapsedEvents, eventOrders, childPath, hiddenEvents, priorityEvent, undefined, sketchHints);
 
     // Compute overlap range that includes children (and grandchildren) extending beyond the parent
     let overlapStart = base.startYear;
@@ -591,6 +600,28 @@ function toLayoutItems(placed: PlacedItem[], offsetY: number): LayoutItem[] {
 }
 
 /**
+ * Walk the event tree and convert absolute Y hints to relative Y values
+ * at each nesting level. Top-level events are relative to levelBaseY;
+ * children are relative to their parent's content area (parentY + CONTAINER_CONTENT_OFFSET).
+ */
+function buildRelativeHints(
+  events: TimelineEvent[],
+  absoluteHints: Map<TimelineEvent, number>,
+  levelBaseY: number,
+  result: Map<TimelineEvent, number>,
+): void {
+  for (const event of events) {
+    const absY = absoluteHints.get(event);
+    if (absY !== undefined) {
+      result.set(event, absY - levelBaseY);
+    }
+    if (event.nested && event.nested.length > 0 && absY !== undefined) {
+      buildRelativeHints(event.nested, absoluteHints, absY + CONTAINER_CONTENT_OFFSET, result);
+    }
+  }
+}
+
+/**
  * Recursively compute layout for a list of events starting at a given Y offset.
  */
 export function computeLayout(
@@ -604,13 +635,11 @@ export function computeLayout(
   sketchHints?: Map<TimelineEvent, number>,
 ): LayoutItem[] {
   const pinnedRelativeY = pinnedY !== undefined ? pinnedY - startY : undefined;
-  // Convert absolute Y hints to relative
+  // Convert absolute Y hints to level-correct relative values
   let relativeHints: Map<TimelineEvent, number> | undefined;
   if (sketchHints) {
     relativeHints = new Map();
-    for (const [e, y] of sketchHints) {
-      relativeHints.set(e, y - startY);
-    }
+    buildRelativeHints(events, sketchHints, startY, relativeHints);
   }
   const { items } = placeLevel(events, LAYOUT.parentBarHeight, LAYOUT.itemGap, collapsedEvents, eventOrders, [], hiddenEvents, priorityEvent, pinnedRelativeY, relativeHints);
   return toLayoutItems(items, startY);
