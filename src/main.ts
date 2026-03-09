@@ -592,7 +592,7 @@ async function main() {
     }
   }
 
-  function onSketchMove(item: LayoutItem, newStartYear: number, newEndYear: number) {
+  function onSketchMove(item: LayoutItem, newStartYear: number, newEndYear: number, isResize?: boolean) {
     const event = item.event;
 
     // Save original dates and all Y positions on first move
@@ -606,25 +606,29 @@ async function main() {
       capturePositions(state.layout, state.sketchSavedPositions);
     }
 
-    const currentStartYear = dateToDecimalYear(event.start);
-    const deltaYears = newStartYear - currentStartYear;
+    // Compute total delta from original dates to avoid rounding drift
+    // on imprecise (year-only, month-only) dates across many small moves.
+    const origParent = state.sketchOriginalDates!.get(event)!;
+    const totalStartDelta = newStartYear - dateToDecimalYear(origParent.start);
 
-    // Update event dates
-    event.start = shiftIsoDate(event.start, deltaYears);
-    if (event.end !== undefined && event.end !== 'ongoing') {
-      const currentEndYear = dateToDecimalYear(event.end);
-      const endDelta = newEndYear - currentEndYear;
-      event.end = shiftIsoDate(event.end, endDelta);
+    // Update event dates from originals
+    event.start = shiftIsoDate(origParent.start, totalStartDelta);
+    if (origParent.end !== undefined && origParent.end !== 'ongoing') {
+      const totalEndDelta = newEndYear - dateToDecimalYear(origParent.end);
+      event.end = shiftIsoDate(origParent.end, totalEndDelta);
     }
 
-    // For container moves (duration unchanged), shift children
-    const duration = newEndYear - newStartYear;
-    const origDuration = (state.sketchPriorityEvent === event)
-      ? (item.nominalEndYear - item.nominalStartYear) // won't change during a move
-      : 0;
+    // For container moves (duration unchanged), shift children.
+    // Resizes never shift children — only moves do.
+    if (!isResize) {
+      const duration = newEndYear - newStartYear;
+      const origDuration = (state.sketchPriorityEvent === event)
+        ? (item.nominalEndYear - item.nominalStartYear) // won't change during a move
+        : 0;
 
-    if (event.nested && event.nested.length > 0 && Math.abs(duration - origDuration) < 0.001) {
-      shiftChildren(event.nested, deltaYears);
+      if (event.nested && event.nested.length > 0 && Math.abs(duration - origDuration) < 0.001) {
+        shiftChildren(event.nested, totalStartDelta, state.sketchOriginalDates!);
+      }
     }
 
     // Save layout positions before relayout (to detect if targets changed)
@@ -708,14 +712,17 @@ async function main() {
     requestRedraw();
   }
 
-  function shiftChildren(children: TimelineEvent[], deltaYears: number) {
+  function shiftChildren(children: TimelineEvent[], deltaYears: number, origDates: Map<TimelineEvent, { start: string; end?: string }>) {
     for (const child of children) {
-      child.start = shiftIsoDate(child.start, deltaYears);
-      if (child.end !== undefined && child.end !== 'ongoing') {
-        child.end = shiftIsoDate(child.end, deltaYears);
+      const orig = origDates.get(child);
+      if (orig) {
+        child.start = shiftIsoDate(orig.start, deltaYears);
+        if (orig.end !== undefined && orig.end !== 'ongoing') {
+          child.end = shiftIsoDate(orig.end, deltaYears);
+        }
       }
       if (child.nested) {
-        shiftChildren(child.nested, deltaYears);
+        shiftChildren(child.nested, deltaYears, origDates);
       }
     }
   }

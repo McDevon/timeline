@@ -36,7 +36,7 @@ export interface InputConfig {
   getShowTodayLine?: () => boolean;
   onContextMenu?: (event: import('../types').TimelineEvent, x: number, y: number) => void;
   getSketchMode?: () => boolean;
-  onSketchMove?: (item: LayoutItem, newStartYear: number, newEndYear: number) => void;
+  onSketchMove?: (item: LayoutItem, newStartYear: number, newEndYear: number, isResize?: boolean) => void;
   onSketchEnd?: (item: LayoutItem) => void;
   onSketchCancel?: () => void;
 }
@@ -694,7 +694,7 @@ export function setupInput(config: InputConfig): InputHandlers {
         }
       }
 
-      onSketchMove?.(drag.item, newStartYear, newEndYear);
+      onSketchMove?.(drag.item, newStartYear, newEndYear, true);
       scheduleRedraw();
       return;
     }
