@@ -11,6 +11,10 @@ import {
   todayDecimalYear,
   todayIsoDate,
   MONTH_NAMES,
+  daysInYear,
+  monthStartDay,
+  decYearToAbsDay,
+  absDayToDecYear,
 } from "../data/time";
 import { LayoutItem } from "./layout";
 import { SnapDetail, SnapState } from "./snap";
@@ -200,15 +204,13 @@ function drawMonthGrid(
 
   const labelY = LAYOUT.axisY + LAYOUT.tickHeight / 2 + 4;
 
-  // Cumulative day-of-year for each month start (non-leap)
-  const monthStartDay = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
-
   for (let year = firstYear; year <= lastYear; year++) {
+    const totalDays = daysInYear(year);
     for (let month = 0; month < 12; month++) {
-      const decYear = year + monthStartDay[month] / 365;
+      const decYear = year + monthStartDay(year, month + 1) / totalDays;
       const nextMonth = month + 1;
       const nextDecYear = nextMonth < 12
-        ? year + monthStartDay[nextMonth] / 365
+        ? year + monthStartDay(year, nextMonth + 1) / totalDays
         : year + 1;
       const x = yearToX(decYear, viewport, canvasWidth);
       const nextX = yearToX(nextDecYear, viewport, canvasWidth);
@@ -246,30 +248,31 @@ function drawWeekBands(
   canvasWidth: number,
   canvasHeight: number,
 ) {
-  const weekStep = 7 / 365;
-  // Jan 1, 2024 is a Monday — use as epoch for consistent week alignment
-  const epoch = 2024.0;
+  // Convert viewport edges to absolute days from epoch (Jan 1 2024 = Monday)
+  const startDay = decYearToAbsDay(viewport.start);
+  const endDay = decYearToAbsDay(viewport.end);
 
-  // Find the first Monday-aligned week boundary at or before viewport.start
-  const weeksSinceEpoch = Math.floor((viewport.start - epoch) / weekStep);
-  let weekStart = epoch + weeksSinceEpoch * weekStep;
-  let weekIndex = weeksSinceEpoch;
+  // Find the first Monday-aligned week boundary at or before startDay
+  // Epoch day 0 is a Monday, so align to multiples of 7
+  const firstWeekDay = Math.floor(startDay / 7) * 7;
+  let weekIndex = Math.floor(startDay / 7);
 
   const top = LAYOUT.axisY;
   ctx.fillStyle = colorWithAlpha(colors.axisText, 0.05);
 
-  while (weekStart < viewport.end) {
-    const weekEnd = weekStart + weekStep;
+  let dayPos = firstWeekDay;
+  while (dayPos < endDay) {
+    const nextDayPos = dayPos + 7;
 
     if (weekIndex % 2 !== 0) {
-      const x1 = Math.max(0, yearToX(weekStart, viewport, canvasWidth));
-      const x2 = Math.min(canvasWidth, yearToX(weekEnd, viewport, canvasWidth));
+      const x1 = Math.max(0, yearToX(absDayToDecYear(dayPos), viewport, canvasWidth));
+      const x2 = Math.min(canvasWidth, yearToX(absDayToDecYear(nextDayPos), viewport, canvasWidth));
       if (x2 > x1) {
         ctx.fillRect(x1, top, x2 - x1, canvasHeight - top);
       }
     }
 
-    weekStart = weekEnd;
+    dayPos = nextDayPos;
     weekIndex++;
   }
 }

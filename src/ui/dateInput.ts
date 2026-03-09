@@ -1,5 +1,6 @@
+import { daysInMonth as daysInMonthFn } from '../data/time';
+
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const DAYS_IN_MONTH = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
 export class DateInput {
   private el: HTMLDivElement;
@@ -22,7 +23,7 @@ export class DateInput {
     this.yearInput.type = 'number';
     this.yearInput.min = '1';
     this.yearInput.className = 'date-input-year';
-    this.yearInput.addEventListener('input', () => this.emitChange());
+    this.yearInput.addEventListener('input', () => { this.updateDayOptions(); this.emitChange(); });
     this.yearInput.addEventListener('blur', () => this.emitCommit());
     this.yearInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') this.emitCommit();
@@ -31,7 +32,7 @@ export class DateInput {
     this.eraSelect = document.createElement('select');
     this.eraSelect.className = 'date-input-era';
     this.eraSelect.innerHTML = '<option value="CE">CE</option><option value="BCE">BCE</option>';
-    this.eraSelect.addEventListener('change', () => { this.emitChange(); this.emitCommit(); });
+    this.eraSelect.addEventListener('change', () => { this.updateDayOptions(); this.emitChange(); this.emitCommit(); });
 
     row1.appendChild(this.yearInput);
     row1.appendChild(this.eraSelect);
@@ -99,8 +100,11 @@ export class DateInput {
     }
     this.daySelect.style.display = '';
 
-    const monthIdx = parseInt(monthVal, 10) - 1;
-    const maxDay = DAYS_IN_MONTH[monthIdx];
+    const monthNum = parseInt(monthVal, 10);
+    const yearVal = parseInt(this.yearInput.value, 10) || 1;
+    const bce = this.eraSelect.value === 'BCE';
+    const calYear = bce ? -yearVal : yearVal;
+    const maxDay = daysInMonthFn(calYear, monthNum);
     const currentDay = parseInt(this.daySelect.value, 10) || 0;
 
     let html = '<option value="">\u2014</option>';

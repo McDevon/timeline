@@ -10,7 +10,34 @@ import {
   formatDecimalYearDelta,
   formatAxisLabel,
   shiftIsoDate,
+  isLeapYear,
+  daysFromEpochToYear,
+  decYearToAbsDay,
+  absDayToDecYear,
 } from './time';
+
+describe('isLeapYear', () => {
+  it('returns true for divisible by 4', () => {
+    expect(isLeapYear(2024)).toBe(true);
+  });
+
+  it('returns true for divisible by 400', () => {
+    expect(isLeapYear(2000)).toBe(true);
+  });
+
+  it('returns false for divisible by 100 but not 400', () => {
+    expect(isLeapYear(1900)).toBe(false);
+  });
+
+  it('returns false for non-leap year', () => {
+    expect(isLeapYear(2023)).toBe(false);
+  });
+
+  it('returns false for BCE years', () => {
+    expect(isLeapYear(-4)).toBe(false);
+    expect(isLeapYear(0)).toBe(false);
+  });
+});
 
 describe('dateToDecimalYear', () => {
   it('returns integer for year-only format', () => {
@@ -25,14 +52,14 @@ describe('dateToDecimalYear', () => {
 
   it('adds fractional part for year-month', () => {
     const val = dateToDecimalYear('2000-07');
-    // July 1 = day 182, fraction = 181/365
+    // July 1 in leap year 2000: day 183, fraction = 182/366
     expect(val).toBeGreaterThan(2000);
     expect(val).toBeLessThan(2001);
   });
 
   it('adds fractional part for full date', () => {
     const val = dateToDecimalYear('2000-01-01');
-    // Jan 1 → dayOfYear=1, fraction=(1-1)/365=0
+    // Jan 1 → dayOfYear=1, fraction=(1-1)/366=0
     expect(val).toBe(2000);
   });
 
@@ -40,10 +67,16 @@ describe('dateToDecimalYear', () => {
     expect(dateToDecimalYear('2000-01-01')).toBe(2000);
   });
 
-  it('handles end of year', () => {
+  it('handles end of year (leap year)', () => {
     const val = dateToDecimalYear('2000-12-31');
-    // Dec 31 → dayOfYear = 365, fraction = 364/365
-    expect(val).toBeCloseTo(2000 + 364 / 365, 5);
+    // Dec 31 of leap year → dayOfYear = 366, fraction = 365/366
+    expect(val).toBeCloseTo(2000 + 365 / 366, 5);
+  });
+
+  it('handles end of year (non-leap year)', () => {
+    const val = dateToDecimalYear('2001-12-31');
+    // Dec 31 of non-leap year → fraction = 364/365
+    expect(val).toBeCloseTo(2001 + 364 / 365, 5);
   });
 
   it('handles negative year with month and day', () => {
@@ -52,10 +85,23 @@ describe('dateToDecimalYear', () => {
     expect(val).toBeLessThan(-2999);
   });
 
-  it('Feb 1 gives correct fraction', () => {
+  it('Feb 1 gives correct fraction (leap year)', () => {
     const val = dateToDecimalYear('2000-02-01');
+    // Feb 1 → dayOfYear = 32, fraction = 31/366
+    expect(val).toBeCloseTo(2000 + 31 / 366, 5);
+  });
+
+  it('Feb 1 gives correct fraction (non-leap year)', () => {
+    const val = dateToDecimalYear('2001-02-01');
     // Feb 1 → dayOfYear = 32, fraction = 31/365
-    expect(val).toBeCloseTo(2000 + 31 / 365, 5);
+    expect(val).toBeCloseTo(2001 + 31 / 365, 5);
+  });
+
+  it('Feb 29 has its own position distinct from Mar 1', () => {
+    const feb29 = dateToDecimalYear('2024-02-29');
+    const mar1 = dateToDecimalYear('2024-03-01');
+    expect(feb29).not.toBe(mar1);
+    expect(mar1).toBeGreaterThan(feb29);
   });
 });
 
@@ -167,11 +213,6 @@ describe('formatPreciseDuration', () => {
   });
 
   it('handles day borrowing', () => {
-    // March 1 - Jan 30: days = 1 - 30 = -29, borrow Feb (28 days) → days = -1
-    // Then months = 2-1-1 = 0, borrow year → months = 11... no, months = 1-1 = 0 after borrow
-    // Actually: days=-29, borrow prev month (Feb=28), days=-29+28=-1 → still negative
-    // The function only borrows once, so this is an edge case.
-    // Let's just assert what the function actually returns.
     expect(formatPreciseDuration('2000-01-30', '2000-03-01')).toBe('1 mo');
   });
 
@@ -190,9 +231,14 @@ describe('decimalYearToDayIso', () => {
     expect(decimalYearToDayIso(2000)).toBe('2000-01-01');
   });
 
-  it('converts mid-year to correct date', () => {
-    // dayOfYear = round(0.5 * 365) + 1 = 183 + 1 = 184 → Jul 3
-    expect(decimalYearToDayIso(2000.5)).toBe('2000-07-03');
+  it('converts mid-year correctly for leap year', () => {
+    // 2000 is leap: dayOfYear = round(0.5 * 366) + 1 = 183 + 1 = 184 → Jul 2
+    expect(decimalYearToDayIso(2000.5)).toBe('2000-07-02');
+  });
+
+  it('converts mid-year correctly for non-leap year', () => {
+    // 2001 is non-leap: dayOfYear = round(0.5 * 365) + 1 = 183 + 1 = 184 → Jul 3
+    expect(decimalYearToDayIso(2001.5)).toBe('2001-07-03');
   });
 
   it('converts negative year', () => {
@@ -217,6 +263,16 @@ describe('decimalYearToDayIso', () => {
   it('round-trips with dateToDecimalYear for BCE date', () => {
     const dec = dateToDecimalYear('-753-04-21');
     expect(decimalYearToDayIso(dec)).toBe('-753-04-21');
+  });
+
+  it('round-trips Feb 29 in a leap year', () => {
+    const dec = dateToDecimalYear('2024-02-29');
+    expect(decimalYearToDayIso(dec)).toBe('2024-02-29');
+  });
+
+  it('round-trips Feb 29 in year 2000', () => {
+    const dec = dateToDecimalYear('2000-02-29');
+    expect(decimalYearToDayIso(dec)).toBe('2000-02-29');
   });
 });
 
@@ -364,5 +420,45 @@ describe('shiftIsoDate', () => {
     const day = parseInt(result.split('-').pop()!, 10);
     expect(day).toBeGreaterThanOrEqual(1);
     expect(day).toBeLessThanOrEqual(31);
+  });
+});
+
+describe('daysFromEpochToYear', () => {
+  it('returns 0 for epoch year 2024', () => {
+    expect(daysFromEpochToYear(2024)).toBe(0);
+  });
+
+  it('returns 366 for 2025 (2024 is a leap year)', () => {
+    expect(daysFromEpochToYear(2025)).toBe(366);
+  });
+
+  it('returns -365 for 2023 (2023 is not a leap year)', () => {
+    expect(daysFromEpochToYear(2023)).toBe(-365);
+  });
+});
+
+describe('decYearToAbsDay / absDayToDecYear round-trip', () => {
+  it('round-trips for start of 2024', () => {
+    const day = decYearToAbsDay(2024.0);
+    expect(day).toBeCloseTo(0);
+    expect(absDayToDecYear(day)).toBeCloseTo(2024.0, 5);
+  });
+
+  it('round-trips for mid-2024', () => {
+    const dy = 2024.5;
+    const day = decYearToAbsDay(dy);
+    expect(absDayToDecYear(day)).toBeCloseTo(dy, 5);
+  });
+
+  it('round-trips for start of 2020', () => {
+    const dy = 2020.0;
+    const day = decYearToAbsDay(dy);
+    expect(absDayToDecYear(day)).toBeCloseTo(dy, 5);
+  });
+
+  it('round-trips for mid-1900', () => {
+    const dy = 1900.5;
+    const day = decYearToAbsDay(dy);
+    expect(absDayToDecYear(day)).toBeCloseTo(dy, 5);
   });
 });

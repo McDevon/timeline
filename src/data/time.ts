@@ -1,3 +1,90 @@
+// --- Leap year utilities ---
+
+/** Returns true if the given CE year is a leap year (Gregorian rules). BCE years return false. */
+export function isLeapYear(y: number): boolean {
+  if (y <= 0) return false;
+  return (y % 4 === 0 && y % 100 !== 0) || (y % 400 === 0);
+}
+
+/** Returns 366 for leap years, 365 otherwise. */
+export function daysInYear(y: number): number {
+  return isLeapYear(y) ? 366 : 365;
+}
+
+/** Days in a given month (1-indexed). Returns 29 for Feb in leap years. */
+export function daysInMonth(year: number, month: number): number {
+  const base = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  if (month === 2 && isLeapYear(year)) return 29;
+  return base[month - 1];
+}
+
+/** Cumulative days before a 1-indexed month (e.g. month=1 → 0, month=2 → 31). */
+export function monthStartDay(year: number, month: number): number {
+  let days = 0;
+  for (let m = 1; m < month; m++) {
+    days += daysInMonth(year, m);
+  }
+  return days;
+}
+
+// --- Absolute day helpers for week bands ---
+
+/** Days from Jan 1 CE year 1 to Jan 1 of year y (for CE years). */
+function daysSinceYear1(y: number): number {
+  const n = y - 1;
+  return n * 365 + Math.floor(n / 4) - Math.floor(n / 100) + Math.floor(n / 400);
+}
+
+/** Days from Jan 1 2024 (epoch) to Jan 1 of year y. O(1) for CE years. */
+export function daysFromEpochToYear(y: number): number {
+  const epoch = 2024;
+  if (y > 0 && epoch > 0) {
+    return daysSinceYear1(y) - daysSinceYear1(epoch);
+  }
+  // BCE: iterate (rare at week-band zoom)
+  let days = 0;
+  if (y < epoch) {
+    for (let yr = y; yr < epoch; yr++) {
+      days -= daysInYear(yr > 0 ? yr : 1); // BCE treated as 365
+    }
+  } else {
+    for (let yr = epoch; yr < y; yr++) {
+      days += daysInYear(yr > 0 ? yr : 1);
+    }
+  }
+  return days;
+}
+
+/** Convert a decimal year to a day offset from the epoch (Jan 1 2024). */
+export function decYearToAbsDay(dy: number): number {
+  const yr = Math.floor(dy);
+  const frac = dy - yr;
+  return daysFromEpochToYear(yr) + frac * daysInYear(yr);
+}
+
+/** Convert a day offset from epoch back to a decimal year. */
+export function absDayToDecYear(d: number): number {
+  // Estimate year from day offset
+  const epoch = 2024;
+  let yr = epoch + Math.floor(d / 365.2425);
+  // Adjust: find the year that contains this day
+  let yrStart = daysFromEpochToYear(yr);
+  while (yrStart > d) {
+    yr--;
+    yrStart = daysFromEpochToYear(yr);
+  }
+  let nextYrStart = daysFromEpochToYear(yr + 1);
+  while (nextYrStart <= d) {
+    yr++;
+    yrStart = nextYrStart;
+    nextYrStart = daysFromEpochToYear(yr + 1);
+  }
+  const total = daysInYear(yr);
+  return yr + (d - yrStart) / total;
+}
+
+// --- Core conversions ---
+
 /**
  * Convert an ISO date string to a decimal year for rendering math.
  *
@@ -9,9 +96,6 @@
  *   "-3000-06-15" → ~-2999.55 (mid-3000 BCE)
  */
 export function dateToDecimalYear(isoDate: string): number {
-  // Parse the string manually to handle negative (BCE) years
-  // and partial formats without relying on Date which has year-0 issues.
-
   let rest = isoDate;
   let negative = false;
 
@@ -27,12 +111,9 @@ export function dateToDecimalYear(isoDate: string): number {
   const month = parts.length >= 2 ? parseInt(parts[1], 10) : 1;
   const day = parts.length >= 3 ? parseInt(parts[2], 10) : 1;
 
-  // Approximate day-of-year fraction
-  // Days per month (non-leap year approximation is fine for timeline purposes)
-  const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
   let dayOfYear = day;
-  for (let i = 0; i < month - 1; i++) {
-    dayOfYear += daysInMonth[i];
+  for (let i = 1; i < month; i++) {
+    dayOfYear += daysInMonth(year, i);
   }
 
   // For year-only format, don't add any fractional part
@@ -40,7 +121,7 @@ export function dateToDecimalYear(isoDate: string): number {
     return year;
   }
 
-  const fraction = (dayOfYear - 1) / 365;
+  const fraction = (dayOfYear - 1) / daysInYear(year);
   return year + fraction;
 }
 
@@ -115,8 +196,6 @@ export function hasFullDate(isoDate: string): boolean {
   return rest.split('-').length >= 3;
 }
 
-const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-
 function parseIsoDate(iso: string): { year: number; month: number; day: number } {
   let rest = iso;
   let negative = false;
@@ -148,7 +227,8 @@ export function formatPreciseDuration(startIso: string, endIso: string): string 
     months--;
     // Borrow days from the previous month (relative to end date)
     const prevMonth = e.month - 1 <= 0 ? 12 : e.month - 1;
-    days += DAYS_IN_MONTH[prevMonth - 1];
+    const borrowYear = e.month - 1 <= 0 ? e.year - 1 : e.year;
+    days += daysInMonth(borrowYear, prevMonth);
   }
   if (months < 0) {
     years--;
@@ -169,21 +249,22 @@ export function formatPreciseDuration(startIso: string, endIso: string): string 
 export function decimalYearToDayIso(year: number): string {
   const floored = Math.floor(year);
   const fraction = year - floored;
-  const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-  let dayOfYear = Math.round(fraction * 365) + 1;
-  dayOfYear = Math.max(1, Math.min(dayOfYear, 365));
+  const totalDays = daysInYear(floored);
+  let dayOfYear = Math.round(fraction * totalDays) + 1;
+  dayOfYear = Math.max(1, Math.min(dayOfYear, totalDays));
 
   let month = 0;
-  for (let i = 0; i < 12; i++) {
-    if (dayOfYear <= daysInMonth[i]) {
-      month = i + 1;
+  for (let i = 1; i <= 12; i++) {
+    const dim = daysInMonth(floored, i);
+    if (dayOfYear <= dim) {
+      month = i;
       break;
     }
-    dayOfYear -= daysInMonth[i];
-    month = i + 2;
+    dayOfYear -= dim;
+    month = i + 1;
   }
   month = Math.min(month, 12);
-  const day = Math.max(1, Math.min(dayOfYear, daysInMonth[month - 1]));
+  const day = Math.max(1, Math.min(dayOfYear, daysInMonth(floored, month)));
   const absYear = Math.abs(floored);
   const prefix = floored < 0 ? `-${absYear}` : `${absYear}`;
   return `${prefix}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -223,20 +304,21 @@ export function shiftIsoDate(iso: string, deltaYears: number): string {
   }
 
   // Year-month and full date: use day-of-year calendar math
-  const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
   const newYear = Math.floor(newDecimal);
   const fraction = newDecimal - newYear;
-  let dayOfYear = Math.round(fraction * 365) + 1;
-  dayOfYear = Math.max(1, Math.min(dayOfYear, 365));
+  const totalDays = daysInYear(newYear);
+  let dayOfYear = Math.round(fraction * totalDays) + 1;
+  dayOfYear = Math.max(1, Math.min(dayOfYear, totalDays));
 
   let month = 0;
-  for (let i = 0; i < 12; i++) {
-    if (dayOfYear <= daysInMonth[i]) {
-      month = i + 1;
+  for (let i = 1; i <= 12; i++) {
+    const dim = daysInMonth(newYear, i);
+    if (dayOfYear <= dim) {
+      month = i;
       break;
     }
-    dayOfYear -= daysInMonth[i];
-    month = i + 2;
+    dayOfYear -= dim;
+    month = i + 1;
   }
   month = Math.min(month, 12);
 
@@ -247,7 +329,7 @@ export function shiftIsoDate(iso: string, deltaYears: number): string {
     return `${prefix}-${String(month).padStart(2, '0')}`;
   }
 
-  const day = Math.max(1, Math.min(dayOfYear, daysInMonth[month - 1]));
+  const day = Math.max(1, Math.min(dayOfYear, daysInMonth(newYear, month)));
   return `${prefix}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
@@ -312,9 +394,10 @@ export function formatAxisLabel(decimalYear: number, spanYears: number): string 
 
 export function todayDecimalYear(): number {
   const now = new Date();
-  const start = new Date(now.getFullYear(), 0, 1);
-  const dayOfYear = (now.getTime() - start.getTime()) / 86400000;
-  return now.getFullYear() + dayOfYear / 365;
+  const y = now.getFullYear();
+  const start = new Date(y, 0, 1);
+  const dayOfYear = Math.floor((now.getTime() - start.getTime()) / 86400000);
+  return y + dayOfYear / daysInYear(y);
 }
 
 export function todayIsoDate(): string {

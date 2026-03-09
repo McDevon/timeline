@@ -5,7 +5,7 @@ import { hitTest } from './hitTest';
 import { Tooltip } from '../ui/tooltip';
 import { LAYOUT, chooseTickInterval } from './renderer';
 import { collectSnapTargets, findSnapYear, getSnapDetail, SnapDetail, SnapState } from './snap';
-import { todayDecimalYear, todayIsoDate, formatDate, dateToDecimalYear, decimalYearToDayIso } from '../data/time';
+import { todayDecimalYear, todayIsoDate, formatDate, dateToDecimalYear, decimalYearToDayIso, daysInYear, monthStartDay } from '../data/time';
 
 export interface InputHandlers {
   destroy(): void;
@@ -113,12 +113,12 @@ export function setupInput(config: InputConfig): InputHandlers {
       const spanYears = viewport.end - viewport.start;
       const pxPerMonth = canvasWidth / (spanYears * 12);
       if (pxPerMonth >= 50) {
-        const monthStartDay = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
         const firstYear = Math.floor(viewport.start);
         const lastYear = Math.ceil(viewport.end);
         for (let year = firstYear; year <= lastYear; year++) {
-          for (let month = 1; month < 12; month++) {
-            const decYear = year + monthStartDay[month] / 365;
+          const totalDays = daysInYear(year);
+          for (let month = 2; month <= 12; month++) {
+            const decYear = year + monthStartDay(year, month) / totalDays;
             if (decYear >= viewport.start && decYear <= viewport.end) {
               ticks.push(decYear);
             }
@@ -178,7 +178,12 @@ export function setupInput(config: InputConfig): InputHandlers {
     if (modifierHeld) return rawYear;
     const snapped = findBestSnap(pixelX);
     if (snapped !== null) return snapped;
-    if (isDayAccuracyZoom()) return Math.round(rawYear * 365) / 365;
+    if (isDayAccuracyZoom()) {
+      const yr = Math.floor(rawYear);
+      const frac = rawYear - yr;
+      const total = daysInYear(yr);
+      return yr + Math.round(frac * total) / total;
+    }
     return rawYear;
   }
 
@@ -447,7 +452,10 @@ export function setupInput(config: InputConfig): InputHandlers {
       } else if (isDayAccuracyZoom()) {
         const viewport = getViewport();
         const rawYear = xToYear(newX, viewport, canvas.clientWidth);
-        newSnapYear = Math.round(rawYear * 365) / 365;
+        const yr = Math.floor(rawYear);
+        const frac = rawYear - yr;
+        const total = daysInYear(yr);
+        newSnapYear = yr + Math.round(frac * total) / total;
       }
     }
     cursorSnapYear = newSnapYear;
