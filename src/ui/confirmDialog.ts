@@ -79,6 +79,7 @@ export function showConfirmDialog(message: string, onConfirm: () => void): void 
   function close() {
     backdrop.classList.remove('visible');
     backdrop.addEventListener('transitionend', () => backdrop.remove());
+    window.removeEventListener('keydown', onKeyDown);
   }
 
   cancelBtn.addEventListener('click', close);
@@ -90,12 +91,10 @@ export function showConfirmDialog(message: string, onConfirm: () => void): void 
   function onKeyDown(e: KeyboardEvent) {
     if (e.key === 'Escape') {
       close();
-      window.removeEventListener('keydown', onKeyDown);
     } else if (e.key === 'Enter') {
       e.preventDefault();
       close();
       onConfirm();
-      window.removeEventListener('keydown', onKeyDown);
     }
   }
   window.addEventListener('keydown', onKeyDown);
