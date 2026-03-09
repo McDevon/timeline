@@ -6,6 +6,7 @@ import {
   hasFullDate,
   formatPreciseDuration,
   decimalYearToIso,
+  decimalYearToDayIso,
   formatDecimalYearDelta,
   formatAxisLabel,
   shiftIsoDate,
@@ -184,6 +185,41 @@ describe('formatPreciseDuration', () => {
   });
 });
 
+describe('decimalYearToDayIso', () => {
+  it('converts integer year to Jan 1', () => {
+    expect(decimalYearToDayIso(2000)).toBe('2000-01-01');
+  });
+
+  it('converts mid-year to correct date', () => {
+    // dayOfYear = round(0.5 * 365) + 1 = 183 + 1 = 184 → Jul 3
+    expect(decimalYearToDayIso(2000.5)).toBe('2000-07-03');
+  });
+
+  it('converts negative year', () => {
+    expect(decimalYearToDayIso(-3000)).toBe('-3000-01-01');
+  });
+
+  it('round-trips with dateToDecimalYear for Jan 1', () => {
+    const dec = dateToDecimalYear('2000-01-01');
+    expect(decimalYearToDayIso(dec)).toBe('2000-01-01');
+  });
+
+  it('round-trips with dateToDecimalYear for Aug 9', () => {
+    const dec = dateToDecimalYear('1471-08-09');
+    expect(decimalYearToDayIso(dec)).toBe('1471-08-09');
+  });
+
+  it('round-trips with dateToDecimalYear for Dec 31', () => {
+    const dec = dateToDecimalYear('2000-12-31');
+    expect(decimalYearToDayIso(dec)).toBe('2000-12-31');
+  });
+
+  it('round-trips with dateToDecimalYear for BCE date', () => {
+    const dec = dateToDecimalYear('-753-04-21');
+    expect(decimalYearToDayIso(dec)).toBe('-753-04-21');
+  });
+});
+
 describe('decimalYearToIso', () => {
   it('converts integer year', () => {
     expect(decimalYearToIso(2000)).toBe('2000-01');
@@ -248,16 +284,16 @@ describe('formatAxisLabel', () => {
     expect(formatAxisLabel(2000.5, 10)).toBe('2000');
   });
 
-  it('shows month and year when zoomed in (span <= 2)', () => {
-    expect(formatAxisLabel(2000.5, 1)).toBe('Jul 2000');
+  it('shows year when zoomed in (span <= 2)', () => {
+    expect(formatAxisLabel(2000.5, 1)).toBe('2000');
   });
 
-  it('shows month and year for BCE when zoomed in', () => {
-    expect(formatAxisLabel(-3000.5, 1)).toMatch(/BCE/);
+  it('shows BCE for negative years when zoomed in', () => {
+    expect(formatAxisLabel(-3000.5, 1)).toBe('3001 BCE');
   });
 
-  it('shows Jan for integer year when zoomed in', () => {
-    expect(formatAxisLabel(2000, 1)).toBe('Jan 2000');
+  it('shows year for integer year when zoomed in', () => {
+    expect(formatAxisLabel(2000, 1)).toBe('2000');
   });
 });
 

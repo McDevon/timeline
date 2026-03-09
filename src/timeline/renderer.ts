@@ -10,6 +10,7 @@ import {
   formatPreciseDuration,
   todayDecimalYear,
   todayIsoDate,
+  MONTH_NAMES,
 } from "../data/time";
 import { LayoutItem } from "./layout";
 import { SnapDetail, SnapState } from "./snap";
@@ -185,10 +186,92 @@ function drawRoundedRect(
   ctx.closePath();
 }
 
+function drawMonthGrid(
+  ctx: CanvasRenderingContext2D,
+  viewport: Viewport,
+  canvasWidth: number,
+  canvasHeight: number,
+) {
+  const firstYear = Math.floor(viewport.start);
+  const lastYear = Math.ceil(viewport.end);
+
+  ctx.lineWidth = 1;
+
+  const labelY = LAYOUT.axisY + LAYOUT.tickHeight / 2 + 4;
+
+  for (let year = firstYear; year <= lastYear; year++) {
+    for (let month = 0; month < 12; month++) {
+      const decYear = year + month / 12;
+      const nextDecYear = year + (month + 1) / 12;
+      const x = yearToX(decYear, viewport, canvasWidth);
+      const nextX = yearToX(nextDecYear, viewport, canvasWidth);
+
+      // Vertical grid line at month boundary
+      if (decYear >= viewport.start && decYear <= viewport.end) {
+        ctx.strokeStyle = colorWithAlpha(colors.axisText, 0.15);
+        ctx.beginPath();
+        if (month === 0) {
+          // Year boundary: start below the year label
+          ctx.moveTo(x, labelY + LAYOUT.smallFontSize + 2);
+        } else {
+          ctx.moveTo(x, LAYOUT.axisY);
+        }
+        ctx.lineTo(x, canvasHeight);
+        ctx.stroke();
+      }
+
+      // Month label centered between this boundary and the next
+      const labelX = (x + nextX) / 2;
+      if (labelX >= 0 && labelX <= canvasWidth) {
+        ctx.fillStyle = colorWithAlpha(colors.axisText, 0.5);
+        ctx.font = `${LAYOUT.smallFontSize}px monospace`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "top";
+        ctx.fillText(MONTH_NAMES[month], labelX, labelY);
+      }
+    }
+  }
+}
+
+function drawWeekBands(
+  ctx: CanvasRenderingContext2D,
+  viewport: Viewport,
+  canvasWidth: number,
+  canvasHeight: number,
+) {
+  const weekStep = 7 / 365;
+  // Jan 1, 2024 is a Monday — use as epoch for consistent week alignment
+  const epoch = 2024.0;
+
+  // Find the first Monday-aligned week boundary at or before viewport.start
+  const weeksSinceEpoch = Math.floor((viewport.start - epoch) / weekStep);
+  let weekStart = epoch + weeksSinceEpoch * weekStep;
+  let weekIndex = weeksSinceEpoch;
+
+  const top = LAYOUT.axisY;
+  ctx.fillStyle = colorWithAlpha(colors.axisText, 0.05);
+
+  while (weekStart < viewport.end) {
+    const weekEnd = weekStart + weekStep;
+
+    if (weekIndex % 2 !== 0) {
+      const x1 = Math.max(0, yearToX(weekStart, viewport, canvasWidth));
+      const x2 = Math.min(canvasWidth, yearToX(weekEnd, viewport, canvasWidth));
+      if (x2 > x1) {
+        ctx.fillRect(x1, top, x2 - x1, canvasHeight - top);
+      }
+    }
+
+    weekStart = weekEnd;
+    weekIndex++;
+  }
+}
+
 function drawAxis(
   ctx: CanvasRenderingContext2D,
   viewport: Viewport,
   canvasWidth: number,
+  canvasHeight: number,
 ) {
   const y = LAYOUT.axisY;
   const x1 = LAYOUT.paddingX;
@@ -204,6 +287,18 @@ function drawAxis(
   const interval = chooseTickInterval(viewport, canvasWidth);
   const firstTick = Math.ceil(viewport.start / interval) * interval;
   const spanYears = viewport.end - viewport.start;
+
+  // Draw month grid lines and labels when zoomed to individual years
+  if (interval === 1) {
+    const pxPerMonth = canvasWidth / (spanYears * 12);
+    const pxPerWeek = canvasWidth / (spanYears * (365 / 7));
+    if (pxPerWeek >= 30) {
+      drawWeekBands(ctx, viewport, canvasWidth, canvasHeight);
+    }
+    if (pxPerMonth >= 50) {
+      drawMonthGrid(ctx, viewport, canvasWidth, canvasHeight);
+    }
+  }
 
   ctx.fillStyle = colors.axisText;
   ctx.font = `${LAYOUT.smallFontSize}px monospace`;
@@ -255,6 +350,21 @@ function drawTodayLine(
   );
 }
 
+/** Format a "X ago" / "in X" string, using day-precise calendar math when the detail has a full date. */
+function formatRelativeToNow(year: number, detail: SnapDetail | null, span: number): string {
+  const today = todayDecimalYear();
+  const delta = today - year;
+  if (detail && hasFullDate(detail.isoDate)) {
+    const todayIso = todayIsoDate();
+    const dur = delta >= 0
+      ? formatPreciseDuration(detail.isoDate, todayIso)
+      : formatPreciseDuration(todayIso, detail.isoDate);
+    return delta > 0 ? `${dur} ago` : delta < 0 ? `in ${dur}` : 'today';
+  }
+  const mag = formatDecimalYearDelta(delta, span);
+  return delta > 0 ? `${mag} ago` : `in ${mag}`;
+}
+
 function drawCursorLine(
   ctx: CanvasRenderingContext2D,
   cursorX: number,
@@ -263,6 +373,7 @@ function drawCursorLine(
   viewport: Viewport,
   canvasWidth: number,
   canvasHeight: number,
+  showTodayLine: boolean,
 ) {
   if (cursorX < 0) return;
 
@@ -281,7 +392,7 @@ function drawCursorLine(
   const isSinglePoint = selection !== null && selection.start === selection.end;
   const lines: { text: string; color: string }[] = [];
 
-  if (cursorDetail) {
+  if (cursorDetail && cursorDetail.label !== cursorDetail.date) {
     lines.push({ text: cursorDetail.label, color: colors.cursorText });
   }
 
@@ -291,12 +402,11 @@ function drawCursorLine(
   lines.push({ text: dateStr, color: colors.cursorText });
 
   if (!isRange) {
-    const today = todayDecimalYear();
-    const deltaNow = today - year;
     const span = viewport.end - viewport.start;
-    const nowMag = formatDecimalYearDelta(deltaNow, span);
-    const nowLabel = deltaNow > 0 ? `${nowMag} ago` : `in ${nowMag}`;
-    lines.push({ text: nowLabel, color: colors.cursorText });
+    if (showTodayLine) {
+      const nowLabel = formatRelativeToNow(year, cursorDetail, span);
+      lines.push({ text: nowLabel, color: colors.cursorText });
+    }
 
     if (isSinglePoint) {
       const deltaSel = year - selection!.start;
@@ -375,6 +485,7 @@ function drawSelectionForeground(
   viewport: Viewport,
   canvasWidth: number,
   canvasHeight: number,
+  showTodayLine: boolean,
 ) {
   if (selection === null) return;
 
@@ -400,12 +511,20 @@ function drawSelectionForeground(
       const dateStr = selStartDetail
         ? selStartDetail.date
         : formatDate(decimalYearToIso(selection.start));
+      const span = viewport.end - viewport.start;
+      const agoLabel = formatRelativeToNow(selection.start, selStartDetail, span);
 
-      if (selStartDetail) {
-        ctx.fillText(selStartDetail.label, x, baseY - lineHeight);
-        ctx.fillText(dateStr, x, baseY);
-      } else {
-        ctx.fillText(dateStr, x, baseY);
+      const selLines: string[] = [];
+      if (selStartDetail && selStartDetail.label !== selStartDetail.date) {
+        selLines.push(selStartDetail.label);
+      }
+      selLines.push(dateStr);
+      if (showTodayLine) {
+        selLines.push(agoLabel);
+      }
+
+      for (let i = 0; i < selLines.length; i++) {
+        ctx.fillText(selLines[i], x, baseY - (selLines.length - 1 - i) * lineHeight);
       }
     }
   } else {
@@ -426,9 +545,13 @@ function drawSelectionForeground(
     // Build label lines bottom-up
     const lines: string[] = [];
 
-    // Event labels line (only when both ends are snapped)
-    if (selStartDetail && selEndDetail) {
-      lines.push(`${selStartDetail.label} — ${selEndDetail.label}`);
+    // Event labels line: show when at least one end is a named event (label differs from date)
+    const startIsNamed = selStartDetail != null && selStartDetail.label !== selStartDetail.date;
+    const endIsNamed = selEndDetail != null && selEndDetail.label !== selEndDetail.date;
+    if (startIsNamed || endIsNamed) {
+      const startLabel = startIsNamed ? selStartDetail!.label : (selStartDetail?.date ?? formatDate(decimalYearToIso(selection.start)));
+      const endLabel = endIsNamed ? selEndDetail!.label : (selEndDetail?.date ?? formatDate(decimalYearToIso(selection.end)));
+      lines.push(`${startLabel} — ${endLabel}`);
     }
 
     // Date + duration line
@@ -1010,8 +1133,9 @@ export function render(
   ctx.restore();
 
   // Axis and overlays drawn in screen space (not scrolled)
-  drawAxis(ctx, viewport, canvasWidth);
+  drawAxis(ctx, viewport, canvasWidth, canvasHeight);
   if (showTodayLine !== false) drawTodayLine(ctx, viewport, canvasWidth, canvasHeight);
+  const todayVisible = showTodayLine !== false;
   drawSelectionForeground(
     ctx,
     selection,
@@ -1020,6 +1144,7 @@ export function render(
     viewport,
     canvasWidth,
     canvasHeight,
+    todayVisible,
   );
   drawCursorLine(
     ctx,
@@ -1029,5 +1154,6 @@ export function render(
     viewport,
     canvasWidth,
     canvasHeight,
+    todayVisible,
   );
 }

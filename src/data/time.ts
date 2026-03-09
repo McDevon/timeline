@@ -44,7 +44,7 @@ export function dateToDecimalYear(isoDate: string): number {
   return year + fraction;
 }
 
-const MONTH_NAMES = [
+export const MONTH_NAMES = [
   'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
 ];
@@ -163,6 +163,33 @@ export function formatPreciseDuration(startIso: string, endIso: string): string 
 }
 
 /**
+ * Convert a decimal year to a full YYYY-MM-DD ISO date string with day precision.
+ * Uses the same day-of-year calendar math as dateToDecimalYear in reverse.
+ */
+export function decimalYearToDayIso(year: number): string {
+  const floored = Math.floor(year);
+  const fraction = year - floored;
+  const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  let dayOfYear = Math.round(fraction * 365) + 1;
+  dayOfYear = Math.max(1, Math.min(dayOfYear, 365));
+
+  let month = 0;
+  for (let i = 0; i < 12; i++) {
+    if (dayOfYear <= daysInMonth[i]) {
+      month = i + 1;
+      break;
+    }
+    dayOfYear -= daysInMonth[i];
+    month = i + 2;
+  }
+  month = Math.min(month, 12);
+  const day = Math.max(1, Math.min(dayOfYear, daysInMonth[month - 1]));
+  const absYear = Math.abs(floored);
+  const prefix = floored < 0 ? `-${absYear}` : `${absYear}`;
+  return `${prefix}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+/**
  * Convert a decimal year to an approximate ISO date string (year-month).
  */
 export function decimalYearToIso(year: number): string {
@@ -277,21 +304,10 @@ export function formatAxisLabel(decimalYear: number, spanYears: number): string 
     return `${year}`;
   }
 
-  if (spanYears > 2) {
-    // Show year
-    const year = Math.floor(decimalYear);
-    if (year < 0) return `${Math.abs(year)} BCE`;
-    return `${year}`;
-  }
-
-  // Show month and year
+  // Show year
   const year = Math.floor(decimalYear);
-  const fraction = decimalYear - year;
-  const monthIndex = Math.floor(fraction * 12);
-  const month = MONTH_NAMES[Math.min(monthIndex, 11)];
-  const absYear = Math.abs(year);
-  const suffix = year < 0 ? ' BCE' : '';
-  return `${month} ${absYear}${suffix}`;
+  if (year < 0) return `${Math.abs(year)} BCE`;
+  return `${year}`;
 }
 
 export function todayDecimalYear(): number {

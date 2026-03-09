@@ -5,7 +5,7 @@ import { hitTest } from './hitTest';
 import { Tooltip } from '../ui/tooltip';
 import { LAYOUT, chooseTickInterval } from './renderer';
 import { collectSnapTargets, findSnapYear, getSnapDetail, SnapDetail, SnapState } from './snap';
-import { todayDecimalYear, todayIsoDate, formatDate, dateToDecimalYear } from '../data/time';
+import { todayDecimalYear, todayIsoDate, formatDate, dateToDecimalYear, decimalYearToDayIso } from '../data/time';
 
 export interface InputHandlers {
   destroy(): void;
@@ -145,11 +145,21 @@ export function setupInput(config: InputConfig): InputHandlers {
       findSnapYear(pixelX, snapTargetsCache, viewport, w, TICK_SNAP_THRESHOLD_PX);
   }
 
+  function isDayAccuracyZoom(): boolean {
+    const viewport = getViewport();
+    const spanYears = viewport.end - viewport.start;
+    const pxPerMonth = canvas.clientWidth / (spanYears * 12);
+    return pxPerMonth >= 50;
+  }
+
   function snapYear(pixelX: number): number {
     const viewport = getViewport();
     const rawYear = xToYear(pixelX, viewport, canvas.clientWidth);
     if (modifierHeld) return rawYear;
-    return findBestSnap(pixelX) ?? rawYear;
+    const snapped = findBestSnap(pixelX);
+    if (snapped !== null) return snapped;
+    if (isDayAccuracyZoom()) return Math.round(rawYear * 365) / 365;
+    return rawYear;
   }
 
   // --- Snap highlighting ---
@@ -189,10 +199,16 @@ export function setupInput(config: InputConfig): InputHandlers {
     };
   }
 
+  function daySnapDetail(year: number): SnapDetail {
+    const isoDate = decimalYearToDayIso(year);
+    return { label: formatDate(isoDate), date: formatDate(isoDate), isoDate };
+  }
+
   function snapDetailFor(year: number, layout: LayoutItem[]): SnapDetail | null {
     return getSnapDetail(year, layout) ??
       (year === cachedNowYear ? nowSnapDetail() : null) ??
-      (Number.isInteger(year) ? axisTickSnapDetail(year) : null);
+      (Number.isInteger(year) ? axisTickSnapDetail(year) : null) ??
+      (isDayAccuracyZoom() ? daySnapDetail(year) : null);
   }
 
   function updateSnapHighlights() {
@@ -408,6 +424,10 @@ export function setupInput(config: InputConfig): InputHandlers {
         const viewport = getViewport();
         newX = yearToX(snapped, viewport, canvas.clientWidth);
         newSnapYear = snapped;
+      } else if (isDayAccuracyZoom()) {
+        const viewport = getViewport();
+        const rawYear = xToYear(newX, viewport, canvas.clientWidth);
+        newSnapYear = Math.round(rawYear * 365) / 365;
       }
     }
     cursorSnapYear = newSnapYear;
