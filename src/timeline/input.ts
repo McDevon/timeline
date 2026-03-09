@@ -640,6 +640,16 @@ export function setupInput(config: InputConfig): InputHandlers {
         }
       }
 
+      // Clamp: ongoing events cannot have start past today
+      if (drag.item.event.end === 'ongoing') {
+        const today = todayDecimalYear();
+        if (newStartYear > today) {
+          const excess = newStartYear - today;
+          newStartYear -= excess;
+          newEndYear -= excess;
+        }
+      }
+
       onSketchMove?.(drag.item, newStartYear, newEndYear);
       scheduleRedraw();
       return;
@@ -685,9 +695,18 @@ export function setupInput(config: InputConfig): InputHandlers {
         }
       }
 
-      // Prevent inverted range
-      if (newStartYear > newEndYear) {
-        if (drag.edge === 'start') {
+      if (drag.item.event.end === 'ongoing') {
+        // Ongoing events: clamp start to today (no real "end" to invert against)
+        const today = todayDecimalYear();
+        if (newStartYear > today) newStartYear = today;
+      } else if (newStartYear > newEndYear) {
+        // Prevent inverted range
+        if (altHeld) {
+          // Alt-resize: freeze at the midpoint of the original range
+          const mid = (drag.originalStartYear + drag.originalEndYear) / 2;
+          newStartYear = mid;
+          newEndYear = mid;
+        } else if (drag.edge === 'start') {
           newStartYear = newEndYear;
         } else {
           newEndYear = newStartYear;
