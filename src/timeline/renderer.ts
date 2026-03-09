@@ -191,6 +191,7 @@ function drawMonthGrid(
   viewport: Viewport,
   canvasWidth: number,
   canvasHeight: number,
+  weekBandsVisible: boolean,
 ) {
   const firstYear = Math.floor(viewport.start);
   const lastYear = Math.ceil(viewport.end);
@@ -199,16 +200,22 @@ function drawMonthGrid(
 
   const labelY = LAYOUT.axisY + LAYOUT.tickHeight / 2 + 4;
 
+  // Cumulative day-of-year for each month start (non-leap)
+  const monthStartDay = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
+
   for (let year = firstYear; year <= lastYear; year++) {
     for (let month = 0; month < 12; month++) {
-      const decYear = year + month / 12;
-      const nextDecYear = year + (month + 1) / 12;
+      const decYear = year + monthStartDay[month] / 365;
+      const nextMonth = month + 1;
+      const nextDecYear = nextMonth < 12
+        ? year + monthStartDay[nextMonth] / 365
+        : year + 1;
       const x = yearToX(decYear, viewport, canvasWidth);
       const nextX = yearToX(nextDecYear, viewport, canvasWidth);
 
       // Vertical grid line at month boundary
       if (decYear >= viewport.start && decYear <= viewport.end) {
-        ctx.strokeStyle = colorWithAlpha(colors.axisText, 0.15);
+        ctx.strokeStyle = colorWithAlpha(colors.axisText, weekBandsVisible ? 0.3 : 0.15);
         ctx.beginPath();
         if (month === 0) {
           // Year boundary: start below the year label
@@ -292,14 +299,16 @@ function drawAxis(
   if (interval === 1) {
     const pxPerMonth = canvasWidth / (spanYears * 12);
     const pxPerWeek = canvasWidth / (spanYears * (365 / 7));
-    if (pxPerWeek >= 30) {
+    const weekBandsVisible = pxPerWeek >= 30;
+    if (weekBandsVisible) {
       drawWeekBands(ctx, viewport, canvasWidth, canvasHeight);
     }
     if (pxPerMonth >= 50) {
-      drawMonthGrid(ctx, viewport, canvasWidth, canvasHeight);
+      drawMonthGrid(ctx, viewport, canvasWidth, canvasHeight, weekBandsVisible);
     }
   }
 
+  ctx.strokeStyle = colors.axis;
   ctx.fillStyle = colors.axisText;
   ctx.font = `${LAYOUT.smallFontSize}px monospace`;
   ctx.textAlign = "center";

@@ -107,6 +107,26 @@ export function setupInput(config: InputConfig): InputHandlers {
     for (let year = firstTick; year <= viewport.end; year += interval) {
       ticks.push(year);
     }
+
+    // Add month boundaries when month grid is visible
+    if (interval === 1) {
+      const spanYears = viewport.end - viewport.start;
+      const pxPerMonth = canvasWidth / (spanYears * 12);
+      if (pxPerMonth >= 50) {
+        const monthStartDay = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
+        const firstYear = Math.floor(viewport.start);
+        const lastYear = Math.ceil(viewport.end);
+        for (let year = firstYear; year <= lastYear; year++) {
+          for (let month = 1; month < 12; month++) {
+            const decYear = year + monthStartDay[month] / 365;
+            if (decYear >= viewport.start && decYear <= viewport.end) {
+              ticks.push(decYear);
+            }
+          }
+        }
+      }
+    }
+
     return ticks;
   }
 
