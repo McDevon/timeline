@@ -5,6 +5,7 @@ export interface TimelineEvent {
   startApprox?: [string, string];
   endApprox?: [string, string];
   info?: string;
+  color?: string;
   nested?: TimelineEvent[];
 }
 

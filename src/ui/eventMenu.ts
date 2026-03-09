@@ -3,6 +3,7 @@ import { dateToDecimalYear, todayDecimalYear, todayIsoDate } from "../data/time"
 import { showConfirmDialog } from "./confirmDialog";
 import { DateInput } from "./dateInput";
 import { ApproxInput } from "./approxInput";
+import { EVENT_COLORS, getEventColor } from "../colorPalette";
 
 export interface ParentCandidate {
   event: TimelineEvent | null;
@@ -28,6 +29,7 @@ export interface EventMenuCallbacks {
     event: TimelineEvent,
     newParent: TimelineEvent | null,
   ) => void;
+  onChangeColor: (event: TimelineEvent, color: string | undefined) => void;
   onTypeChange: (event: TimelineEvent) => void;
   onHoverEvent: (event: TimelineEvent | null) => void;
   onDelete: (event: TimelineEvent) => void;
@@ -63,6 +65,13 @@ export class EventMenu {
   private stashedEnd: string | undefined;
   private stashedEndApprox: [string, string] | undefined;
 
+  // Color flyout
+  private colorTriggerSwatch: HTMLDivElement;
+  private colorTriggerText: HTMLSpanElement;
+  private colorFlyout: HTMLDivElement | null = null;
+  private colorAnchor: HTMLDivElement | null = null;
+  private colorHideTimer = 0;
+
   // Parent flyout
   private parentTriggerText: HTMLSpanElement;
   private parentFlyout: HTMLDivElement | null = null;
@@ -89,7 +98,10 @@ export class EventMenu {
     header.addEventListener("click", () => {
       const wasExpanded = !this.el.classList.contains("collapsed");
       this.el.classList.toggle("collapsed");
-      if (wasExpanded) this.hideParentFlyout();
+      if (wasExpanded) {
+        this.hideColorFlyout();
+        this.hideParentFlyout();
+      }
     });
     this.el.appendChild(header);
 
@@ -234,6 +246,42 @@ export class EventMenu {
     }
     body.appendChild(typeRow);
 
+    // Color section — hover-triggered flyout
+    const colorHeader = document.createElement("div");
+    colorHeader.className = "event-menu-section";
+    colorHeader.textContent = "Color";
+    body.appendChild(colorHeader);
+
+    const colorRow = document.createElement("div");
+    colorRow.className = "event-menu-btn";
+    colorRow.style.display = "flex";
+    colorRow.style.alignItems = "center";
+    colorRow.style.gap = "6px";
+    this.colorTriggerSwatch = document.createElement("div");
+    this.colorTriggerSwatch.className = "color-trigger-swatch";
+    this.colorTriggerText = document.createElement("span");
+    this.colorTriggerText.style.flex = "1";
+    this.colorTriggerText.style.minWidth = "0";
+    this.colorTriggerText.style.overflow = "hidden";
+    this.colorTriggerText.style.textOverflow = "ellipsis";
+    this.colorTriggerText.style.whiteSpace = "nowrap";
+    const colorArrow = document.createElement("span");
+    colorArrow.style.flexShrink = "0";
+    colorArrow.textContent = "\u25B6";
+    colorRow.appendChild(this.colorTriggerSwatch);
+    colorRow.appendChild(this.colorTriggerText);
+    colorRow.appendChild(colorArrow);
+
+    colorRow.addEventListener("mouseenter", () => {
+      clearTimeout(this.colorHideTimer);
+      this.showColorFlyout(colorRow);
+    });
+    colorRow.addEventListener("mouseleave", () => {
+      this.scheduleColorHide();
+    });
+
+    body.appendChild(colorRow);
+
     // Parent section — hover-triggered flyout
     const parentHeader = document.createElement("div");
     parentHeader.className = "event-menu-section";
@@ -323,19 +371,24 @@ export class EventMenu {
     // Populate end
     this.updateEndSection();
 
+    // Update color trigger display
+    this.updateColorTrigger(event.color);
+
     // Update parent trigger text
     const currentParent = this.callbacks.getCurrentParent(event);
     this.parentTriggerText.textContent = currentParent
       ? currentParent.name
       : "None (top level)";
 
-    // Close any open flyout
+    // Close any open flyouts
+    this.hideColorFlyout();
     this.hideParentFlyout();
 
     this.el.classList.remove("disabled");
   }
 
   hide(): void {
+    this.hideColorFlyout();
     this.hideParentFlyout();
     this.el.classList.add("disabled", "collapsed");
     this.titleSpan.textContent = "Nothing selected";
@@ -369,6 +422,7 @@ export class EventMenu {
       this.endDateInput.setValue(event.end);
       this.endApproxInput.setValue(event.endApprox, event.end);
     }
+    this.updateColorTrigger(event.color);
   }
 
   focusName(): void {
@@ -631,6 +685,116 @@ export class EventMenu {
       container.appendChild(item);
       i = childEnd;
     }
+  }
+
+  private updateColorTrigger(colorId: string | undefined): void {
+    const ec = getEventColor(colorId);
+    if (ec) {
+      this.colorTriggerSwatch.style.background = ec.hex;
+      this.colorTriggerSwatch.classList.remove("default");
+      this.colorTriggerText.textContent = ec.label;
+    } else {
+      this.colorTriggerSwatch.style.background = "";
+      this.colorTriggerSwatch.classList.add("default");
+      this.colorTriggerText.textContent = "Default";
+    }
+  }
+
+  private showColorFlyout(anchor: HTMLDivElement): void {
+    if (this.colorFlyout) {
+      this.colorFlyout.remove();
+    }
+    if (!this.currentEvent) return;
+
+    const currentColor = this.currentEvent.color;
+    const flyout = document.createElement("div");
+    flyout.className = "color-flyout";
+
+    const grid = document.createElement("div");
+    grid.className = "color-flyout-grid";
+
+    // Default swatch (first position)
+    const defaultSwatch = document.createElement("div");
+    defaultSwatch.className = "color-swatch default-swatch" + (currentColor === undefined ? " active" : "");
+    defaultSwatch.title = "Default";
+    defaultSwatch.addEventListener("click", () => {
+      if (!this.currentEvent) return;
+      this.callbacks.onChangeColor(this.currentEvent, undefined);
+      this.updateColorTrigger(undefined);
+      this.showColorFlyout(anchor);
+    });
+    grid.appendChild(defaultSwatch);
+
+    // Color swatches
+    for (const ec of EVENT_COLORS) {
+      const swatch = document.createElement("div");
+      swatch.className = "color-swatch" + (currentColor === ec.id ? " active" : "");
+      swatch.style.background = ec.hex;
+      swatch.title = ec.label;
+      swatch.addEventListener("click", () => {
+        if (!this.currentEvent) return;
+        this.callbacks.onChangeColor(this.currentEvent, ec.id);
+        this.updateColorTrigger(ec.id);
+        this.showColorFlyout(anchor);
+      });
+      grid.appendChild(swatch);
+    }
+
+    flyout.appendChild(grid);
+
+    flyout.addEventListener("mouseenter", () => {
+      clearTimeout(this.colorHideTimer);
+    });
+    flyout.addEventListener("mouseleave", () => {
+      this.scheduleColorHide();
+    });
+
+    document.body.appendChild(flyout);
+    this.colorFlyout = flyout;
+    this.colorAnchor = anchor;
+
+    this.repositionColorFlyout();
+  }
+
+  private repositionColorFlyout(): void {
+    if (!this.colorFlyout || !this.colorAnchor) return;
+
+    const flyout = this.colorFlyout;
+    const anchorRect = this.colorAnchor.getBoundingClientRect();
+    const menuRect = this.el.getBoundingClientRect();
+
+    // Horizontal: try right of menu, fallback left
+    let left = menuRect.right + 4;
+    flyout.style.left = `${left}px`;
+    const flyoutWidth = flyout.getBoundingClientRect().width;
+    if (left + flyoutWidth > window.innerWidth - 8) {
+      left = menuRect.left - flyoutWidth - 4;
+      flyout.style.left = `${left}px`;
+    }
+
+    // Vertical: align top with anchor
+    let top = anchorRect.top;
+    const flyoutHeight = flyout.getBoundingClientRect().height;
+    if (top + flyoutHeight > window.innerHeight - 8) {
+      top = window.innerHeight - 8 - flyoutHeight;
+    }
+    top = Math.max(8, top);
+    flyout.style.top = `${top}px`;
+  }
+
+  private hideColorFlyout(): void {
+    clearTimeout(this.colorHideTimer);
+    if (this.colorFlyout) {
+      this.colorFlyout.remove();
+      this.colorFlyout = null;
+    }
+  }
+
+  private scheduleColorHide(): void {
+    clearTimeout(this.colorHideTimer);
+    this.colorHideTimer = window.setTimeout(() => {
+      this.hideColorFlyout();
+    }, 150);
   }
 
   private hideParentFlyout(): void {

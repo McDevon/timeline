@@ -142,6 +142,32 @@ describe('validateEvents', () => {
     expect('error' in result).toBe(true);
   });
 
+  it('accepts valid color', () => {
+    const result = validateEvents([{ name: 'A', start: '2000', color: 'teal' }]);
+    expect('events' in result).toBe(true);
+  });
+
+  it('rejects invalid color string', () => {
+    const result = validateEvents([{ name: 'A', start: '2000', color: 'neon' }]);
+    expect('error' in result).toBe(true);
+    if ('error' in result) {
+      expect(result.error).toMatch(/color/);
+    }
+  });
+
+  it('rejects non-string color', () => {
+    const result = validateEvents([{ name: 'A', start: '2000', color: 42 }]);
+    expect('error' in result).toBe(true);
+    if ('error' in result) {
+      expect(result.error).toMatch(/color/);
+    }
+  });
+
+  it('accepts missing color (undefined)', () => {
+    const result = validateEvents([{ name: 'A', start: '2000' }]);
+    expect('events' in result).toBe(true);
+  });
+
   it('rejects null input', () => {
     const result = validateEvents(null);
     expect('error' in result).toBe(true);

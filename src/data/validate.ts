@@ -1,5 +1,6 @@
 import { TimelineEvent } from '../types';
 import { dateToDecimalYear } from './time';
+import { VALID_COLOR_IDS } from '../colorPalette';
 
 function isString(v: unknown): v is string {
   return typeof v === 'string';
@@ -67,6 +68,15 @@ function validateEvent(obj: unknown, path: string): string | null {
 
   if (record.info !== undefined && !isString(record.info)) {
     return `${path} "${name}": 'info' must be a string`;
+  }
+
+  if (record.color !== undefined) {
+    if (!isString(record.color)) {
+      return `${path} "${name}": 'color' must be a string`;
+    }
+    if (!VALID_COLOR_IDS.has(record.color)) {
+      return `${path} "${name}": unknown color "${record.color}"`;
+    }
   }
 
   if (record.nested !== undefined) {

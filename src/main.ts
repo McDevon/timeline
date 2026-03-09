@@ -1181,6 +1181,11 @@ async function main() {
       else event.endApprox = approx;
       commitEdit(event, `endApprox:${getEventId(event)}`);
     },
+    onChangeColor: (event, color) => {
+      if (color === undefined) delete event.color;
+      else event.color = color;
+      commitEdit(event, `color:${getEventId(event)}`);
+    },
     onTypeChange: () => {
       skipCoalesce = true;
       queueMicrotask(() => {

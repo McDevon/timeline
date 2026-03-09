@@ -18,6 +18,7 @@ import {
 } from "../data/time";
 import { LayoutItem } from "./layout";
 import { SnapDetail, SnapState } from "./snap";
+import { getEventColor } from "../colorPalette";
 
 export interface LayoutTransition {
   fadingOut: LayoutItem[];
@@ -632,21 +633,24 @@ function drawContainer(
     (snapHighlightYears.has(item.nominalStartYear) ||
       snapHighlightYears.has(item.nominalEndYear));
 
-  // Container background
+  // Container background — use custom color if set
+  const eventColor = getEventColor(item.event.color);
+  const custom = eventColor ? deriveContainerColors(eventColor.hex) : null;
+
   const fillColor = isSelected
     ? colors.containerSelectedFill
     : isHovered
-      ? colors.containerHoverFill
+      ? (custom?.hoverFill ?? colors.containerHoverFill)
       : isSnap
-        ? colors.containerSnapFill
-        : colors.containerFill;
+        ? (custom?.snapFill ?? colors.containerSnapFill)
+        : (custom?.fill ?? colors.containerFill);
   const strokeColor = isSelected
     ? colors.containerSelectedBorder
     : isHovered
-      ? colors.containerHoverBorder
+      ? (custom?.hoverBorder ?? colors.containerHoverBorder)
       : isSnap
-        ? colors.containerSnapBorder
-        : colors.containerBorder;
+        ? (custom?.snapBorder ?? colors.containerSnapBorder)
+        : (custom?.border ?? colors.containerBorder);
   const lineWidth = isSelected || isHovered ? 2 : 1;
 
   // When both uncertainty gradient and child overflow exist on the same side,
@@ -741,6 +745,66 @@ function parseColor(color: string): [number, number, number, number] {
     ];
   }
   return [0, 0, 0, 0];
+}
+
+/** Blend a hex color toward white by amount (0–1). */
+function lighten(hex: string, amount: number): string {
+  const [r, g, b] = parseColor(hex);
+  const nr = Math.round(r + (255 - r) * amount);
+  const ng = Math.round(g + (255 - g) * amount);
+  const nb = Math.round(b + (255 - b) * amount);
+  return `rgb(${nr}, ${ng}, ${nb})`;
+}
+
+/** Blend a hex color toward black by amount (0–1). */
+function darken(hex: string, amount: number): string {
+  const [r, g, b] = parseColor(hex);
+  const nr = Math.round(r * (1 - amount));
+  const ng = Math.round(g * (1 - amount));
+  const nb = Math.round(b * (1 - amount));
+  return `rgb(${nr}, ${ng}, ${nb})`;
+}
+
+/** Return a light or dark text color based on the perceived luminance of a background. */
+function textColorForBg(hex: string): string {
+  const [r, g, b] = parseColor(hex);
+  // Relative luminance (sRGB)
+  const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+  return lum > 150 ? '#1a1a1a' : '#f0f0f0';
+}
+
+interface DerivedColors {
+  fill: string;
+  border: string;
+  hoverFill: string;
+  hoverBorder: string;
+  snapFill: string;
+  snapBorder: string;
+  text: string;
+}
+
+function deriveBarColors(hex: string): DerivedColors {
+  return {
+    fill: hex,
+    border: darken(hex, 0.20),
+    hoverFill: lighten(hex, 0.12),
+    hoverBorder: darken(hex, 0.10),
+    snapFill: lighten(hex, 0.06),
+    snapBorder: darken(hex, 0.15),
+    text: textColorForBg(hex),
+  };
+}
+
+function deriveContainerColors(hex: string): DerivedColors {
+  return {
+    fill: colorWithAlpha(hex, 0.20),
+    border: hex,
+    hoverFill: colorWithAlpha(hex, 0.35),
+    hoverBorder: lighten(hex, 0.20),
+    snapFill: colorWithAlpha(hex, 0.25),
+    snapBorder: lighten(hex, 0.10),
+    text: colors.containerText, // background shows through
+  };
 }
 
 function drawOverflowShadow(
@@ -876,27 +940,31 @@ function drawBar(
   const x2 = yearToX(item.endYear, viewport, canvasWidth);
   const barWidth = Math.max(x2 - x1, 3);
 
+  const eventColor = getEventColor(item.event.color);
+  const custom = eventColor ? deriveBarColors(eventColor.hex) : null;
+
   const fillColor = isSelected
     ? colors.barSelectedFill
     : isHovered
-      ? colors.barHoverFill
+      ? (custom?.hoverFill ?? colors.barHoverFill)
       : isSnap
-        ? colors.barSnapFill
-        : colors.barFill;
+        ? (custom?.snapFill ?? colors.barSnapFill)
+        : (custom?.fill ?? colors.barFill);
   const strokeColor = isSelected
     ? colors.barSelectedBorder
     : isHovered
-      ? colors.barHoverBorder
+      ? (custom?.hoverBorder ?? colors.barHoverBorder)
       : isSnap
-        ? colors.barSnapBorder
-        : colors.barBorder;
+        ? (custom?.snapBorder ?? colors.barSnapBorder)
+        : (custom?.border ?? colors.barBorder);
   const lineWidth = isSelected || isHovered ? 2 : 1;
+  const textColor = isSelected ? colors.barText : (custom?.text ?? colors.barText);
 
   applyGradient(ctx, item, viewport, canvasWidth, x1, barWidth, fillColor, strokeColor, lineWidth);
 
   // Label — only render when bar is wide enough to show text
   if (barWidth > 10) {
-    ctx.fillStyle = colors.barText;
+    ctx.fillStyle = textColor;
     ctx.font = `${LAYOUT.smallFontSize}px sans-serif`;
     ctx.textBaseline = "middle";
     ctx.textAlign = "left";
@@ -929,7 +997,7 @@ function drawBar(
       labelX = Math.max(x1 + 6, Math.min(nominalX + offset, x2 - tw - 6));
     }
 
-    ctx.fillStyle = colors.barText;
+    ctx.fillStyle = textColor;
 
     ctx.save();
     ctx.beginPath();
@@ -953,23 +1021,26 @@ function drawPointEvent(
   const cy = item.y + item.height / 2;
   const radius = item.height / 4 - 1;
 
+  const eventColor = getEventColor(item.event.color);
+  const custom = eventColor ? deriveBarColors(eventColor.hex) : null;
+
   ctx.beginPath();
   ctx.arc(x, cy, radius, 0, Math.PI * 2);
   ctx.fillStyle = isSelected
     ? colors.barSelectedFill
     : isHovered
-      ? colors.barHoverFill
+      ? (custom?.hoverFill ?? colors.barHoverFill)
       : isSnap
-        ? colors.barSnapFill
-        : colors.barFill;
+        ? (custom?.snapFill ?? colors.barSnapFill)
+        : (custom?.fill ?? colors.barFill);
   ctx.fill();
   ctx.strokeStyle = isSelected
     ? colors.barSelectedBorder
     : isHovered
-      ? colors.barHoverBorder
+      ? (custom?.hoverBorder ?? colors.barHoverBorder)
       : isSnap
-        ? colors.barSnapBorder
-        : colors.barBorder;
+        ? (custom?.snapBorder ?? colors.barSnapBorder)
+        : (custom?.border ?? colors.barBorder);
   ctx.lineWidth = isSelected || isHovered ? 2 : 1;
   ctx.stroke();
 }
