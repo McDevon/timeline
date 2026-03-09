@@ -359,6 +359,18 @@ export class EventMenu {
     return this.el.getBoundingClientRect().right;
   }
 
+  /** Re-read current event's dates into the UI fields (e.g. during sketch drag). */
+  refresh(): void {
+    if (!this.currentEvent || !this.isVisible()) return;
+    const event = this.currentEvent;
+    this.startDateInput.setValue(event.start);
+    this.startApproxInput.setValue(event.startApprox, event.start);
+    if (event.end !== undefined && event.end !== "ongoing") {
+      this.endDateInput.setValue(event.end);
+      this.endApproxInput.setValue(event.endApprox, event.end);
+    }
+  }
+
   focusName(): void {
     this.el.classList.remove("collapsed");
     this.nameInput.focus();

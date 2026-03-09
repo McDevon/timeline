@@ -604,6 +604,13 @@ async function main() {
       state.sketchPriorityEvent = event;
       state.sketchSavedPositions = new Map();
       capturePositions(state.layout, state.sketchSavedPositions);
+
+      // Select the event being edited (opens the edit panel)
+      if (state.selectedItem?.event !== event) {
+        state.selectedItem = item;
+        eventListPanel?.selectEvent(event);
+        eventMenu.show(event);
+      }
     }
 
     // Compute total delta from original dates to avoid rounding drift
@@ -658,6 +665,11 @@ async function main() {
     const pinnedY = state.sketchSavedPositions!.get(event);
     relayout(event, pinnedY, state.sketchSavedPositions!);
 
+    // Re-find the selected item in the new layout (relayout creates new LayoutItem objects)
+    if (state.selectedItem) {
+      state.selectedItem = findLayoutItem(state.selectedItem.event, state.layout);
+    }
+
     // Only start/restart animation when layout targets actually changed
     const targetsChanged = hasTargetChanged(state.layout, prevTargets);
 
@@ -709,6 +721,7 @@ async function main() {
       }
     }
 
+    eventMenu.refresh();
     requestRedraw();
   }
 
@@ -781,6 +794,9 @@ async function main() {
 
     // Relayout — uses saved order, so events stay in place
     relayout();
+    if (state.selectedItem) {
+      state.selectedItem = findLayoutItem(state.selectedItem.event, state.layout);
+    }
 
     // Animate the vertical settle
     const yOffsets = new Map<TimelineEvent, number>();
@@ -812,6 +828,9 @@ async function main() {
       state.sketchPriorityEvent = null;
       state.sketchSavedPositions = null;
       relayout();
+      if (state.selectedItem) {
+        state.selectedItem = findLayoutItem(state.selectedItem.event, state.layout);
+      }
 
       // Animate back to original positions
       const yOffsets = new Map<TimelineEvent, number>();
@@ -1242,11 +1261,13 @@ async function main() {
           selEnd = Math.min(selEnd, parentEnd);
         }
       }
-      start = decimalYearToIso(selStart);
-      end = decimalYearToIso(selEnd);
+      const { selStartDetail, selEndDetail } = state.snapState;
+      start = (selStartDetail && selStart === state.selection.start) ? selStartDetail.isoDate : decimalYearToIso(selStart);
+      end = (selEndDetail && selEnd === state.selection.end) ? selEndDetail.isoDate : decimalYearToIso(selEnd);
     } else if (state.selection && state.selection.start === state.selection.end) {
       // Single cursor point
-      start = decimalYearToIso(state.selection.start);
+      const { selStartDetail } = state.snapState;
+      start = selStartDetail ? selStartDetail.isoDate : decimalYearToIso(state.selection.start);
     } else {
       // No cursor/selection — use center of parent or viewport
       if (parent && parentStart !== null && parentEnd !== null) {
