@@ -727,16 +727,59 @@ async function main() {
     }
   }
 
+  function saveLayoutOrder(
+    layout: LayoutItem[],
+    events: TimelineEvent[],
+    eventOrders: Map<string, string[]>,
+    hiddenEvents: Set<TimelineEvent>,
+  ) {
+    // Root level
+    const rootOrder = [...layout]
+      .sort((a, b) => a.y - b.y || a.startYear - b.startYear)
+      .map(item => item.event.name);
+    for (const e of events) {
+      if (hiddenEvents.has(e) && !rootOrder.includes(e.name)) {
+        rootOrder.push(e.name);
+      }
+    }
+    eventOrders.set('[]', rootOrder);
+
+    // Recurse into containers
+    function walkChildren(items: LayoutItem[], parentPath: string[]) {
+      for (const item of items) {
+        if (item.children.length > 0 && item.event.nested) {
+          const childPath = [...parentPath, item.event.name];
+          const key = JSON.stringify(childPath);
+          const childOrder = [...item.children]
+            .sort((a, b) => a.y - b.y || a.startYear - b.startYear)
+            .map(c => c.event.name);
+          for (const ne of item.event.nested) {
+            if (hiddenEvents.has(ne) && !childOrder.includes(ne.name)) {
+              childOrder.push(ne.name);
+            }
+          }
+          eventOrders.set(key, childOrder);
+          walkChildren(item.children, childPath);
+        }
+      }
+    }
+    walkChildren(layout, []);
+  }
+
   function onSketchEnd(_item: LayoutItem) {
     // Capture frozen positions before final relayout
     const oldPositions = new Map<TimelineEvent, number>();
     capturePositions(state.layout, oldPositions);
 
+    // Lock in the current vertical order at every level so the final
+    // relayout (without sketch hints) doesn't rearrange events.
+    saveLayoutOrder(state.layout, state.events, state.eventOrders, state.hiddenEvents);
+
     state.sketchOriginalDates = null;
     state.sketchPriorityEvent = null;
     state.sketchSavedPositions = null;
 
-    // Relayout — events settle to natural Y positions
+    // Relayout — uses saved order, so events stay in place
     relayout();
 
     // Animate the vertical settle
