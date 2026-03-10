@@ -61,6 +61,9 @@ export class EventMenu {
   private endOngoingLabel: HTMLDivElement;
   private endDateContainer: HTMLDivElement;
 
+  // Sticky open/closed intent — only toggled by header click
+  private wantOpen = false;
+
   // Stashed end date (for type switching round-trips)
   private stashedEnd: string | undefined;
   private stashedEndApprox: [string, string] | undefined;
@@ -96,9 +99,10 @@ export class EventMenu {
     header.appendChild(this.titleSpan);
     header.appendChild(chevron);
     header.addEventListener("click", () => {
-      const wasExpanded = !this.el.classList.contains("collapsed");
-      this.el.classList.toggle("collapsed");
-      if (wasExpanded) {
+      if (this.el.classList.contains("disabled")) return;
+      this.wantOpen = !this.wantOpen;
+      this.el.classList.toggle("collapsed", !this.wantOpen);
+      if (!this.wantOpen) {
         this.hideColorFlyout();
         this.hideParentFlyout();
       }
@@ -385,6 +389,7 @@ export class EventMenu {
     this.hideParentFlyout();
 
     this.el.classList.remove("disabled");
+    this.el.classList.toggle("collapsed", !this.wantOpen);
   }
 
   hide(): void {
@@ -404,6 +409,7 @@ export class EventMenu {
   }
 
   expand(): void {
+    this.wantOpen = true;
     this.el.classList.remove("collapsed");
   }
 
@@ -426,6 +432,7 @@ export class EventMenu {
   }
 
   focusName(): void {
+    this.wantOpen = true;
     this.el.classList.remove("collapsed");
     this.nameInput.focus();
     this.nameInput.select();

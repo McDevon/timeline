@@ -30,7 +30,9 @@ export class EventListPanel {
     header.className = 'event-list-header';
     header.innerHTML = `<span class="event-list-title">Events</span><span class="event-list-chevron">\u25BC</span>`;
     header.addEventListener('click', () => {
+      const wasCollapsed = this.el.classList.contains('collapsed');
       this.el.classList.toggle('collapsed');
+      if (wasCollapsed) this.filterInput.focus();
     });
     this.el.appendChild(header);
 
