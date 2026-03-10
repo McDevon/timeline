@@ -36,6 +36,12 @@ html, body {
   height: 100%;
   overflow: hidden;
   background: var(--tl-page-bg);
+  -webkit-user-select: none;
+  user-select: none;
+}
+input, textarea {
+  -webkit-user-select: text;
+  user-select: text;
 }
 canvas {
   display: block;

@@ -22,7 +22,6 @@
   justify-content: space-between;
   padding: 6px 10px;
   cursor: pointer;
-  user-select: none;
   border-top: 1px solid var(--tl-border);
 }
 .event-list-header:hover {
@@ -117,7 +116,6 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  user-select: none;
 }
 .event-list-arrow.placeholder {
   visibility: hidden;
@@ -224,7 +222,6 @@
   justify-content: space-between;
   padding: 6px 10px;
   cursor: pointer;
-  user-select: none;
   border-top: 1px solid var(--tl-border);
 }
 .timeline-menu-header:hover {
@@ -258,7 +255,6 @@
 .timeline-menu-btn {
   padding: 8px 10px;
   cursor: pointer;
-  user-select: none;
 }
 .timeline-menu-btn:hover {
   background: var(--tl-list-highlight);
@@ -302,7 +298,6 @@
   justify-content: space-between;
   padding: 6px 10px;
   cursor: pointer;
-  user-select: none;
   border-top: 1px solid var(--tl-border);
 }
 .event-menu-header:hover {
@@ -381,7 +376,6 @@
 .event-menu-btn {
   padding: 8px 10px;
   cursor: pointer;
-  user-select: none;
 }
 .event-menu-btn:hover {
   background: var(--tl-list-highlight);
@@ -410,7 +404,6 @@
   color: var(--tl-text);
   cursor: pointer;
   font-size: 12px;
-  user-select: none;
 }
 .event-menu-type-btn:hover {
   background: var(--tl-list-highlight);
@@ -458,7 +451,6 @@
   gap: 4px;
   padding: 4px 8px;
   cursor: pointer;
-  user-select: none;
 }
 .parent-flyout-row:hover {
   background: var(--tl-list-highlight);
@@ -571,7 +563,6 @@
   gap: 8px;
   padding: 6px 10px;
   cursor: pointer;
-  user-select: none;
 }
 .theme-flyout-row:hover {
   background: var(--tl-list-highlight);

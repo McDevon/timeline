@@ -200,7 +200,6 @@
   line-height: 30px;
   text-align: center;
   cursor: pointer;
-  user-select: none;
 }
 .new-event-btn:hover {
   background: var(--tl-hover-bg);
