@@ -37,6 +37,16 @@ export interface EventMenuCallbacks {
   hasChildren: (event: TimelineEvent) => boolean;
   getParentCandidates: (event: TimelineEvent) => ParentCandidate[];
   getCurrentParent: (event: TimelineEvent) => TimelineEvent | null;
+  // Bulk callbacks
+  onBulkChangeStart?: (events: TimelineEvent[], start: string) => void;
+  onBulkChangeEnd?: (events: TimelineEvent[], end: string | undefined) => void;
+  onBulkChangeStartApprox?: (events: TimelineEvent[], approx: [string, string] | undefined) => void;
+  onBulkChangeEndApprox?: (events: TimelineEvent[], approx: [string, string] | undefined) => void;
+  onBulkChangeColor?: (events: TimelineEvent[], color: string | undefined) => void;
+  onBulkChangeParent?: (events: TimelineEvent[], newParent: TimelineEvent | null) => void;
+  onBulkTypeChange?: (events: TimelineEvent[]) => void;
+  onBulkDelete?: (events: TimelineEvent[]) => void;
+  onBulkExport?: (events: TimelineEvent[]) => void;
 }
 
 type EventType = "point" | "range" | "ongoing";
@@ -70,6 +80,14 @@ export class EventMenu {
   // Stashed end date (for type switching round-trips)
   private stashedEnd: string | undefined;
   private stashedEndApprox: [string, string] | undefined;
+
+  // Multi-select mode
+  private multiMode = false;
+  private multiEvents: TimelineEvent[] = [];
+  private nameField: HTMLDivElement | null = null;
+  private infoField: HTMLDivElement | null = null;
+  private exportBtn: HTMLDivElement | null = null;
+  private deleteBtn: HTMLDivElement | null = null;
 
   // Color flyout
   private colorTriggerSwatch: HTMLDivElement;
@@ -147,6 +165,7 @@ export class EventMenu {
     nameField.appendChild(nameLabel);
     nameField.appendChild(this.nameInput);
     body.appendChild(nameField);
+    this.nameField = nameField;
 
     // Info field
     const infoField = document.createElement("div");
@@ -162,6 +181,7 @@ export class EventMenu {
     infoField.appendChild(infoLabel);
     infoField.appendChild(this.infoInput);
     body.appendChild(infoField);
+    this.infoField = infoField;
 
     // Start section
     const startHeader = document.createElement("div");
@@ -170,6 +190,10 @@ export class EventMenu {
     body.appendChild(startHeader);
 
     this.startDateInput = new DateInput((iso) => {
+      if (this.multiMode) {
+        callbacks.onBulkChangeStart?.(this.multiEvents, iso);
+        return;
+      }
       if (!this.currentEvent) return;
       callbacks.onChangeStart(this.currentEvent, iso);
       this.updateTypeButtons();
@@ -195,6 +219,10 @@ export class EventMenu {
     body.appendChild(this.startDateInput.getElement());
 
     this.startApproxInput = new ApproxInput((approx) => {
+      if (this.multiMode) {
+        callbacks.onBulkChangeStartApprox?.(this.multiEvents, approx);
+        return;
+      }
       if (!this.currentEvent) return;
       callbacks.onChangeStartApprox(this.currentEvent, approx);
     });
@@ -218,6 +246,10 @@ export class EventMenu {
     this.endDateContainer = document.createElement("div");
 
     this.endDateInput = new DateInput((iso) => {
+      if (this.multiMode) {
+        callbacks.onBulkChangeEnd?.(this.multiEvents, iso);
+        return;
+      }
       if (!this.currentEvent) return;
       callbacks.onChangeEnd(this.currentEvent, iso);
     });
@@ -236,6 +268,10 @@ export class EventMenu {
     this.endDateContainer.appendChild(this.endDateInput.getElement());
 
     this.endApproxInput = new ApproxInput((approx) => {
+      if (this.multiMode) {
+        callbacks.onBulkChangeEndApprox?.(this.multiEvents, approx);
+        return;
+      }
       if (!this.currentEvent) return;
       callbacks.onChangeEndApprox(this.currentEvent, approx);
     });
@@ -331,16 +367,28 @@ export class EventMenu {
     exportBtn.className = "event-menu-btn";
     exportBtn.textContent = "Export event";
     exportBtn.addEventListener("click", () => {
+      if (this.multiMode) {
+        callbacks.onBulkExport?.(this.multiEvents);
+        return;
+      }
       if (!this.currentEvent) return;
       callbacks.onExport(this.currentEvent);
     });
     body.appendChild(exportBtn);
+    this.exportBtn = exportBtn;
 
     // Delete button
     const deleteBtn = document.createElement("div");
     deleteBtn.className = "event-menu-btn destructive";
     deleteBtn.textContent = "Delete event";
     deleteBtn.addEventListener("click", () => {
+      if (this.multiMode) {
+        const events = [...this.multiEvents];
+        showConfirmDialog(`Delete ${events.length} events?`, () => {
+          callbacks.onBulkDelete?.(events);
+        });
+        return;
+      }
       if (!this.currentEvent) return;
       const event = this.currentEvent;
       showConfirmDialog(`Delete "${event.name}"?`, () => {
@@ -348,14 +396,22 @@ export class EventMenu {
       });
     });
     body.appendChild(deleteBtn);
+    this.deleteBtn = deleteBtn;
 
     this.el.appendChild(body);
     document.body.appendChild(this.el);
   }
 
   show(event: TimelineEvent): void {
+    this.multiMode = false;
+    this.multiEvents = [];
     this.retained = false;
     this.currentEvent = event;
+    // Restore name/info visibility
+    if (this.nameField) this.nameField.style.display = "";
+    if (this.infoField) this.infoField.style.display = "";
+    if (this.exportBtn) this.exportBtn.textContent = "Export event";
+    if (this.deleteBtn) this.deleteBtn.textContent = "Delete event";
     this.titleSpan.textContent = event.name;
     this.nameInput.value = event.name;
     this.infoInput.value = event.info ?? "";
@@ -402,21 +458,34 @@ export class EventMenu {
 
   /** Soft deselect: if wantOpen, keep showing last event; otherwise fully hide. */
   deselect(): void {
-    if (this.wantOpen && this.currentEvent) {
-      this.retained = true;
-      return;
+    if (this.wantOpen) {
+      if (this.multiMode && this.multiEvents.length > 0) {
+        // Revert to showing the first event from the multi-selection
+        this.show(this.multiEvents[0]);
+      }
+      if (this.currentEvent) {
+        this.retained = true;
+        return;
+      }
     }
     this.hide();
   }
 
   /** Unconditional hide — used when the event is deleted or data is replaced. */
   hide(): void {
+    this.multiMode = false;
+    this.multiEvents = [];
     this.retained = false;
     this.hideColorFlyout();
     this.hideParentFlyout();
     this.el.classList.add("disabled", "collapsed");
     this.titleSpan.textContent = "Nothing selected";
     this.currentEvent = null;
+    // Restore name/info visibility
+    if (this.nameField) this.nameField.style.display = "";
+    if (this.infoField) this.infoField.style.display = "";
+    if (this.exportBtn) this.exportBtn.textContent = "Export event";
+    if (this.deleteBtn) this.deleteBtn.textContent = "Delete event";
   }
 
   isVisible(): boolean {
@@ -442,6 +511,7 @@ export class EventMenu {
 
   /** Re-read current event's dates into the UI fields (e.g. during sketch drag). */
   refresh(): void {
+    if (this.multiMode) return; // multi-mode refresh not needed during sketch
     if (!this.currentEvent || !this.isVisible()) return;
     const event = this.currentEvent;
     this.startDateInput.setValue(event.start);
@@ -458,6 +528,160 @@ export class EventMenu {
     this.el.classList.remove("collapsed");
     this.nameInput.focus();
     this.nameInput.select();
+  }
+
+  showMulti(events: TimelineEvent[]): void {
+    this.multiMode = true;
+    this.multiEvents = events;
+    this.currentEvent = null;
+    this.retained = false;
+    this.stashedEnd = undefined;
+    this.stashedEndApprox = undefined;
+
+    // Title
+    this.titleSpan.textContent = `${events.length} events selected`;
+
+    // Hide name + info fields
+    if (this.nameField) this.nameField.style.display = "none";
+    if (this.infoField) this.infoField.style.display = "none";
+
+    // Type selector: active button if all same type, else none
+    const types = events.map((e) =>
+      e.end === undefined ? "point" : e.end === "ongoing" ? "ongoing" : "range",
+    );
+    const allSame = types.every((t) => t === types[0]);
+    this.currentType = allSame ? (types[0] as EventType) : "range";
+    for (const [type, btn] of this.typeBtns) {
+      btn.classList.toggle("active", allSame && type === this.currentType);
+      btn.classList.remove("disabled");
+    }
+
+    // Start date: common if unanimous, else blank
+    const starts = events.map((e) => e.start);
+    const startUnanimous = starts.every((s) => s === starts[0]);
+    if (startUnanimous) {
+      this.startDateInput.setValue(starts[0]);
+    } else {
+      this.startDateInput.clear();
+    }
+
+    // Start approx: common if unanimous, else cleared
+    const startApproxes = events.map((e) => e.startApprox);
+    const startApproxUnanimous = startApproxes.every(
+      (a) => JSON.stringify(a) === JSON.stringify(startApproxes[0]),
+    );
+    if (startApproxUnanimous && startApproxes[0] !== undefined) {
+      this.startApproxInput.setValue(startApproxes[0], starts[0] ?? "2000");
+    } else {
+      this.startApproxInput.clear();
+    }
+
+    // End section: show if common type is range or ongoing
+    const commonType = allSame ? types[0] : null;
+    if (commonType === "point") {
+      this.endSection.style.display = "none";
+    } else if (commonType === "ongoing") {
+      this.endSection.style.display = "";
+      this.endOngoingLabel.style.display = "";
+      this.endDateContainer.style.display = "none";
+    } else if (commonType === "range") {
+      this.endSection.style.display = "";
+      this.endOngoingLabel.style.display = "none";
+      this.endDateContainer.style.display = "";
+      const ends = events
+        .filter((e) => e.end !== undefined && e.end !== "ongoing")
+        .map((e) => e.end as string);
+      const endUnanimous = ends.length === events.length && ends.every((e) => e === ends[0]);
+      if (endUnanimous) {
+        this.endDateInput.setValue(ends[0]);
+      } else {
+        this.endDateInput.clear();
+      }
+      const endApproxes = events.map((e) => e.endApprox);
+      const endApproxUnanimous = endApproxes.every(
+        (a) => JSON.stringify(a) === JSON.stringify(endApproxes[0]),
+      );
+      if (endApproxUnanimous && endApproxes[0] !== undefined) {
+        this.endApproxInput.setValue(endApproxes[0], ends[0] ?? "2000");
+      } else {
+        this.endApproxInput.clear();
+      }
+    } else {
+      // Mixed types: show end section with blank fields
+      this.endSection.style.display = "";
+      this.endOngoingLabel.style.display = "none";
+      this.endDateContainer.style.display = "";
+      this.endDateInput.clear();
+      this.endApproxInput.clear();
+    }
+
+    // Color: common if unanimous, else "Mixed"
+    const colors = events.map((e) => e.color);
+    const colorUnanimous = colors.every((c) => c === colors[0]);
+    if (colorUnanimous) {
+      this.updateColorTrigger(colors[0]);
+    } else {
+      this.colorTriggerSwatch.style.background = "";
+      this.colorTriggerSwatch.classList.add("default");
+      this.colorTriggerText.textContent = "Mixed";
+    }
+
+    // Parent: common if unanimous, else "Mixed"
+    const parents = events.map((e) => this.callbacks.getCurrentParent(e));
+    const parentUnanimous = parents.every((p) => p === parents[0]);
+    if (parentUnanimous) {
+      this.parentTriggerText.textContent = parents[0]
+        ? parents[0].name
+        : "None (top level)";
+    } else {
+      this.parentTriggerText.textContent = "Mixed";
+    }
+
+    // Export/delete button labels
+    if (this.exportBtn) this.exportBtn.textContent = `Export ${events.length} events`;
+    if (this.deleteBtn) this.deleteBtn.textContent = `Delete ${events.length} events`;
+
+    // Close flyouts
+    this.hideColorFlyout();
+    this.hideParentFlyout();
+
+    this.el.classList.remove("disabled");
+    this.el.classList.toggle("collapsed", !this.wantOpen);
+  }
+
+  private onMultiTypeClick(newType: EventType): void {
+    for (const event of this.multiEvents) {
+      const currentType: EventType =
+        event.end === undefined ? "point" : event.end === "ongoing" ? "ongoing" : "range";
+      if (currentType === newType) continue;
+
+      // Skip point conversion for events with children
+      if (newType === "point" && this.callbacks.hasChildren(event)) continue;
+
+      if (newType === "point") {
+        delete event.end;
+        delete event.endApprox;
+      } else if (newType === "ongoing") {
+        event.end = "ongoing";
+        delete event.endApprox;
+        if (dateToDecimalYear(event.start) > todayDecimalYear()) {
+          event.start = todayIsoDate();
+          delete event.startApprox;
+        }
+      } else {
+        // range
+        if (currentType === "ongoing") {
+          event.end = todayIsoDate();
+        } else {
+          // point → range: add default end
+          event.end = offsetStartYear(event.start, 1);
+        }
+        delete event.endApprox;
+      }
+    }
+    this.callbacks.onBulkTypeChange?.(this.multiEvents);
+    // Refresh multi display
+    this.showMulti(this.multiEvents);
   }
 
   private updateTypeButtons(): void {
@@ -500,10 +724,12 @@ export class EventMenu {
     if (this.parentFlyout) {
       this.parentFlyout.remove();
     }
-    if (!this.currentEvent) return;
+    if (!this.currentEvent && !this.multiMode) return;
 
-    const currentParent = this.callbacks.getCurrentParent(this.currentEvent);
-    const candidates = this.callbacks.getParentCandidates(this.currentEvent);
+    // In multi-mode, use first event for candidates (best effort)
+    const refEvent = this.multiMode ? this.multiEvents[0] : this.currentEvent!;
+    const currentParent = this.callbacks.getCurrentParent(refEvent);
+    const candidates = this.callbacks.getParentCandidates(refEvent);
 
     // Collect ancestor chain of current parent for auto-expanding
     const ancestorSet = new Set<TimelineEvent>();
@@ -528,6 +754,12 @@ export class EventMenu {
       this.callbacks.onHoverEvent(null);
     });
     noneRow.addEventListener("click", () => {
+      if (this.multiMode) {
+        this.callbacks.onBulkChangeParent?.(this.multiEvents, null);
+        this.parentTriggerText.textContent = "None (top level)";
+        this.showParentFlyout(anchor);
+        return;
+      }
       if (!this.currentEvent) return;
       this.callbacks.onChangeParent(this.currentEvent, null);
       this.parentTriggerText.textContent = "None (top level)";
@@ -704,6 +936,13 @@ export class EventMenu {
 
       // Row click → reparent
       row.addEventListener("click", () => {
+        if (this.multiMode) {
+          if (!c.event) return;
+          this.callbacks.onBulkChangeParent?.(this.multiEvents, c.event);
+          this.parentTriggerText.textContent = c.name;
+          this.showParentFlyout(anchor);
+          return;
+        }
         if (!this.currentEvent || !c.event) return;
         this.callbacks.onChangeParent(this.currentEvent, c.event);
         this.parentTriggerText.textContent = c.name;
@@ -733,9 +972,9 @@ export class EventMenu {
     if (this.colorFlyout) {
       this.colorFlyout.remove();
     }
-    if (!this.currentEvent) return;
+    if (!this.currentEvent && !this.multiMode) return;
 
-    const currentColor = this.currentEvent.color;
+    const currentColor = this.multiMode ? this.multiEvents[0]?.color : this.currentEvent?.color;
     const flyout = document.createElement("div");
     flyout.className = "color-flyout";
 
@@ -747,6 +986,12 @@ export class EventMenu {
     defaultSwatch.className = "color-swatch default-swatch" + (currentColor === undefined ? " active" : "");
     defaultSwatch.title = "Default";
     defaultSwatch.addEventListener("click", () => {
+      if (this.multiMode) {
+        this.callbacks.onBulkChangeColor?.(this.multiEvents, undefined);
+        this.updateColorTrigger(undefined);
+        this.showColorFlyout(anchor);
+        return;
+      }
       if (!this.currentEvent) return;
       this.callbacks.onChangeColor(this.currentEvent, undefined);
       this.updateColorTrigger(undefined);
@@ -761,6 +1006,12 @@ export class EventMenu {
       swatch.style.background = ec.hex;
       swatch.title = ec.label;
       swatch.addEventListener("click", () => {
+        if (this.multiMode) {
+          this.callbacks.onBulkChangeColor?.(this.multiEvents, ec.id);
+          this.updateColorTrigger(ec.id);
+          this.showColorFlyout(anchor);
+          return;
+        }
         if (!this.currentEvent) return;
         this.callbacks.onChangeColor(this.currentEvent, ec.id);
         this.updateColorTrigger(ec.id);
@@ -885,6 +1136,10 @@ export class EventMenu {
   }
 
   private onTypeClick(newType: EventType): void {
+    if (this.multiMode) {
+      this.onMultiTypeClick(newType);
+      return;
+    }
     if (!this.currentEvent || newType === this.currentType) return;
 
     const hasKids = this.callbacks.hasChildren(this.currentEvent);

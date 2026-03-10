@@ -60,6 +60,14 @@ export class ApproxInput {
     return this.el;
   }
 
+  /** Blank out all fields without triggering change callbacks. */
+  clear(): void {
+    this.suppressChange = true;
+    this.checkbox.checked = false;
+    this.fields.style.display = 'none';
+    this.suppressChange = false;
+  }
+
   setValue(approx: [string, string] | undefined, nominalIso: string): void {
     this.suppressChange = true;
     if (approx) {

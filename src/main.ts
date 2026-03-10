@@ -3,10 +3,10 @@ import './styles/controls.css';
 import './styles/panels.css';
 import './styles/dialogs.css';
 import { loadEvents } from './data/loader';
-import { render, computeFullRange, computeMaxLayoutY, LAYOUT, ReorderState } from './timeline/renderer';
+import { render, computeFullRange, computeMaxLayoutY, LAYOUT, ReorderState, BoxSelectRect } from './timeline/renderer';
 import { computeLayout, LayoutItem } from './timeline/layout';
 import { Viewport, zoomViewport, xToYear } from './timeline/viewport';
-import { hitTest } from './timeline/hitTest';
+import { hitTest, hitTestBox } from './timeline/hitTest';
 import { TimelineEvent, TimelineSelection } from './types';
 import { setupInput } from './timeline/input';
 import { SnapDetail, SnapState } from './timeline/snap';
@@ -125,6 +125,11 @@ async function main() {
     preClickSnapOverrides: { anchor: null, extend: null } as { anchor: SnapDetail | null; extend: SnapDetail | null },
     lastMouseDownTime: 0,
 
+    // Multi-select
+    selectedEvents: new Set<TimelineEvent>(),
+    boxSelectRect: null as BoxSelectRect | null,
+    boxSelectBaseEvents: null as Set<TimelineEvent> | null,
+
     // Derived
     layout: [] as LayoutItem[],
   };
@@ -234,7 +239,7 @@ async function main() {
 
     const ctx = setupCanvas(canvas);
     const rect = canvas.getBoundingClientRect();
-    render(ctx, rect.width, rect.height, state.layout, state.viewport, state.hoveredItem, state.selectedItem, state.cursorX, state.selection, state.snapState, state.scrollY, state.showTodayLine, state.weekendBands, transition, state.reorderState ?? undefined);
+    render(ctx, rect.width, rect.height, state.layout, state.viewport, state.hoveredItem, state.selectedItem, state.cursorX, state.selection, state.snapState, state.scrollY, state.showTodayLine, state.weekendBands, transition, state.reorderState ?? undefined, state.selectedEvents, state.boxSelectRect);
   }
 
   let saveTimer = 0;
@@ -281,6 +286,23 @@ async function main() {
         animateScroll(Math.max(item.y - LAYOUT.eventsStartY - 10, 0));
       }
     }
+  }
+
+  // --- Multi-select helpers ---
+  function clearMultiSelect() {
+    state.selectedEvents.clear();
+    state.boxSelectRect = null;
+    state.selectedItem = null;
+    eventListPanel?.selectEvent(null);
+    eventMenu.deselect();
+  }
+
+  function selectMulti(events: TimelineEvent[]) {
+    state.selectedItem = null;
+    state.selectedEvents.clear();
+    for (const e of events) state.selectedEvents.add(e);
+    eventListPanel?.selectEvents(state.selectedEvents);
+    eventMenu.showMulti(events);
   }
 
   // Collapse toggle handler
@@ -868,6 +890,7 @@ async function main() {
     getHovered: () => state.hoveredItem,
     setHovered: setHoveredItem,
     setSelected: (item: LayoutItem | null) => {
+      state.selectedEvents.clear();
       state.selectedItem = item;
       eventListPanel?.selectEvent(item?.event ?? null);
       if (item) eventMenu.show(item.event); else eventMenu.deselect();
@@ -890,6 +913,77 @@ async function main() {
     onSketchMove,
     onSketchEnd,
     onSketchCancel,
+    setBoxSelectRect: (rect) => { state.boxSelectRect = rect; },
+    onBoxSelectUpdate: (rect) => {
+      // Capture base selection on first update of this drag
+      if (!state.boxSelectBaseEvents) {
+        state.boxSelectBaseEvents = new Set(state.selectedEvents);
+        if (state.selectedItem) state.boxSelectBaseEvents.add(state.selectedItem.event);
+      }
+      const hits = hitTestBox(rect, state.layout, state.viewport, canvas.clientWidth, state.scrollY);
+      const combined = new Set(state.boxSelectBaseEvents);
+      for (const h of hits) combined.add(h.event);
+      // Update canvas highlights in real-time (no menu/list update yet)
+      state.selectedEvents = combined;
+      state.selectedItem = null;
+    },
+    onBoxSelectEnd: () => {
+      state.boxSelectBaseEvents = null;
+      const combined = state.selectedEvents;
+      if (combined.size === 0) {
+        clearMultiSelect();
+      } else if (combined.size === 1) {
+        const event = [...combined][0];
+        const item = findLayoutItem(event, state.layout);
+        state.selectedEvents.clear();
+        state.selectedItem = item;
+        eventListPanel?.selectEvent(event);
+        eventMenu.show(event);
+      } else {
+        selectMulti([...combined]);
+      }
+    },
+    onBoxSelectCancel: () => {
+      // Restore selection to pre-drag state
+      if (state.boxSelectBaseEvents) {
+        state.selectedEvents = new Set(state.boxSelectBaseEvents);
+        state.boxSelectBaseEvents = null;
+        state.selectedItem = null;
+        if (state.selectedEvents.size === 0) {
+          clearMultiSelect();
+        } else if (state.selectedEvents.size === 1) {
+          const event = [...state.selectedEvents][0];
+          const item = findLayoutItem(event, state.layout);
+          state.selectedEvents.clear();
+          state.selectedItem = item;
+          eventListPanel?.selectEvent(event);
+          eventMenu.show(event);
+        } else {
+          selectMulti([...state.selectedEvents]);
+        }
+      }
+    },
+    onToggleSelect: (event) => {
+      // Build current set (merge single-select if active)
+      const current = new Set(state.selectedEvents);
+      if (state.selectedItem) current.add(state.selectedItem.event);
+
+      if (current.has(event)) current.delete(event); else current.add(event);
+
+      if (current.size === 0) {
+        clearMultiSelect();
+      } else if (current.size === 1) {
+        const ev = [...current][0];
+        const item = findLayoutItem(ev, state.layout);
+        state.selectedEvents.clear();
+        state.selectedItem = item;
+        eventListPanel?.selectEvent(ev);
+        eventMenu.show(ev);
+      } else {
+        selectMulti([...current]);
+      }
+      requestRedraw();
+    },
   });
 
   // Info button
@@ -1233,6 +1327,75 @@ async function main() {
     },
     getParentCandidates,
     getCurrentParent: (event) => findParent(state.events, event),
+    // Bulk callbacks
+    onBulkChangeStart: (events, start) => {
+      for (const e of events) e.start = start;
+      commit({ relayout: true, saveEvents: true, undo: true });
+    },
+    onBulkChangeEnd: (events, end) => {
+      for (const e of events) {
+        if (end === undefined) { delete e.end; delete e.endApprox; }
+        else e.end = end;
+      }
+      commit({ relayout: true, saveEvents: true, undo: true });
+    },
+    onBulkChangeStartApprox: (events, approx) => {
+      for (const e of events) {
+        if (approx === undefined) delete e.startApprox;
+        else e.startApprox = approx;
+      }
+      commit({ relayout: true, saveEvents: true, undo: true });
+    },
+    onBulkChangeEndApprox: (events, approx) => {
+      for (const e of events) {
+        if (approx === undefined) delete e.endApprox;
+        else e.endApprox = approx;
+      }
+      commit({ relayout: true, saveEvents: true, undo: true });
+    },
+    onBulkChangeColor: (events, color) => {
+      for (const e of events) {
+        if (color === undefined) delete e.color;
+        else e.color = color;
+      }
+      commit({ relayout: true, saveEvents: true, undo: true });
+    },
+    onBulkChangeParent: (events, newParent) => {
+      for (const e of events) {
+        removeEvent(state.events, e);
+        if (newParent === null) {
+          state.events.push(e);
+        } else {
+          if (!newParent.nested) newParent.nested = [];
+          newParent.nested.push(e);
+        }
+        const destSiblings = newParent?.nested ?? state.events;
+        const unique = uniqueSiblingName(e.name, destSiblings, e);
+        if (unique !== e.name) e.name = unique;
+      }
+      commit({ relayout: true, saveEvents: true, undo: true, rebuildList: true });
+      infoLog.show(`Moved ${events.length} events to ${newParent ? `"${newParent.name}"` : 'top level'}`);
+    },
+    onBulkTypeChange: (events) => {
+      commit({ relayout: true, saveEvents: true, undo: true, rebuildList: true });
+      infoLog.show(`Changed type of ${events.length} events`);
+    },
+    onBulkDelete: (events) => {
+      for (const e of events) {
+        removeEvent(state.events, e);
+        state.hiddenEvents.delete(e);
+        state.collapsedEvents.delete(e);
+        state.collapseAllSaved?.delete(e);
+      }
+      clearMultiSelect();
+      eventMenu.hide();
+      commit({ relayout: true, saveEvents: true, undo: true, rebuildList: true });
+      infoLog.show(`Deleted ${events.length} events`);
+    },
+    onBulkExport: (events) => {
+      exportToFile(events, 'selected-events.json');
+      infoLog.show(`Exported ${events.length} events`);
+    },
   });
 
   // --- Panel swap ---
@@ -1650,6 +1813,7 @@ async function main() {
     }
 
     state.hoveredItem = null;
+    state.selectedEvents.clear(); // stale refs after snapshot restore
     inputHandlers.restoreSelectionOverrides(null, null);
 
     // Rebuild event list and redraw
@@ -1697,7 +1861,32 @@ async function main() {
       return;
     }
 
-    // Delete/Backspace: delete selected event
+    // Escape: clear multi-select
+    if (e.key === 'Escape' && state.selectedEvents.size > 0) {
+      e.preventDefault();
+      clearMultiSelect();
+      requestRedraw();
+      return;
+    }
+
+    // Delete/Backspace: delete selected event(s)
+    if ((e.key === 'Delete' || e.key === 'Backspace') && state.selectedEvents.size > 0) {
+      e.preventDefault();
+      const events = [...state.selectedEvents];
+      showConfirmDialog(`Delete ${events.length} events?`, () => {
+        for (const ev of events) {
+          removeEvent(state.events, ev);
+          state.hiddenEvents.delete(ev);
+          state.collapsedEvents.delete(ev);
+          state.collapseAllSaved?.delete(ev);
+        }
+        clearMultiSelect();
+        eventMenu.hide();
+        commit({ relayout: true, saveEvents: true, undo: true, rebuildList: true });
+        infoLog.show(`Deleted ${events.length} events`);
+      });
+      return;
+    }
     if ((e.key === 'Delete' || e.key === 'Backspace') && state.selectedItem) {
       e.preventDefault();
       const event = state.selectedItem.event;

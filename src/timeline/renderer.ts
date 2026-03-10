@@ -651,7 +651,7 @@ function drawContainer(
   const x1 = yearToX(item.startYear, viewport, canvasWidth);
   const x2 = yearToX(item.endYear, viewport, canvasWidth);
   const boxWidth = Math.max(x2 - x1, 3);
-  const isSelected = selectedItem === item;
+  const isSelected = selectedItem === item || (currentSelectedEvents !== null && currentSelectedEvents.has(item.event));
   const isHovered = !isSelected && hoveredItem === item;
   const isSnap =
     !isSelected &&
@@ -1073,6 +1073,8 @@ function drawPointEvent(
 
 // Module-level state set during render() so nested drawing can detect the dragged event
 let currentDraggedEvent: TimelineEvent | null = null;
+// Module-level multi-select set, populated by render()
+let currentSelectedEvents: Set<TimelineEvent> | null = null;
 
 function drawLayoutItem(
   ctx: CanvasRenderingContext2D,
@@ -1106,7 +1108,7 @@ function drawLayoutItem(
     ctx.globalAlpha = 0.3;
   }
 
-  const isSelected = selectedItem === item;
+  const isSelected = selectedItem === item || (currentSelectedEvents !== null && currentSelectedEvents.has(item.event));
   const isHovered = !isSelected && hoveredItem === item;
   const isSnap =
     !isSelected &&
@@ -1169,6 +1171,10 @@ export function computeMaxLayoutY(layout: LayoutItem[]): number {
   return maxY;
 }
 
+export interface BoxSelectRect {
+  x1: number; y1: number; x2: number; y2: number;
+}
+
 export function render(
   ctx: CanvasRenderingContext2D,
   canvasWidth: number,
@@ -1185,7 +1191,12 @@ export function render(
   weekendBands?: boolean,
   transition?: LayoutTransition,
   reorderState?: ReorderState,
+  selectedEvents?: Set<TimelineEvent>,
+  boxSelectRect?: BoxSelectRect | null,
 ) {
+  // Set module-level multi-select for nested draw functions
+  currentSelectedEvents = selectedEvents && selectedEvents.size > 0 ? selectedEvents : null;
+
   ctx.fillStyle = colors.background;
   ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
@@ -1266,4 +1277,21 @@ export function render(
     canvasHeight,
     todayVisible,
   );
+
+  // Box select overlay — drawn on top of everything
+  if (boxSelectRect) {
+    const bx = Math.min(boxSelectRect.x1, boxSelectRect.x2);
+    const by = Math.min(boxSelectRect.y1, boxSelectRect.y2);
+    const bw = Math.abs(boxSelectRect.x2 - boxSelectRect.x1);
+    const bh = Math.abs(boxSelectRect.y2 - boxSelectRect.y1);
+    ctx.fillStyle = colorWithAlpha(colors.selectionFill, 0.5);
+    ctx.fillRect(bx, by, bw, bh);
+    ctx.strokeStyle = colors.selectionLine;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.strokeRect(bx, by, bw, bh);
+    ctx.setLineDash([]);
+  }
+
+  currentSelectedEvents = null;
 }

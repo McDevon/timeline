@@ -39,6 +39,11 @@ export interface InputConfig {
   onSketchMove?: (item: LayoutItem, newStartYear: number, newEndYear: number, isResize?: boolean) => void;
   onSketchEnd?: (item: LayoutItem) => void;
   onSketchCancel?: () => void;
+  setBoxSelectRect?: (rect: { x1: number; y1: number; x2: number; y2: number } | null) => void;
+  onBoxSelectUpdate?: (rect: { x1: number; y1: number; x2: number; y2: number }) => void;
+  onBoxSelectEnd?: () => void;
+  onBoxSelectCancel?: () => void;
+  onToggleSelect?: (event: import('../types').TimelineEvent) => void;
 }
 
 const CLICK_THRESHOLD = 3; // pixels — movement under this is a click, not a drag
@@ -74,6 +79,11 @@ export function setupInput(config: InputConfig): InputHandlers {
     onSketchMove,
     onSketchEnd,
     onSketchCancel,
+    setBoxSelectRect,
+    onBoxSelectUpdate,
+    onBoxSelectEnd,
+    onBoxSelectCancel,
+    onToggleSelect,
   } = config;
   const tooltip = new Tooltip();
 
@@ -393,7 +403,8 @@ export function setupInput(config: InputConfig): InputHandlers {
     | { mode: 'reordering'; item: LayoutItem; startViewport: Viewport }
     | { mode: 'zooming'; mouseDownX: number; mouseDownY: number; anchorYear: number; startViewport: Viewport; didDrag: boolean }
     | { mode: 'sketch-moving'; item: LayoutItem; startViewport: Viewport; originalStartYear: number; originalEndYear: number; anchorYear: number }
-    | { mode: 'sketch-resizing'; item: LayoutItem; startViewport: Viewport; edge: 'start' | 'end'; originalStartYear: number; originalEndYear: number; anchorYear: number };
+    | { mode: 'sketch-resizing'; item: LayoutItem; startViewport: Viewport; edge: 'start' | 'end'; originalStartYear: number; originalEndYear: number; anchorYear: number }
+    | { mode: 'box-selecting'; mouseDownX: number; mouseDownY: number; canvasDownX: number; canvasDownY: number; didDrag: boolean };
 
   let drag: DragState = { mode: 'none' };
   const REORDER_DECISION_THRESHOLD = 8;
@@ -475,7 +486,19 @@ export function setupInput(config: InputConfig): InputHandlers {
 
     cursorSnapYear = null;
 
-    if (y < LAYOUT.eventsStartY) {
+    if (e.altKey && setBoxSelectRect) {
+      // Alt+mousedown anywhere → box select mode
+      drag = {
+        mode: 'box-selecting',
+        mouseDownX: e.clientX,
+        mouseDownY: e.clientY,
+        canvasDownX: x,
+        canvasDownY: y,
+        didDrag: false,
+      };
+      canvas.style.cursor = 'crosshair';
+      updateCursorLine(-1, LAYOUT.eventsStartY);
+    } else if (y < LAYOUT.eventsStartY) {
       // Axis region — start selection mode
       drag = {
         mode: 'axis-selecting',
@@ -534,6 +557,21 @@ export function setupInput(config: InputConfig): InputHandlers {
 
   function onMouseMove(e: MouseEvent) {
     modifierHeld = e.ctrlKey || e.metaKey;
+
+    if (drag.mode === 'box-selecting') {
+      const dist = Math.hypot(e.clientX - drag.mouseDownX, e.clientY - drag.mouseDownY);
+      if (dist >= CLICK_THRESHOLD) drag.didDrag = true;
+      if (drag.didDrag) {
+        const rect = canvas.getBoundingClientRect();
+        const cx = e.clientX - rect.left;
+        const cy = e.clientY - rect.top;
+        const boxRect = { x1: drag.canvasDownX, y1: drag.canvasDownY, x2: cx, y2: cy };
+        setBoxSelectRect?.(boxRect);
+        onBoxSelectUpdate?.(boxRect);
+        scheduleRedraw();
+      }
+      return;
+    }
 
     if (drag.mode === 'axis-selecting') {
       const dist = Math.hypot(e.clientX - drag.mouseDownX, e.clientY - drag.mouseDownY);
@@ -799,6 +837,27 @@ export function setupInput(config: InputConfig): InputHandlers {
 
     if (state.mode === 'none') return; // mousedown wasn't on the canvas
 
+    if (state.mode === 'box-selecting') {
+      setBoxSelectRect?.(null);
+      if (state.didDrag) {
+        onBoxSelectEnd?.();
+      } else {
+        // Alt+click without drag → toggle event under cursor
+        const hit = hitTest(
+          state.canvasDownX, state.canvasDownY,
+          getLayout(), getViewport(), canvas.clientWidth, getScrollY(),
+        );
+        if (hit) onToggleSelect?.(hit.event);
+      }
+      cursorCanvasX = e.clientX - canvas.getBoundingClientRect().left;
+      cursorCanvasY = e.clientY - canvas.getBoundingClientRect().top;
+      updateCursorLine(cursorCanvasX, cursorCanvasY);
+      updateHover();
+      canvas.style.cursor = sketchCursor(getHovered());
+      scheduleRedraw();
+      return;
+    }
+
     if (state.mode === 'reordering') {
       stopAutoScroll();
       onReorderEnd(state.item);
@@ -968,6 +1027,13 @@ export function setupInput(config: InputConfig): InputHandlers {
   }
 
   function onKeyDown(e: KeyboardEvent) {
+    if (e.key === 'Escape' && drag.mode === 'box-selecting') {
+      setBoxSelectRect?.(null);
+      onBoxSelectCancel?.();
+      drag = { mode: 'none' };
+      canvas.style.cursor = sketchCursor(getHovered());
+      scheduleRedraw();
+    }
     if (e.key === 'Escape' && (drag.mode === 'sketch-moving' || drag.mode === 'sketch-resizing')) {
       snapExcludeEvent = null;
       cachedLayout = null;

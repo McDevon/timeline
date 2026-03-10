@@ -184,12 +184,33 @@ export class EventListPanel {
       this.selectedRow.classList.remove('selected');
       this.selectedRow = null;
     }
+    // Also clear any multi-select highlights
+    this.clearMultiSelect();
     if (event) {
       const row = this.rowMap.get(event) ?? null;
       if (row) {
         row.classList.add('selected');
         this.selectedRow = row;
       }
+    }
+  }
+
+  selectEvents(events: Set<TimelineEvent>): void {
+    // Clear previous single and multi selection
+    if (this.selectedRow) {
+      this.selectedRow.classList.remove('selected');
+      this.selectedRow = null;
+    }
+    this.clearMultiSelect();
+    for (const event of events) {
+      const row = this.rowMap.get(event);
+      if (row) row.classList.add('selected');
+    }
+  }
+
+  private clearMultiSelect(): void {
+    for (const row of this.rowMap.values()) {
+      row.classList.remove('selected');
     }
   }
 

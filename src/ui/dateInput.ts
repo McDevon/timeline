@@ -83,6 +83,17 @@ export class DateInput {
     this.suppressChange = false;
   }
 
+  /** Blank out all fields without triggering change callbacks. */
+  clear(): void {
+    this.suppressChange = true;
+    this.yearInput.value = '';
+    this.eraSelect.value = 'CE';
+    this.monthSelect.value = '';
+    this.daySelect.value = '';
+    this.daySelect.style.display = 'none';
+    this.suppressChange = false;
+  }
+
   getValue(): string {
     const year = Math.max(1, parseInt(this.yearInput.value, 10) || 1);
     const bce = this.eraSelect.value === 'BCE';
