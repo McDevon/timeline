@@ -15,6 +15,7 @@ Provide a collapsible UI panel that lists all events in a recursive tree view. E
 7. Hiding/showing an event triggers animated relayout on canvas
 8. Hidden events' snap targets are removed from the snap system
 9. Hovering a row highlights the corresponding event on the canvas (bidirectional)
+10. Filter input for searching events by name, auto-focused on panel expand
 
 ## Panel Layout
 
@@ -33,6 +34,7 @@ Provide a collapsible UI panel that lists all events in a recursive tree view. E
 - Width: 300px, max-height: 50vh (scrollable)
 - Themed via CSS custom properties
 - Collapsed state hides the body via CSS `max-height` transition
+- Header has `cursor: grab` — draggable to swap position with the event edit menu (see below)
 
 ## Row Structure
 
@@ -82,6 +84,19 @@ Uses max-height CSS transition:
 ### State persistence
 
 Hidden events are serialized as name paths in `src/state.ts` (works at any nesting depth).
+
+## Panel Swap
+
+The event list panel and event edit menu occupy two fixed slots at the bottom-left. Either panel can be dragged by its header to swap positions with the other.
+
+- **Geometry**: left slot starts at 20px, right slot starts at `20 + leftPanelWidth + 8`. The + button sits at a fixed 536px regardless of order.
+- **Swap trigger**: dragging a panel's center past the midpoint of the combined panel area (274px) swaps the other panel to the vacated slot with a 0.2s ease animation.
+- **On release**: the dragged panel snaps to its final slot with animation.
+- **4px drag threshold**: prevents accidental swap on header click (collapse/expand still fires).
+- **Clamping**: panels cannot be dragged past the left window edge or into the + button area.
+- **State**: panel order is persisted as a single `eventListOnLeft` boolean.
+
+Implementation: `src/ui/panelDrag.ts` (`setupPanelSwap`).
 
 ## Edge Cases
 

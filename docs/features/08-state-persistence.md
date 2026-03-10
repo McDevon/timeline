@@ -11,6 +11,10 @@ Persist the timeline's view state to `localStorage` so that the page restores it
 - **Hidden events** (from event list panel toggles)
 - **Collapsed events** (from ctrl/cmd+click collapse)
 - **Event orders** (from drag-and-drop reordering, see Feature 09)
+- **Show today line** (boolean, default true)
+- **Weekend bands** (boolean, default true)
+- **Sketch mode** (boolean, default false)
+- **Panel order** (`eventListOnLeft` boolean, default true — see Feature 06)
 
 ## Event Identification
 
@@ -32,6 +36,10 @@ interface SerializedState {
   hiddenEventPaths: string[][];
   collapsedEventPaths: string[][];
   eventOrders?: Record<string, string[]>;
+  showTodayLine?: boolean;
+  weekendBands?: boolean;
+  sketchMode?: boolean;
+  eventListOnLeft?: boolean;
 }
 ```
 
