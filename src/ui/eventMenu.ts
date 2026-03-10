@@ -43,6 +43,7 @@ type EventType = "point" | "range" | "ongoing";
 
 export class EventMenu {
   private el: HTMLDivElement;
+  private header: HTMLDivElement;
   private titleSpan: HTMLSpanElement;
   private nameInput: HTMLInputElement;
   private infoInput: HTMLTextAreaElement;
@@ -88,17 +89,17 @@ export class EventMenu {
     this.el.className = "event-menu collapsed disabled";
 
     // Header
-    const header = document.createElement("div");
-    header.className = "event-menu-header";
+    this.header = document.createElement("div");
+    this.header.className = "event-menu-header";
     this.titleSpan = document.createElement("span");
     this.titleSpan.className = "event-menu-title";
     this.titleSpan.textContent = "Nothing selected";
     const chevron = document.createElement("span");
     chevron.className = "event-menu-chevron";
     chevron.textContent = "\u25BC";
-    header.appendChild(this.titleSpan);
-    header.appendChild(chevron);
-    header.addEventListener("click", () => {
+    this.header.appendChild(this.titleSpan);
+    this.header.appendChild(chevron);
+    this.header.addEventListener("click", () => {
       if (this.el.classList.contains("disabled")) return;
       this.wantOpen = !this.wantOpen;
       this.el.classList.toggle("collapsed", !this.wantOpen);
@@ -107,7 +108,7 @@ export class EventMenu {
         this.hideParentFlyout();
       }
     });
-    this.el.appendChild(header);
+    this.el.appendChild(this.header);
 
     // Body
     const body = document.createElement("div");
@@ -417,6 +418,9 @@ export class EventMenu {
   getRightEdge(): number {
     return this.el.getBoundingClientRect().right;
   }
+
+  getElement(): HTMLDivElement { return this.el; }
+  getHeader(): HTMLDivElement { return this.header; }
 
   /** Re-read current event's dates into the UI fields (e.g. during sketch drag). */
   refresh(): void {

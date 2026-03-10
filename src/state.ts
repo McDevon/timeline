@@ -13,6 +13,7 @@ interface SerializedState {
   showTodayLine?: boolean;
   weekendBands?: boolean;
   sketchMode?: boolean;
+  eventListOnLeft?: boolean;
 }
 
 const STORAGE_BASE = 'timeline-state';
@@ -58,6 +59,7 @@ export interface PersistableState {
   showTodayLine: boolean;
   weekendBands: boolean;
   sketchMode: boolean;
+  eventListOnLeft?: boolean;
 }
 
 export function saveState(slug: string, s: PersistableState): void {
@@ -88,6 +90,7 @@ export function saveState(slug: string, s: PersistableState): void {
     showTodayLine: s.showTodayLine,
     weekendBands: s.weekendBands,
     sketchMode: s.sketchMode,
+    eventListOnLeft: s.eventListOnLeft,
   };
 
   try {
@@ -109,6 +112,7 @@ export function loadState(
   showTodayLine: boolean;
   weekendBands: boolean;
   sketchMode: boolean;
+  eventListOnLeft?: boolean;
 } | null {
   try {
     const raw = localStorage.getItem(storageKey(slug));
@@ -145,6 +149,7 @@ export function loadState(
       showTodayLine: state.showTodayLine ?? true,
       weekendBands: state.weekendBands ?? true,
       sketchMode: state.sketchMode ?? false,
+      eventListOnLeft: state.eventListOnLeft,
     };
   } catch {
     return null;

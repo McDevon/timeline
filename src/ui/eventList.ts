@@ -3,6 +3,7 @@ import { formatDate } from '../data/time';
 
 export class EventListPanel {
   private el: HTMLDivElement;
+  private header: HTMLDivElement;
   private rowMap = new Map<TimelineEvent, HTMLDivElement>();
   private childrenMap = new Map<TimelineEvent, HTMLDivElement>();
   private expandedEvents = new Set<TimelineEvent>();
@@ -26,15 +27,15 @@ export class EventListPanel {
     this.el.className = 'event-list-panel collapsed';
 
     // Header
-    const header = document.createElement('div');
-    header.className = 'event-list-header';
-    header.innerHTML = `<span class="event-list-title">Events</span><span class="event-list-chevron">\u25BC</span>`;
-    header.addEventListener('click', () => {
+    this.header = document.createElement('div');
+    this.header.className = 'event-list-header';
+    this.header.innerHTML = `<span class="event-list-title">Events</span><span class="event-list-chevron">\u25BC</span>`;
+    this.header.addEventListener('click', () => {
       const wasCollapsed = this.el.classList.contains('collapsed');
       this.el.classList.toggle('collapsed');
       if (wasCollapsed) this.filterInput.focus();
     });
-    this.el.appendChild(header);
+    this.el.appendChild(this.header);
 
     // Filter row
     const filterRow = document.createElement('div');
@@ -196,6 +197,9 @@ export class EventListPanel {
   getRightEdge(): number {
     return this.el.getBoundingClientRect().right;
   }
+
+  getElement(): HTMLDivElement { return this.el; }
+  getHeader(): HTMLDivElement { return this.header; }
 
   highlightEvent(event: TimelineEvent | null) {
     if (this.highlightedRow) {

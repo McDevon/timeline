@@ -11,6 +11,7 @@ import { TimelineEvent, TimelineSelection } from './types';
 import { setupInput } from './timeline/input';
 import { SnapDetail, SnapState } from './timeline/snap';
 import { EventListPanel } from './ui/eventList';
+import { setupPanelSwap } from './ui/panelDrag';
 import { InfoLog } from './ui/infoLog';
 import { TimelineMenu } from './ui/timelineMenu';
 import { EventMenu } from './ui/eventMenu';
@@ -92,6 +93,7 @@ async function main() {
     weekendBands: saved?.weekendBands ?? true,
     sketchMode: saved?.sketchMode ?? config.sketchMode ?? false,
     sketchModeUnlocked: !!(saved?.sketchMode ?? config.sketchMode),
+    eventListOnLeft: saved?.eventListOnLeft ?? true,
 
     // Transient interaction
     selectedItem: null as LayoutItem | null,
@@ -1233,6 +1235,21 @@ async function main() {
     getCurrentParent: (event) => findParent(state.events, event),
   });
 
+  // --- Panel swap ---
+  const swapHandle = setupPanelSwap(
+    { el: eventListPanel.getElement(), header: eventListPanel.getHeader(), width: 300 },
+    { el: eventMenu.getElement(), header: eventMenu.getHeader(), width: 200 },
+    {
+      baseLeft: 20,
+      gap: 8,
+      onOrderChange(listIsLeft) {
+        state.eventListOnLeft = listIsLeft;
+        scheduleSave();
+      },
+    },
+  );
+  swapHandle.setOrder(state.eventListOnLeft);
+
   // --- New event button ---
   const newEventBtn = document.createElement('div');
   newEventBtn.className = 'new-event-btn';
@@ -1708,6 +1725,7 @@ async function main() {
   window.addEventListener('resize', () => {
     const max = computeMaxScrollY();
     if (state.scrollY > max) state.scrollY = max;
+    swapHandle.setOrder(state.eventListOnLeft);
     requestRedraw();
   });
 }
