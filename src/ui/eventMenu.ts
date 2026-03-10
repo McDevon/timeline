@@ -913,7 +913,9 @@ export class EventMenu {
           );
         }
       } else {
-        const defaultEnd = offsetStartYear(this.currentEvent.start, 1);
+        const defaultEnd = oldType === "ongoing"
+          ? todayIsoDate()
+          : offsetStartYear(this.currentEvent.start, 1);
         this.callbacks.onChangeEnd(this.currentEvent, defaultEnd);
       }
     }
