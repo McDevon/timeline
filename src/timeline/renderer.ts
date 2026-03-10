@@ -209,35 +209,25 @@ function drawMonthGrid(
     const totalDays = daysInYear(year);
     for (let month = 0; month < 12; month++) {
       const decYear = year + monthStartDay(year, month + 1) / totalDays;
-      const nextMonth = month + 1;
-      const nextDecYear = nextMonth < 12
-        ? year + monthStartDay(year, nextMonth + 1) / totalDays
-        : year + 1;
       const x = yearToX(decYear, viewport, canvasWidth);
-      const nextX = yearToX(nextDecYear, viewport, canvasWidth);
 
       // Vertical grid line at month boundary
       if (decYear >= viewport.start && decYear <= viewport.end) {
         ctx.strokeStyle = colorWithAlpha(colors.axisText, weekBandsVisible ? 0.3 : 0.15);
         ctx.beginPath();
-        if (month === 0) {
-          // Year boundary: start below the year label
-          ctx.moveTo(x, labelY + LAYOUT.smallFontSize + 2);
-        } else {
-          ctx.moveTo(x, LAYOUT.axisY);
-        }
+        // Start line below the label
+        ctx.moveTo(x, labelY + LAYOUT.smallFontSize + 4);
         ctx.lineTo(x, canvasHeight);
         ctx.stroke();
       }
 
-      // Month label centered between this boundary and the next
-      const labelX = (x + nextX) / 2;
-      if (labelX >= 0 && labelX <= canvasWidth) {
+      // Month label on top of the line (skip January — handled by year label)
+      if (month > 0 && x >= 0 && x <= canvasWidth) {
         ctx.fillStyle = colorWithAlpha(colors.axisText, 0.5);
         ctx.font = `${LAYOUT.smallFontSize}px monospace`;
         ctx.textAlign = "center";
         ctx.textBaseline = "top";
-        ctx.fillText(MONTH_NAMES[month], labelX, labelY);
+        ctx.fillText(MONTH_NAMES[month], x, labelY);
       }
     }
   }
@@ -307,10 +297,14 @@ function drawAxis(
     if (weekBandsVisible) {
       drawWeekBands(ctx, viewport, canvasWidth, canvasHeight);
     }
-    if (pxPerMonth >= 50) {
+    const monthGridVisible = pxPerMonth >= 50;
+    if (monthGridVisible) {
       drawMonthGrid(ctx, viewport, canvasWidth, canvasHeight, weekBandsVisible);
     }
   }
+
+  const monthGridVisible = interval === 1
+    && canvasWidth / (spanYears * 12) >= 50;
 
   ctx.strokeStyle = colors.axis;
   ctx.fillStyle = colors.axisText;
@@ -324,11 +318,10 @@ function drawAxis(
     ctx.moveTo(x, y - LAYOUT.tickHeight / 2);
     ctx.lineTo(x, y + LAYOUT.tickHeight / 2);
     ctx.stroke();
-    ctx.fillText(
-      formatAxisLabel(year, spanYears),
-      x,
-      y + LAYOUT.tickHeight / 2 + 4,
-    );
+    const label = monthGridVisible
+      ? `Jan ${formatAxisLabel(year, spanYears)}`
+      : formatAxisLabel(year, spanYears);
+    ctx.fillText(label, x, y + LAYOUT.tickHeight / 2 + 4);
   }
 }
 
