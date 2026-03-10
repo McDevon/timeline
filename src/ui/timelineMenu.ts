@@ -6,6 +6,7 @@ export interface TimelineMenuCallbacks {
   onLoadFile: () => void;
   onExport: () => void;
   onToggleTodayLine: (show: boolean) => void;
+  onToggleWeekendBands: (show: boolean) => void;
   onToggleSketchMode: (enabled: boolean) => void;
   onDeleteAll: () => void;
   onReloadDefaults: () => void;
@@ -19,10 +20,16 @@ export class TimelineMenu {
   private currentThemeId: string;
   private slug: string;
   private sketchCheckbox: HTMLInputElement | null = null;
+  private showTodayLine: boolean;
+  private weekendBands: boolean;
+  private sketchMode: boolean;
 
-  constructor(callbacks: TimelineMenuCallbacks, initialShowTodayLine: boolean, initialSketchMode: boolean, slug = '') {
+  constructor(callbacks: TimelineMenuCallbacks, initialShowTodayLine: boolean, initialWeekendBands: boolean, initialSketchMode: boolean, slug = '') {
     this.slug = slug;
     this.currentThemeId = loadSavedTheme(slug).id;
+    this.showTodayLine = initialShowTodayLine;
+    this.weekendBands = initialWeekendBands;
+    this.sketchMode = initialSketchMode;
 
     this.el = document.createElement('div');
     this.el.className = 'timeline-menu collapsed';
@@ -46,11 +53,7 @@ export class TimelineMenu {
     body.appendChild(this.createButton('Import into new event', false, callbacks.onImportIntoEvent));
     body.appendChild(this.createButton('Load events from file', false, callbacks.onLoadFile));
     body.appendChild(this.createButton('Export events', false, callbacks.onExport));
-    body.appendChild(this.createCheckbox('Show today indicator', initialShowTodayLine, callbacks.onToggleTodayLine));
-    const sketchRow = this.createCheckbox('Sketch mode', initialSketchMode, callbacks.onToggleSketchMode);
-    this.sketchCheckbox = sketchRow.querySelector('input') as HTMLInputElement;
-    body.appendChild(sketchRow);
-    body.appendChild(this.createThemeButton(callbacks));
+    body.appendChild(this.createViewButton(callbacks));
     body.appendChild(this.createButton('Delete all events', true, callbacks.onDeleteAll));
     body.appendChild(this.createButton('Reload default events', true, callbacks.onReloadDefaults));
 
@@ -75,33 +78,14 @@ export class TimelineMenu {
     return btn;
   }
 
-  private createCheckbox(label: string, checked: boolean, onChange: (checked: boolean) => void): HTMLDivElement {
-    const row = document.createElement('div');
-    row.className = 'timeline-menu-btn';
-    const checkbox = document.createElement('input');
-    checkbox.type = 'checkbox';
-    checkbox.checked = checked;
-    checkbox.style.margin = '0 6px 0 0';
-    checkbox.style.accentColor = 'var(--tl-check-color)';
-    const labelSpan = document.createElement('span');
-    labelSpan.textContent = label;
-    row.appendChild(checkbox);
-    row.appendChild(labelSpan);
-    row.addEventListener('click', (e) => {
-      if (e.target !== checkbox) checkbox.checked = !checkbox.checked;
-      onChange(checkbox.checked);
-    });
-    return row;
-  }
-
-  private createThemeButton(callbacks: TimelineMenuCallbacks): HTMLDivElement {
+  private createViewButton(callbacks: TimelineMenuCallbacks): HTMLDivElement {
     const btn = document.createElement('div');
     btn.className = 'timeline-menu-btn';
-    btn.innerHTML = 'Color theme <span style="float:right">\u25B6</span>';
+    btn.innerHTML = 'View <span style="float:right">\u25B6</span>';
 
     btn.addEventListener('mouseenter', () => {
       clearTimeout(this.hideTimer);
-      this.showFlyout(btn, callbacks);
+      this.showViewFlyout(btn, callbacks);
     });
 
     btn.addEventListener('mouseleave', () => {
@@ -111,7 +95,7 @@ export class TimelineMenu {
     return btn;
   }
 
-  private showFlyout(anchor: HTMLDivElement, callbacks: TimelineMenuCallbacks) {
+  private showViewFlyout(anchor: HTMLDivElement, callbacks: TimelineMenuCallbacks) {
     if (this.flyout) {
       this.flyout.remove();
     }
@@ -119,6 +103,33 @@ export class TimelineMenu {
     const flyout = document.createElement('div');
     flyout.className = 'theme-flyout';
 
+    // Checkboxes
+    const todayRow = this.createFlyoutCheckbox('Show today indicator', this.showTodayLine, (checked) => {
+      this.showTodayLine = checked;
+      callbacks.onToggleTodayLine(checked);
+    });
+    flyout.appendChild(todayRow);
+
+    const weekendRow = this.createFlyoutCheckbox('Weekend bands', this.weekendBands, (checked) => {
+      this.weekendBands = checked;
+      callbacks.onToggleWeekendBands(checked);
+    });
+    flyout.appendChild(weekendRow);
+
+    const sketchRow = this.createFlyoutCheckbox('Sketch mode', this.sketchMode, (checked) => {
+      this.sketchMode = checked;
+      callbacks.onToggleSketchMode(checked);
+    });
+    this.sketchCheckbox = sketchRow.querySelector('input') as HTMLInputElement;
+    flyout.appendChild(sketchRow);
+
+    // Separator
+    const sep = document.createElement('div');
+    sep.style.borderTop = '1px solid var(--tl-border)';
+    sep.style.margin = '4px 0';
+    flyout.appendChild(sep);
+
+    // Theme rows
     for (const theme of themes) {
       const row = document.createElement('div');
       row.className = 'theme-flyout-row';
@@ -126,7 +137,6 @@ export class TimelineMenu {
         row.classList.add('active');
       }
 
-      // Swatches
       const swatchContainer = document.createElement('div');
       swatchContainer.className = 'theme-swatches';
       for (const color of theme.swatches) {
@@ -137,7 +147,6 @@ export class TimelineMenu {
       }
       row.appendChild(swatchContainer);
 
-      // Name
       const name = document.createElement('span');
       name.textContent = theme.name;
       row.appendChild(name);
@@ -160,7 +169,33 @@ export class TimelineMenu {
     document.body.appendChild(flyout);
     this.flyout = flyout;
 
-    // Position the flyout to the left of the menu (since menu is on the right edge)
+    this.positionFlyout(anchor);
+  }
+
+  private createFlyoutCheckbox(label: string, checked: boolean, onChange: (checked: boolean) => void): HTMLDivElement {
+    const row = document.createElement('div');
+    row.className = 'theme-flyout-row';
+    row.style.cursor = 'pointer';
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = checked;
+    checkbox.style.margin = '0 6px 0 0';
+    checkbox.style.accentColor = 'var(--tl-check-color)';
+    const labelSpan = document.createElement('span');
+    labelSpan.textContent = label;
+    row.appendChild(checkbox);
+    row.appendChild(labelSpan);
+    row.addEventListener('click', (e) => {
+      if (e.target !== checkbox) checkbox.checked = !checkbox.checked;
+      onChange(checkbox.checked);
+    });
+    return row;
+  }
+
+  private positionFlyout(anchor: HTMLDivElement) {
+    const flyout = this.flyout;
+    if (!flyout) return;
+
     const anchorRect = anchor.getBoundingClientRect();
     const menuRect = this.el.getBoundingClientRect();
     const top = anchorRect.top;
@@ -170,13 +205,11 @@ export class TimelineMenu {
     const flyoutWidth = flyout.getBoundingClientRect().width;
 
     let left = menuRect.left - flyoutWidth - 4;
-    // Fall back to right side if it would overflow left
     if (left < 8) {
       left = menuRect.right + 4;
     }
     flyout.style.left = `${left}px`;
 
-    // Clamp vertical position if it overflows bottom
     const flyoutRect = flyout.getBoundingClientRect();
     if (flyoutRect.bottom > window.innerHeight - 8) {
       flyout.style.top = `${window.innerHeight - 8 - flyoutRect.height}px`;
@@ -186,14 +219,15 @@ export class TimelineMenu {
   private applyThemeAndUpdate(theme: Theme, flyout: HTMLDivElement, callbacks: TimelineMenuCallbacks) {
     this.currentThemeId = theme.id;
 
-    // Update active state on rows
     for (const row of flyout.querySelectorAll('.theme-flyout-row')) {
       row.classList.remove('active');
     }
     const rows = flyout.querySelectorAll('.theme-flyout-row');
     const idx = themes.indexOf(theme);
-    if (idx >= 0 && rows[idx]) {
-      rows[idx].classList.add('active');
+    // Offset by 3 checkbox rows + 1 separator
+    const rowIdx = idx + 3;
+    if (rowIdx >= 0 && rows[rowIdx]) {
+      rows[rowIdx].classList.add('active');
     }
 
     applyTheme(this.slug, theme, callbacks.onThemeChange);
@@ -215,6 +249,7 @@ export class TimelineMenu {
 
   /** Update the sketch mode checkbox from outside (e.g. keyboard shortcut). */
   setSketchMode(enabled: boolean) {
+    this.sketchMode = enabled;
     if (this.sketchCheckbox) this.sketchCheckbox.checked = enabled;
   }
 }

@@ -305,9 +305,9 @@ export function setupInput(config: InputConfig): InputHandlers {
     const viewport = getViewport();
     const hit = hitTest(cursorCanvasX, cursorCanvasY, layout, viewport, canvas.clientWidth, getScrollY());
     const prev = getHovered();
+    canvas.style.cursor = sketchCursor(hit);
     if (hit !== prev) {
       setHovered(hit);
-      canvas.style.cursor = sketchCursor(hit);
       if (hit) {
         const rect = canvas.getBoundingClientRect();
         tooltip.show(hit.event, rect.left + cursorCanvasX, rect.top + cursorCanvasY);

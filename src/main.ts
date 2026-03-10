@@ -89,6 +89,7 @@ async function main() {
     scrollY: 0,
     selection: (saved?.selection ?? null) as TimelineSelection | null,
     showTodayLine: saved?.showTodayLine ?? config.showTodayLine ?? true,
+    weekendBands: saved?.weekendBands ?? true,
     sketchMode: saved?.sketchMode ?? config.sketchMode ?? false,
     sketchModeUnlocked: !!(saved?.sketchMode ?? config.sketchMode),
 
@@ -231,7 +232,7 @@ async function main() {
 
     const ctx = setupCanvas(canvas);
     const rect = canvas.getBoundingClientRect();
-    render(ctx, rect.width, rect.height, state.layout, state.viewport, state.hoveredItem, state.selectedItem, state.cursorX, state.selection, state.snapState, state.scrollY, state.showTodayLine, transition, state.reorderState ?? undefined);
+    render(ctx, rect.width, rect.height, state.layout, state.viewport, state.hoveredItem, state.selectedItem, state.cursorX, state.selection, state.snapState, state.scrollY, state.showTodayLine, state.weekendBands, transition, state.reorderState ?? undefined);
   }
 
   let saveTimer = 0;
@@ -1560,13 +1561,17 @@ async function main() {
       state.showTodayLine = show;
       requestRedraw();
     },
+    onToggleWeekendBands: (show) => {
+      state.weekendBands = show;
+      requestRedraw();
+    },
     onToggleSketchMode: (enabled) => {
       state.sketchMode = enabled;
       if (enabled) state.sketchModeUnlocked = true;
       requestRedraw();
     },
     onThemeChange: () => requestRedraw(),
-  }, state.showTodayLine, state.sketchMode, slug);
+  }, state.showTodayLine, state.weekendBands, state.sketchMode, slug);
 
   // --- Undo/redo ---
   undoManager.init(snapshot());

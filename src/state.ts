@@ -11,6 +11,7 @@ interface SerializedState {
   collapsedEventPaths: EventPath[];
   eventOrders?: Record<string, string[]>;
   showTodayLine?: boolean;
+  weekendBands?: boolean;
   sketchMode?: boolean;
 }
 
@@ -55,6 +56,7 @@ export interface PersistableState {
   events: TimelineEvent[];
   eventOrders: Map<string, string[]>;
   showTodayLine: boolean;
+  weekendBands: boolean;
   sketchMode: boolean;
 }
 
@@ -84,6 +86,7 @@ export function saveState(slug: string, s: PersistableState): void {
     collapsedEventPaths,
     eventOrders: serializedOrders,
     showTodayLine: s.showTodayLine,
+    weekendBands: s.weekendBands,
     sketchMode: s.sketchMode,
   };
 
@@ -104,6 +107,7 @@ export function loadState(
   collapsedEvents: Set<TimelineEvent>;
   eventOrders: Map<string, string[]>;
   showTodayLine: boolean;
+  weekendBands: boolean;
   sketchMode: boolean;
 } | null {
   try {
@@ -139,6 +143,7 @@ export function loadState(
       collapsedEvents,
       eventOrders,
       showTodayLine: state.showTodayLine ?? true,
+      weekendBands: state.weekendBands ?? true,
       sketchMode: state.sketchMode ?? false,
     };
   } catch {

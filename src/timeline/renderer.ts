@@ -238,33 +238,47 @@ function drawWeekBands(
   viewport: Viewport,
   canvasWidth: number,
   canvasHeight: number,
+  weekendBands: boolean,
 ) {
   // Convert viewport edges to absolute days from epoch (Jan 1 2024 = Monday)
   const startDay = decYearToAbsDay(viewport.start);
   const endDay = decYearToAbsDay(viewport.end);
 
-  // Find the first Monday-aligned week boundary at or before startDay
+  // Find the first Monday at or before startDay
   // Epoch day 0 is a Monday, so align to multiples of 7
-  const firstWeekDay = Math.floor(startDay / 7) * 7;
-  let weekIndex = Math.floor(startDay / 7);
+  const firstMonday = Math.floor(startDay / 7) * 7;
 
   const top = LAYOUT.axisY;
   ctx.fillStyle = colorWithAlpha(colors.axisText, 0.05);
 
-  let dayPos = firstWeekDay;
-  while (dayPos < endDay) {
-    const nextDayPos = dayPos + 7;
-
-    if (weekIndex % 2 !== 0) {
-      const x1 = Math.max(0, yearToX(absDayToDecYear(dayPos), viewport, canvasWidth));
-      const x2 = Math.min(canvasWidth, yearToX(absDayToDecYear(nextDayPos), viewport, canvasWidth));
+  let monday = firstMonday;
+  if (weekendBands) {
+    // Shade weekends (Sat–Sun)
+    while (monday < endDay) {
+      const saturday = monday + 5;
+      const nextMonday = monday + 7;
+      const x1 = Math.max(0, yearToX(absDayToDecYear(saturday), viewport, canvasWidth));
+      const x2 = Math.min(canvasWidth, yearToX(absDayToDecYear(nextMonday), viewport, canvasWidth));
       if (x2 > x1) {
         ctx.fillRect(x1, top, x2 - x1, canvasHeight - top);
       }
+      monday += 7;
     }
-
-    dayPos = nextDayPos;
-    weekIndex++;
+  } else {
+    // Shade alternating full weeks
+    let weekIndex = Math.floor(startDay / 7);
+    while (monday < endDay) {
+      const nextMonday = monday + 7;
+      if (weekIndex % 2 !== 0) {
+        const x1 = Math.max(0, yearToX(absDayToDecYear(monday), viewport, canvasWidth));
+        const x2 = Math.min(canvasWidth, yearToX(absDayToDecYear(nextMonday), viewport, canvasWidth));
+        if (x2 > x1) {
+          ctx.fillRect(x1, top, x2 - x1, canvasHeight - top);
+        }
+      }
+      monday += 7;
+      weekIndex++;
+    }
   }
 }
 
@@ -273,6 +287,7 @@ function drawAxis(
   viewport: Viewport,
   canvasWidth: number,
   canvasHeight: number,
+  weekendBands: boolean,
 ) {
   const y = LAYOUT.axisY;
   const x1 = LAYOUT.paddingX;
@@ -295,7 +310,7 @@ function drawAxis(
     const pxPerWeek = canvasWidth / (spanYears * (365 / 7));
     const weekBandsVisible = pxPerWeek >= 30;
     if (weekBandsVisible) {
-      drawWeekBands(ctx, viewport, canvasWidth, canvasHeight);
+      drawWeekBands(ctx, viewport, canvasWidth, canvasHeight, weekendBands);
     }
     const monthGridVisible = pxPerMonth >= 50;
     if (monthGridVisible) {
@@ -1167,6 +1182,7 @@ export function render(
   snapState: SnapState,
   scrollY: number,
   showTodayLine?: boolean,
+  weekendBands?: boolean,
   transition?: LayoutTransition,
   reorderState?: ReorderState,
 ) {
@@ -1227,7 +1243,7 @@ export function render(
   ctx.restore();
 
   // Axis and overlays drawn in screen space (not scrolled)
-  drawAxis(ctx, viewport, canvasWidth, canvasHeight);
+  drawAxis(ctx, viewport, canvasWidth, canvasHeight, weekendBands !== false);
   if (showTodayLine !== false) drawTodayLine(ctx, viewport, canvasWidth, canvasHeight);
   const todayVisible = showTodayLine !== false;
   drawSelectionForeground(
