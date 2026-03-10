@@ -86,6 +86,7 @@ export class EventMenu {
   private multiEvents: TimelineEvent[] = [];
   private nameField: HTMLDivElement | null = null;
   private infoField: HTMLDivElement | null = null;
+  private multiLabel: HTMLDivElement | null = null;
   private exportBtn: HTMLDivElement | null = null;
   private deleteBtn: HTMLDivElement | null = null;
 
@@ -182,6 +183,15 @@ export class EventMenu {
     infoField.appendChild(this.infoInput);
     body.appendChild(infoField);
     this.infoField = infoField;
+
+    // Multi-select label (hidden by default)
+    const multiLabel = document.createElement("div");
+    multiLabel.className = "event-menu-field";
+    multiLabel.style.display = "none";
+    multiLabel.style.fontStyle = "italic";
+    multiLabel.style.opacity = "0.7";
+    body.appendChild(multiLabel);
+    this.multiLabel = multiLabel;
 
     // Start section
     const startHeader = document.createElement("div");
@@ -407,9 +417,10 @@ export class EventMenu {
     this.multiEvents = [];
     this.retained = false;
     this.currentEvent = event;
-    // Restore name/info visibility
+    // Restore name/info visibility, hide multi label
     if (this.nameField) this.nameField.style.display = "";
     if (this.infoField) this.infoField.style.display = "";
+    if (this.multiLabel) this.multiLabel.style.display = "none";
     if (this.exportBtn) this.exportBtn.textContent = "Export event";
     if (this.deleteBtn) this.deleteBtn.textContent = "Delete event";
     this.titleSpan.textContent = event.name;
@@ -481,9 +492,10 @@ export class EventMenu {
     this.el.classList.add("disabled", "collapsed");
     this.titleSpan.textContent = "Nothing selected";
     this.currentEvent = null;
-    // Restore name/info visibility
+    // Restore name/info visibility, hide multi label
     if (this.nameField) this.nameField.style.display = "";
     if (this.infoField) this.infoField.style.display = "";
+    if (this.multiLabel) this.multiLabel.style.display = "none";
     if (this.exportBtn) this.exportBtn.textContent = "Export event";
     if (this.deleteBtn) this.deleteBtn.textContent = "Delete event";
   }
@@ -541,9 +553,13 @@ export class EventMenu {
     // Title
     this.titleSpan.textContent = `${events.length} events selected`;
 
-    // Hide name + info fields
+    // Hide name + info fields, show multi label
     if (this.nameField) this.nameField.style.display = "none";
     if (this.infoField) this.infoField.style.display = "none";
+    if (this.multiLabel) {
+      this.multiLabel.textContent = `${events.length} events`;
+      this.multiLabel.style.display = "";
+    }
 
     // Type selector: active button if all same type, else none
     const types = events.map((e) =>

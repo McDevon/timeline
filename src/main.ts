@@ -1361,7 +1361,30 @@ async function main() {
       commit({ relayout: true, saveEvents: true, undo: true });
     },
     onBulkChangeParent: (events, newParent) => {
+      if (newParent) {
+        // If any selected event is an ancestor of the target, extract
+        // the target first so it doesn't get orphaned when we remove them.
+        // Place it at the level of its shallowest selected ancestor.
+        const selectedSet = new Set(events);
+        let current: TimelineEvent | null = findParent(state.events, newParent);
+        let shallowestSelectedAncestor: TimelineEvent | null = null;
+        while (current) {
+          if (selectedSet.has(current)) shallowestSelectedAncestor = current;
+          current = findParent(state.events, current);
+        }
+        if (shallowestSelectedAncestor) {
+          const destParent = findParent(state.events, shallowestSelectedAncestor);
+          removeEvent(state.events, newParent);
+          if (destParent) {
+            if (!destParent.nested) destParent.nested = [];
+            destParent.nested.push(newParent);
+          } else {
+            state.events.push(newParent);
+          }
+        }
+      }
       for (const e of events) {
+        if (e === newParent) continue; // can't move an event into itself
         removeEvent(state.events, e);
         if (newParent === null) {
           state.events.push(e);
