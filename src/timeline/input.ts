@@ -485,6 +485,7 @@ export function setupInput(config: InputConfig): InputHandlers {
         didDrag: false,
       };
       canvas.style.cursor = 'col-resize';
+      updateCursorLine(-1, LAYOUT.eventsStartY);
       selAnchorOverride = null;
       selExtendOverride = null;
     } else if (modifierHeld) {

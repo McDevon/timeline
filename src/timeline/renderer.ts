@@ -341,15 +341,33 @@ function drawTodayLine(
   const today = todayDecimalYear();
   if (today < viewport.start || today > viewport.end) return;
 
-  const x = yearToX(today, viewport, canvasWidth);
+  const spanYears = viewport.end - viewport.start;
+  const pxPerWeek = canvasWidth / (spanYears * (365 / 7));
+  const weekBandsVisible = pxPerWeek >= 30;
 
-  // Vertical line
-  ctx.strokeStyle = colors.todayLine;
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(x, LAYOUT.axisY - LAYOUT.tickHeight);
-  ctx.lineTo(x, canvasHeight);
-  ctx.stroke();
+  const x = yearToX(today, viewport, canvasWidth);
+  const top = LAYOUT.axisY - LAYOUT.tickHeight;
+
+  let labelX: number;
+
+  if (weekBandsVisible) {
+    // Full-day-width highlight when zoomed in enough to see weeks
+    const absDay = Math.floor(decYearToAbsDay(today));
+    const dayStart = yearToX(absDayToDecYear(absDay), viewport, canvasWidth);
+    const dayEnd = yearToX(absDayToDecYear(absDay + 1), viewport, canvasWidth);
+    ctx.fillStyle = colorWithAlpha(colors.todayLine, 0.3);
+    ctx.fillRect(dayStart, top, dayEnd - dayStart, canvasHeight - top);
+    labelX = (dayStart + dayEnd) / 2;
+  } else {
+    // Thin vertical line at normal zoom levels
+    ctx.strokeStyle = colors.todayLine;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x, top);
+    ctx.lineTo(x, canvasHeight);
+    ctx.stroke();
+    labelX = x;
+  }
 
   // Date label above axis
   ctx.fillStyle = colors.todayText;
@@ -358,7 +376,7 @@ function drawTodayLine(
   ctx.textBaseline = "bottom";
   ctx.fillText(
     formatDate(todayIsoDate()),
-    x,
+    labelX,
     LAYOUT.axisY - LAYOUT.tickHeight - 4,
   );
 }
