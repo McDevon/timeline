@@ -64,6 +64,8 @@ export class EventMenu {
 
   // Sticky open/closed intent — only toggled by header click
   private wantOpen = false;
+  // True when showing a deselected event (no canvas selection)
+  private retained = false;
 
   // Stashed end date (for type switching round-trips)
   private stashedEnd: string | undefined;
@@ -102,6 +104,10 @@ export class EventMenu {
     this.header.addEventListener("click", () => {
       if (this.el.classList.contains("disabled")) return;
       this.wantOpen = !this.wantOpen;
+      if (!this.wantOpen && this.retained) {
+        this.hide();
+        return;
+      }
       this.el.classList.toggle("collapsed", !this.wantOpen);
       if (!this.wantOpen) {
         this.hideColorFlyout();
@@ -348,6 +354,7 @@ export class EventMenu {
   }
 
   show(event: TimelineEvent): void {
+    this.retained = false;
     this.currentEvent = event;
     this.titleSpan.textContent = event.name;
     this.nameInput.value = event.name;
@@ -393,7 +400,18 @@ export class EventMenu {
     this.el.classList.toggle("collapsed", !this.wantOpen);
   }
 
+  /** Soft deselect: if wantOpen, keep showing last event; otherwise fully hide. */
+  deselect(): void {
+    if (this.wantOpen && this.currentEvent) {
+      this.retained = true;
+      return;
+    }
+    this.hide();
+  }
+
+  /** Unconditional hide — used when the event is deleted or data is replaced. */
   hide(): void {
+    this.retained = false;
     this.hideColorFlyout();
     this.hideParentFlyout();
     this.el.classList.add("disabled", "collapsed");

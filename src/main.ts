@@ -330,7 +330,7 @@ async function main() {
       if (state.selectedItem && state.selectedItem.event !== event && isDescendantOf(state.selectedItem.event, event)) {
         state.selectedItem = null;
         eventListPanel?.selectEvent(null);
-        eventMenu.hide();
+        eventMenu.deselect();
       }
     }
 
@@ -419,7 +419,7 @@ async function main() {
     if (state.selectedItem && !findLayoutItem(state.selectedItem.event, state.layout)) {
       state.selectedItem = null;
       eventListPanel?.selectEvent(null);
-      eventMenu.hide();
+      eventMenu.deselect();
     }
 
     undoManager.push(snapshot());
@@ -870,7 +870,7 @@ async function main() {
     setSelected: (item: LayoutItem | null) => {
       state.selectedItem = item;
       eventListPanel?.selectEvent(item?.event ?? null);
-      if (item) eventMenu.show(item.event); else eventMenu.hide();
+      if (item) eventMenu.show(item.event); else eventMenu.deselect();
     },
     setCursorX: (x: number) => { state.cursorX = x; },
     getSelection: () => state.selection,
@@ -951,7 +951,7 @@ async function main() {
     state.selectedItem = state.preClickSelectedItem;
     inputHandlers.restoreSelectionOverrides(state.preClickSnapOverrides.anchor, state.preClickSnapOverrides.extend);
     eventListPanel?.selectEvent(state.selectedItem?.event ?? null);
-    if (state.selectedItem) eventMenu.show(state.selectedItem.event); else eventMenu.hide();
+    if (state.selectedItem) eventMenu.show(state.selectedItem.event); else eventMenu.deselect();
 
     toggleZoom(hit.event, hit);
   });
@@ -991,7 +991,7 @@ async function main() {
       if (state.selectedItem && isDescendantOf(state.selectedItem.event, event)) {
         state.selectedItem = null;
         eventListPanel?.selectEvent(null);
-        eventMenu.hide();
+        eventMenu.deselect();
       }
       if (state.dblClickItem && isDescendantOf(state.dblClickItem.event, event)) {
         state.dblClickPrevViewport = null;
@@ -1641,12 +1641,12 @@ async function main() {
       } else {
         state.selectedItem = null;
         eventListPanel?.selectEvent(null);
-        eventMenu.hide();
+        eventMenu.deselect();
       }
     } else {
       state.selectedItem = null;
       eventListPanel?.selectEvent(null);
-      eventMenu.hide();
+      eventMenu.deselect();
     }
 
     state.hoveredItem = null;
