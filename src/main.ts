@@ -20,7 +20,7 @@ import { showPromptDialog } from './ui/promptDialog';
 import { showHelpDialog } from './ui/helpDialog';
 import { saveState, loadState, eventToPath, pathToEvent } from './state';
 import { UndoManager, UndoableState, captureSnapshot, resolvePathSet, getEventId } from './undo';
-import { dateToDecimalYear, decimalYearToIso, shiftIsoDate } from './data/time';
+import { dateToDecimalYear, decimalYearToIso, shiftIsoDate, todayIsoDate } from './data/time';
 import { isStoreInitialized, setStoreInitialized, loadStoredEvents, saveStoredEvents, clearStoredEvents, clearStore } from './data/store';
 import { validateEvents } from './data/validate';
 import { loadSavedTheme, applyTheme } from './themes';
@@ -1287,7 +1287,7 @@ async function main() {
     // 3. Create event
     const siblings = parent?.nested ?? state.events;
     const newEvent: TimelineEvent = { name: uniqueSiblingName('New event', siblings), start };
-    if (end !== undefined) newEvent.end = end;
+    if (end !== undefined) newEvent.end = end === todayIsoDate() ? 'ongoing' : end;
 
     // 4. Add to data
     if (parent) {
