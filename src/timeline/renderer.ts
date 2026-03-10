@@ -664,14 +664,14 @@ function drawContainer(
   const custom = eventColor ? deriveContainerColors(eventColor.hex) : null;
 
   const fillColor = isSelected
-    ? colors.containerSelectedFill
+    ? (custom?.selectedFill ?? colors.containerSelectedFill)
     : isHovered
       ? (custom?.hoverFill ?? colors.containerHoverFill)
       : isSnap
         ? (custom?.snapFill ?? colors.containerSnapFill)
         : (custom?.fill ?? colors.containerFill);
   const strokeColor = isSelected
-    ? colors.containerSelectedBorder
+    ? (custom?.selectedBorder ?? colors.containerSelectedBorder)
     : isHovered
       ? (custom?.hoverBorder ?? colors.containerHoverBorder)
       : isSnap
@@ -806,6 +806,9 @@ interface DerivedColors {
   hoverBorder: string;
   snapFill: string;
   snapBorder: string;
+  selectedFill: string;
+  selectedBorder: string;
+  selectedText: string;
   text: string;
 }
 
@@ -817,6 +820,9 @@ function deriveBarColors(hex: string): DerivedColors {
     hoverBorder: darken(hex, 0.10),
     snapFill: lighten(hex, 0.06),
     snapBorder: darken(hex, 0.15),
+    selectedFill: darken(hex, 0.15),
+    selectedBorder: lighten(hex, 0.30),
+    selectedText: textColorForBg(darken(hex, 0.15)),
     text: textColorForBg(hex),
   };
 }
@@ -829,6 +835,9 @@ function deriveContainerColors(hex: string): DerivedColors {
     hoverBorder: lighten(hex, 0.20),
     snapFill: colorWithAlpha(hex, 0.25),
     snapBorder: lighten(hex, 0.10),
+    selectedFill: colorWithAlpha(hex, 0.45),
+    selectedBorder: lighten(hex, 0.30),
+    selectedText: colors.containerText,
     text: colors.containerText, // background shows through
   };
 }
@@ -970,21 +979,21 @@ function drawBar(
   const custom = eventColor ? deriveBarColors(eventColor.hex) : null;
 
   const fillColor = isSelected
-    ? colors.barSelectedFill
+    ? (custom?.selectedFill ?? colors.barSelectedFill)
     : isHovered
       ? (custom?.hoverFill ?? colors.barHoverFill)
       : isSnap
         ? (custom?.snapFill ?? colors.barSnapFill)
         : (custom?.fill ?? colors.barFill);
   const strokeColor = isSelected
-    ? colors.barSelectedBorder
+    ? (custom?.selectedBorder ?? colors.barSelectedBorder)
     : isHovered
       ? (custom?.hoverBorder ?? colors.barHoverBorder)
       : isSnap
         ? (custom?.snapBorder ?? colors.barSnapBorder)
         : (custom?.border ?? colors.barBorder);
   const lineWidth = isSelected || isHovered ? 2 : 1;
-  const textColor = isSelected ? colors.barText : (custom?.text ?? colors.barText);
+  const textColor = isSelected ? (custom?.selectedText ?? colors.barText) : (custom?.text ?? colors.barText);
 
   applyGradient(ctx, item, viewport, canvasWidth, x1, barWidth, fillColor, strokeColor, lineWidth);
 
@@ -1053,7 +1062,7 @@ function drawPointEvent(
   ctx.beginPath();
   ctx.arc(x, cy, radius, 0, Math.PI * 2);
   ctx.fillStyle = isSelected
-    ? colors.barSelectedFill
+    ? (custom?.selectedFill ?? colors.barSelectedFill)
     : isHovered
       ? (custom?.hoverFill ?? colors.barHoverFill)
       : isSnap
@@ -1061,7 +1070,7 @@ function drawPointEvent(
         : (custom?.fill ?? colors.barFill);
   ctx.fill();
   ctx.strokeStyle = isSelected
-    ? colors.barSelectedBorder
+    ? (custom?.selectedBorder ?? colors.barSelectedBorder)
     : isHovered
       ? (custom?.hoverBorder ?? colors.barHoverBorder)
       : isSnap
