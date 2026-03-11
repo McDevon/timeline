@@ -8,6 +8,7 @@ export interface TimelineMenuCallbacks {
   onToggleTodayLine: (show: boolean) => void;
   onToggleWeekendBands: (show: boolean) => void;
   onToggleSketchMode: (enabled: boolean) => void;
+  onToggleEditMode: (enabled: boolean) => void;
   onDeleteAll: () => void;
   onReloadDefaults: () => void;
   onThemeChange: () => void;
@@ -20,16 +21,26 @@ export class TimelineMenu {
   private currentThemeId: string;
   private slug: string;
   private sketchCheckbox: HTMLInputElement | null = null;
+  private editCheckbox: HTMLInputElement | null = null;
   private showTodayLine: boolean;
   private weekendBands: boolean;
   private sketchMode: boolean;
+  private editMode: boolean;
 
-  constructor(callbacks: TimelineMenuCallbacks, initialShowTodayLine: boolean, initialWeekendBands: boolean, initialSketchMode: boolean, slug = '') {
+  // Edit-only buttons to hide in observer mode
+  private importBtn: HTMLDivElement;
+  private importIntoBtn: HTMLDivElement;
+  private loadFileBtn: HTMLDivElement;
+  private deleteAllBtn: HTMLDivElement;
+  private reloadDefaultsBtn: HTMLDivElement;
+
+  constructor(callbacks: TimelineMenuCallbacks, initialShowTodayLine: boolean, initialWeekendBands: boolean, initialSketchMode: boolean, initialEditMode: boolean, slug = '') {
     this.slug = slug;
     this.currentThemeId = loadSavedTheme(slug).id;
     this.showTodayLine = initialShowTodayLine;
     this.weekendBands = initialWeekendBands;
     this.sketchMode = initialSketchMode;
+    this.editMode = initialEditMode;
 
     this.el = document.createElement('div');
     this.el.className = 'timeline-menu collapsed';
@@ -49,13 +60,20 @@ export class TimelineMenu {
     const body = document.createElement('div');
     body.className = 'timeline-menu-body';
 
-    body.appendChild(this.createButton('Import events', false, callbacks.onImport));
-    body.appendChild(this.createButton('Import into new event', false, callbacks.onImportIntoEvent));
-    body.appendChild(this.createButton('Load events from file', false, callbacks.onLoadFile));
+    this.importBtn = this.createButton('Import events', false, callbacks.onImport);
+    this.importIntoBtn = this.createButton('Import into new event', false, callbacks.onImportIntoEvent);
+    this.loadFileBtn = this.createButton('Load events from file', false, callbacks.onLoadFile);
+    body.appendChild(this.importBtn);
+    body.appendChild(this.importIntoBtn);
+    body.appendChild(this.loadFileBtn);
     body.appendChild(this.createButton('Export events', false, callbacks.onExport));
     body.appendChild(this.createViewButton(callbacks));
-    body.appendChild(this.createButton('Delete all events', true, callbacks.onDeleteAll));
-    body.appendChild(this.createButton('Reload default events', true, callbacks.onReloadDefaults));
+    this.deleteAllBtn = this.createButton('Delete all events', true, callbacks.onDeleteAll);
+    this.reloadDefaultsBtn = this.createButton('Reload default events', true, callbacks.onReloadDefaults);
+    body.appendChild(this.deleteAllBtn);
+    body.appendChild(this.reloadDefaultsBtn);
+
+    this.applyEditMode();
 
     this.el.appendChild(body);
     document.body.appendChild(this.el);
@@ -108,19 +126,37 @@ export class TimelineMenu {
       this.showTodayLine = checked;
       callbacks.onToggleTodayLine(checked);
     });
+    todayRow.dataset.tooltip = 'Show a vertical line marking the current date';
     flyout.appendChild(todayRow);
 
     const weekendRow = this.createFlyoutCheckbox('Weekend bands', this.weekendBands, (checked) => {
       this.weekendBands = checked;
       callbacks.onToggleWeekendBands(checked);
     });
+    weekendRow.dataset.tooltip = 'Shade weekends when zoomed in to day level';
     flyout.appendChild(weekendRow);
 
+    const editRow = this.createFlyoutCheckbox('Enable editing', this.editMode, (checked) => {
+      this.editMode = checked;
+      callbacks.onToggleEditMode(checked);
+      // Rebuild flyout so sketch row updates immediately
+      this.showViewFlyout(anchor, callbacks);
+    });
+    editRow.dataset.tooltip = 'Allow adding, modifying, and deleting events';
+    this.editCheckbox = editRow.querySelector('input') as HTMLInputElement;
+    flyout.appendChild(editRow);
+
     const sketchRow = this.createFlyoutCheckbox('Sketch mode', this.sketchMode, (checked) => {
+      if (!this.editMode) return;
       this.sketchMode = checked;
       callbacks.onToggleSketchMode(checked);
     });
+    sketchRow.dataset.tooltip = 'Drag events on the canvas to move or resize them';
     this.sketchCheckbox = sketchRow.querySelector('input') as HTMLInputElement;
+    if (!this.editMode) {
+      sketchRow.style.opacity = '0.4';
+      sketchRow.style.pointerEvents = 'none';
+    }
     flyout.appendChild(sketchRow);
 
     // Separator
@@ -224,8 +260,8 @@ export class TimelineMenu {
     }
     const rows = flyout.querySelectorAll('.theme-flyout-row');
     const idx = themes.indexOf(theme);
-    // Offset by 3 checkbox rows + 1 separator
-    const rowIdx = idx + 3;
+    // Offset by 4 checkbox rows + 1 separator
+    const rowIdx = idx + 4;
     if (rowIdx >= 0 && rows[rowIdx]) {
       rows[rowIdx].classList.add('active');
     }
@@ -251,5 +287,20 @@ export class TimelineMenu {
   setSketchMode(enabled: boolean) {
     this.sketchMode = enabled;
     if (this.sketchCheckbox) this.sketchCheckbox.checked = enabled;
+  }
+
+  setEditMode(enabled: boolean) {
+    this.editMode = enabled;
+    if (this.editCheckbox) this.editCheckbox.checked = enabled;
+    this.applyEditMode();
+  }
+
+  private applyEditMode() {
+    const display = this.editMode ? '' : 'none';
+    this.importBtn.style.display = display;
+    this.importIntoBtn.style.display = display;
+    this.loadFileBtn.style.display = display;
+    this.deleteAllBtn.style.display = display;
+    this.reloadDefaultsBtn.style.display = display;
   }
 }

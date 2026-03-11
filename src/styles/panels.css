@@ -574,6 +574,30 @@
 .theme-flyout-row.active {
   background: var(--tl-list-highlight-strong);
 }
+.theme-flyout-row[data-tooltip] {
+  position: relative;
+}
+.theme-flyout-row[data-tooltip]:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: calc(100% + 4px);
+  background: var(--tl-panel-bg);
+  border: 1px solid var(--tl-border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 11px;
+  color: var(--tl-text-muted);
+  white-space: nowrap;
+  z-index: 70;
+  pointer-events: none;
+  opacity: 0;
+  animation: tooltip-show 0s 0.3s forwards;
+}
+@keyframes tooltip-show {
+  to { opacity: 1; }
+}
 .theme-swatches {
   display: flex;
   gap: 2px;

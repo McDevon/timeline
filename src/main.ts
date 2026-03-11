@@ -93,6 +93,7 @@ async function main() {
     weekendBands: saved?.weekendBands ?? true,
     sketchMode: saved?.sketchMode ?? config.sketchMode ?? false,
     sketchModeUnlocked: !!(saved?.sketchMode ?? config.sketchMode),
+    editMode: saved?.editMode ?? config.editMode ?? true,
     eventListOnLeft: saved?.eventListOnLeft ?? true,
 
     // Transient interaction
@@ -909,7 +910,7 @@ async function main() {
     requestRedraw,
     getShowTodayLine: () => state.showTodayLine,
     onContextMenu,
-    getSketchMode: () => state.sketchMode,
+    getSketchMode: () => state.sketchMode && state.editMode,
     onSketchMove,
     onSketchEnd,
     onSketchCancel,
@@ -1444,12 +1445,14 @@ async function main() {
   const newEventBtn = document.createElement('div');
   newEventBtn.className = 'new-event-btn';
   newEventBtn.textContent = '+';
-  newEventBtn.title = 'New event';
+  newEventBtn.dataset.tooltip = 'New event';
   document.body.appendChild(newEventBtn);
 
   newEventBtn.style.left = '536px';
+  if (!state.editMode) newEventBtn.style.display = 'none';
 
   newEventBtn.addEventListener('click', () => {
+    if (!state.editMode) return;
     // 1. Determine parent
     const parent = (state.selectedItem && state.selectedItem.event.end !== undefined)
       ? state.selectedItem.event : null;
@@ -1676,6 +1679,7 @@ async function main() {
   });
 
   document.body.addEventListener('dragenter', (e) => {
+    if (!state.editMode) return;
     e.preventDefault();
     dragCounter++;
     if (dragCounter === 1) {
@@ -1695,6 +1699,10 @@ async function main() {
     e.preventDefault();
     dragCounter = 0;
     dropOverlay?.classList.remove('visible');
+    if (!state.editMode) {
+      infoLog.show('Enable editing to add events');
+      return;
+    }
 
     const file = e.dataTransfer?.files[0];
     if (file) importEventsFromFile(file);
@@ -1777,8 +1785,16 @@ async function main() {
       if (enabled) state.sketchModeUnlocked = true;
       requestRedraw();
     },
+    onToggleEditMode: (enabled) => {
+      state.editMode = enabled;
+      newEventBtn.style.display = enabled ? '' : 'none';
+      eventMenu.setEditMode(enabled);
+      timelineMenu.setEditMode(enabled);
+      contextMenu.setEditMode(enabled);
+      requestRedraw();
+    },
     onThemeChange: () => requestRedraw(),
-  }, state.showTodayLine, state.weekendBands, state.sketchMode, slug);
+  }, state.showTodayLine, state.weekendBands, state.sketchMode, state.editMode, slug);
 
   // --- Undo/redo ---
   undoManager.init(snapshot());
@@ -1981,8 +1997,8 @@ async function main() {
       return;
     }
 
-    // Delete/Backspace: delete selected event(s)
-    if ((e.key === 'Delete' || e.key === 'Backspace') && state.selectedEvents.size > 0) {
+    // Delete/Backspace: delete selected event(s) (edit mode only)
+    if ((e.key === 'Delete' || e.key === 'Backspace') && state.editMode && state.selectedEvents.size > 0) {
       e.preventDefault();
       const events = [...state.selectedEvents];
       showConfirmDialog(`Delete ${events.length} events?`, () => {
@@ -1999,7 +2015,7 @@ async function main() {
       });
       return;
     }
-    if ((e.key === 'Delete' || e.key === 'Backspace') && state.selectedItem) {
+    if ((e.key === 'Delete' || e.key === 'Backspace') && state.editMode && state.selectedItem) {
       e.preventDefault();
       const event = state.selectedItem.event;
       showConfirmDialog(`Delete "${event.name}"?`, () => deleteEvent(event));

@@ -18,8 +18,13 @@ export class ContextMenu {
   private flyoutAnchor: HTMLDivElement | null = null;
   private onClickOutside: ((e: MouseEvent) => void) | null = null;
   private onKeyDown: ((e: KeyboardEvent) => void) | null = null;
+  private editMode = true;
 
   constructor(private callbacks: ContextMenuCallbacks) {}
+
+  setEditMode(enabled: boolean) {
+    this.editMode = enabled;
+  }
 
   show(event: TimelineEvent, x: number, y: number): void {
     this.hide();
@@ -27,28 +32,30 @@ export class ContextMenu {
     const menu = document.createElement("div");
     menu.className = "context-menu";
 
-    // Edit
-    const editRow = this.createRow("Edit");
+    // Edit / View
+    const editRow = this.createRow(this.editMode ? "Edit" : "View");
     editRow.addEventListener("click", () => {
       this.hide();
       this.callbacks.onEdit(event);
     });
     menu.appendChild(editRow);
 
-    // Move to...
-    const moveRow = this.createRow("Move to\u2026");
-    const moveArrow = document.createElement("span");
-    moveArrow.className = "context-menu-arrow";
-    moveArrow.textContent = "\u25B6";
-    moveRow.appendChild(moveArrow);
-    moveRow.addEventListener("mouseenter", () => {
-      this.showParentFlyout(event, moveRow);
-    });
-    moveRow.addEventListener("click", (e) => {
-      e.stopPropagation();
-      this.showParentFlyout(event, moveRow);
-    });
-    menu.appendChild(moveRow);
+    // Move to... (edit-only)
+    if (this.editMode) {
+      const moveRow = this.createRow("Move to\u2026");
+      const moveArrow = document.createElement("span");
+      moveArrow.className = "context-menu-arrow";
+      moveArrow.textContent = "\u25B6";
+      moveRow.appendChild(moveArrow);
+      moveRow.addEventListener("mouseenter", () => {
+        this.showParentFlyout(event, moveRow);
+      });
+      moveRow.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.showParentFlyout(event, moveRow);
+      });
+      menu.appendChild(moveRow);
+    }
 
     // Export
     const exportRow = this.createRow("Export event");
@@ -58,16 +65,18 @@ export class ContextMenu {
     });
     menu.appendChild(exportRow);
 
-    // Delete
-    const deleteRow = this.createRow("Delete event");
-    deleteRow.classList.add("destructive");
-    deleteRow.addEventListener("click", () => {
-      this.hide();
-      showConfirmDialog(`Delete "${event.name}"?`, () => {
-        this.callbacks.onDelete(event);
+    // Delete (edit-only)
+    if (this.editMode) {
+      const deleteRow = this.createRow("Delete event");
+      deleteRow.classList.add("destructive");
+      deleteRow.addEventListener("click", () => {
+        this.hide();
+        showConfirmDialog(`Delete "${event.name}"?`, () => {
+          this.callbacks.onDelete(event);
+        });
       });
-    });
-    menu.appendChild(deleteRow);
+      menu.appendChild(deleteRow);
+    }
 
     document.body.appendChild(menu);
     this.el = menu;

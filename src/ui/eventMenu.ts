@@ -1,5 +1,5 @@
 import { TimelineEvent } from "../types";
-import { dateToDecimalYear, todayDecimalYear, todayIsoDate } from "../data/time";
+import { dateToDecimalYear, formatDate, todayDecimalYear, todayIsoDate } from "../data/time";
 import { showConfirmDialog } from "./confirmDialog";
 import { DateInput } from "./dateInput";
 import { ApproxInput } from "./approxInput";
@@ -97,6 +97,20 @@ export class EventMenu {
   private colorAnchor: HTMLDivElement | null = null;
   private colorHideTimer = 0;
 
+  // Edit mode
+  private editMode = true;
+  private readonlyName: HTMLSpanElement;
+  private readonlyInfo: HTMLDivElement;
+  private readonlyStartDate: HTMLDivElement;
+  private readonlyStartApprox: HTMLDivElement;
+  private readonlyEndDate: HTMLDivElement;
+  private readonlyEndApprox: HTMLDivElement;
+  private readonlyType: HTMLSpanElement;
+  private typeRow: HTMLDivElement;
+  private colorHeader: HTMLDivElement;
+  private colorRowEl: HTMLDivElement;
+  private parentArrow: HTMLSpanElement;
+
   // Parent flyout
   private parentTriggerText: HTMLSpanElement;
   private parentFlyout: HTMLDivElement | null = null;
@@ -163,8 +177,11 @@ export class EventMenu {
         this.titleSpan.textContent = corrected;
       }
     });
+    this.readonlyName = document.createElement("span");
+    this.readonlyName.style.display = "none";
     nameField.appendChild(nameLabel);
     nameField.appendChild(this.nameInput);
+    nameField.appendChild(this.readonlyName);
     body.appendChild(nameField);
     this.nameField = nameField;
 
@@ -179,8 +196,13 @@ export class EventMenu {
       if (!this.currentEvent) return;
       callbacks.onEditInfo(this.currentEvent, this.infoInput.value);
     });
+    this.readonlyInfo = document.createElement("div");
+    this.readonlyInfo.style.display = "none";
+    this.readonlyInfo.style.whiteSpace = "pre-wrap";
+    this.readonlyInfo.style.wordBreak = "break-word";
     infoField.appendChild(infoLabel);
     infoField.appendChild(this.infoInput);
+    infoField.appendChild(this.readonlyInfo);
     body.appendChild(infoField);
     this.infoField = infoField;
 
@@ -226,7 +248,11 @@ export class EventMenu {
         }
       }
     });
+    this.readonlyStartDate = document.createElement("div");
+    this.readonlyStartDate.style.display = "none";
+    this.readonlyStartDate.style.padding = "2px 10px";
     body.appendChild(this.startDateInput.getElement());
+    body.appendChild(this.readonlyStartDate);
 
     this.startApproxInput = new ApproxInput((approx) => {
       if (this.multiMode) {
@@ -236,7 +262,11 @@ export class EventMenu {
       if (!this.currentEvent) return;
       callbacks.onChangeStartApprox(this.currentEvent, approx);
     });
+    this.readonlyStartApprox = document.createElement("div");
+    this.readonlyStartApprox.style.display = "none";
+    this.readonlyStartApprox.style.padding = "2px 10px";
     body.appendChild(this.startApproxInput.getElement());
+    body.appendChild(this.readonlyStartApprox);
 
     // End section
     this.endSection = document.createElement("div");
@@ -287,7 +317,15 @@ export class EventMenu {
     });
     this.endDateContainer.appendChild(this.endApproxInput.getElement());
 
+    this.readonlyEndDate = document.createElement("div");
+    this.readonlyEndDate.style.display = "none";
+    this.readonlyEndDate.style.padding = "2px 10px";
+    this.readonlyEndApprox = document.createElement("div");
+    this.readonlyEndApprox.style.display = "none";
+    this.readonlyEndApprox.style.padding = "2px 10px";
     this.endSection.appendChild(this.endDateContainer);
+    this.endSection.appendChild(this.readonlyEndDate);
+    this.endSection.appendChild(this.readonlyEndApprox);
     body.appendChild(this.endSection);
 
     // Type selector
@@ -301,13 +339,17 @@ export class EventMenu {
       typeRow.appendChild(btn);
       this.typeBtns.set(type, btn);
     }
+    this.typeRow = typeRow;
+    this.readonlyType = document.createElement("span");
+    this.readonlyType.style.display = "none";
     body.appendChild(typeRow);
+    body.appendChild(this.readonlyType);
 
     // Color section — hover-triggered flyout
-    const colorHeader = document.createElement("div");
-    colorHeader.className = "event-menu-section";
-    colorHeader.textContent = "Color";
-    body.appendChild(colorHeader);
+    this.colorHeader = document.createElement("div");
+    this.colorHeader.className = "event-menu-section";
+    this.colorHeader.textContent = "Color";
+    body.appendChild(this.colorHeader);
 
     const colorRow = document.createElement("div");
     colorRow.className = "event-menu-btn";
@@ -330,6 +372,7 @@ export class EventMenu {
     colorRow.appendChild(colorArrow);
 
     colorRow.addEventListener("mouseenter", () => {
+      if (!this.editMode) return;
       clearTimeout(this.colorHideTimer);
       this.showColorFlyout(colorRow);
     });
@@ -337,6 +380,7 @@ export class EventMenu {
       this.scheduleColorHide();
     });
 
+    this.colorRowEl = colorRow;
     body.appendChild(colorRow);
 
     // Parent section — hover-triggered flyout
@@ -359,10 +403,12 @@ export class EventMenu {
     const parentArrow = document.createElement("span");
     parentArrow.style.flexShrink = "0";
     parentArrow.textContent = "\u25B6";
+    this.parentArrow = parentArrow;
     parentRow.appendChild(this.parentTriggerText);
     parentRow.appendChild(parentArrow);
 
     parentRow.addEventListener("mouseenter", () => {
+      if (!this.editMode) return;
       clearTimeout(this.parentHideTimer);
       this.showParentFlyout(parentRow);
     });
@@ -459,9 +505,14 @@ export class EventMenu {
       ? currentParent.name
       : "None (top level)";
 
+    // Populate read-only fields
+    this.populateReadonly(event);
+
     // Close any open flyouts
     this.hideColorFlyout();
     this.hideParentFlyout();
+
+    this.applyEditMode();
 
     this.el.classList.remove("disabled");
     this.el.classList.toggle("collapsed", !this.wantOpen);
@@ -550,6 +601,7 @@ export class EventMenu {
   }
 
   focusName(): void {
+    if (!this.editMode) return;
     this.wantOpen = true;
     this.el.classList.remove("collapsed");
     this.nameInput.focus();
@@ -674,6 +726,8 @@ export class EventMenu {
     // Close flyouts
     this.hideColorFlyout();
     this.hideParentFlyout();
+
+    this.applyEditMode();
 
     this.el.classList.remove("disabled");
     this.el.classList.toggle("collapsed", !this.wantOpen);
@@ -1229,6 +1283,82 @@ export class EventMenu {
 
     this.updateTypeButtons();
     this.updateEndSection();
+  }
+
+  setEditMode(enabled: boolean) {
+    this.editMode = enabled;
+    this.applyEditMode();
+  }
+
+  private applyEditMode() {
+    const edit = this.editMode;
+    // Name
+    this.nameInput.style.display = edit ? "" : "none";
+    this.readonlyName.style.display = edit ? "none" : "";
+    // Info
+    this.infoInput.style.display = edit ? "" : "none";
+    this.readonlyInfo.style.display = edit ? "none" : "";
+    // Start
+    this.startDateInput.getElement().style.display = edit ? "" : "none";
+    this.readonlyStartDate.style.display = edit ? "none" : "";
+    this.startApproxInput.getElement().style.display = edit ? "" : "none";
+    this.readonlyStartApprox.style.display = edit ? "none" : "";
+    // End
+    if (edit) {
+      this.endDateContainer.style.display = "";
+      this.readonlyEndDate.style.display = "none";
+      this.readonlyEndApprox.style.display = "none";
+    } else {
+      this.endDateContainer.style.display = "none";
+      if (this.currentEvent) this.populateReadonly(this.currentEvent);
+    }
+    // Type: hide both in observer mode
+    this.typeRow.style.display = edit ? "" : "none";
+    this.readonlyType.style.display = "none";
+    // Color section: hide entirely in observer mode
+    this.colorHeader.style.display = edit ? "" : "none";
+    this.colorRowEl.style.display = edit ? "flex" : "none";
+    // Parent arrow
+    this.parentArrow.style.display = edit ? "" : "none";
+    // Delete button
+    if (this.deleteBtn) this.deleteBtn.style.display = edit ? "" : "none";
+  }
+
+  private populateReadonly(event: TimelineEvent) {
+    this.readonlyName.textContent = event.name;
+
+    if (event.info) {
+      this.readonlyInfo.textContent = event.info;
+      this.readonlyInfo.style.display = this.editMode ? "none" : "";
+      if (this.infoField) this.infoField.style.display = "";
+    } else if (!this.editMode) {
+      if (this.infoField) this.infoField.style.display = "none";
+    }
+
+    this.readonlyStartDate.textContent = formatDate(event.start);
+    if (event.startApprox) {
+      this.readonlyStartApprox.textContent = `Uncertainty: ${formatDate(event.startApprox[0])} – ${formatDate(event.startApprox[1])}`;
+      this.readonlyStartApprox.style.display = this.editMode ? "none" : "";
+    } else {
+      this.readonlyStartApprox.style.display = "none";
+    }
+
+    const typeLabel = event.end === undefined ? "Point" : event.end === "ongoing" ? "Ongoing" : "Range";
+    this.readonlyType.textContent = typeLabel;
+
+    if (event.end !== undefined && event.end !== "ongoing") {
+      this.readonlyEndDate.textContent = formatDate(event.end);
+      this.readonlyEndDate.style.display = this.editMode ? "none" : "";
+      if (event.endApprox) {
+        this.readonlyEndApprox.textContent = `Uncertainty: ${formatDate(event.endApprox[0])} – ${formatDate(event.endApprox[1])}`;
+        this.readonlyEndApprox.style.display = this.editMode ? "none" : "";
+      } else {
+        this.readonlyEndApprox.style.display = "none";
+      }
+    } else {
+      this.readonlyEndDate.style.display = "none";
+      this.readonlyEndApprox.style.display = "none";
+    }
   }
 }
 

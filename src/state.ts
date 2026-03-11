@@ -13,6 +13,7 @@ interface SerializedState {
   showTodayLine?: boolean;
   weekendBands?: boolean;
   sketchMode?: boolean;
+  editMode?: boolean;
   eventListOnLeft?: boolean;
 }
 
@@ -59,6 +60,7 @@ export interface PersistableState {
   showTodayLine: boolean;
   weekendBands: boolean;
   sketchMode: boolean;
+  editMode: boolean;
   eventListOnLeft?: boolean;
 }
 
@@ -90,6 +92,7 @@ export function saveState(slug: string, s: PersistableState): void {
     showTodayLine: s.showTodayLine,
     weekendBands: s.weekendBands,
     sketchMode: s.sketchMode,
+    editMode: s.editMode,
     eventListOnLeft: s.eventListOnLeft,
   };
 
@@ -112,6 +115,7 @@ export function loadState(
   showTodayLine: boolean;
   weekendBands: boolean;
   sketchMode: boolean;
+  editMode: boolean;
   eventListOnLeft?: boolean;
 } | null {
   try {
@@ -149,6 +153,7 @@ export function loadState(
       showTodayLine: state.showTodayLine ?? true,
       weekendBands: state.weekendBands ?? true,
       sketchMode: state.sketchMode ?? false,
+      editMode: state.editMode ?? true,
       eventListOnLeft: state.eventListOnLeft,
     };
   } catch {
