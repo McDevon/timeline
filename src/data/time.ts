@@ -196,6 +196,14 @@ export function hasFullDate(isoDate: string): boolean {
   return rest.split('-').length >= 3;
 }
 
+/**
+ * Returns true if the ISO date string has at least year-month precision.
+ */
+export function hasMonthDate(isoDate: string): boolean {
+  const rest = isoDate.startsWith('-') ? isoDate.slice(1) : isoDate;
+  return rest.split('-').length >= 2;
+}
+
 function parseIsoDate(iso: string): { year: number; month: number; day: number } {
   let rest = iso;
   let negative = false;

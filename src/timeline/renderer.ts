@@ -7,6 +7,7 @@ import {
   formatDate,
   formatDecimalYearDelta,
   hasFullDate,
+  hasMonthDate,
   formatPreciseDuration,
   formatDaysDuration,
   todayDecimalYear,
@@ -405,7 +406,8 @@ function formatRelativeToNow(year: number, detail: SnapDetail | null, span: numb
           : formatPreciseDuration(todayIso, detail.isoDate));
     return delta > 0 ? `${dur} ago` : delta < 0 ? `in ${dur}` : 'today';
   }
-  const mag = formatDecimalYearDelta(delta, span);
+  const effectiveSpan = detail && hasMonthDate(detail.isoDate) ? Math.min(span, 2) : span;
+  const mag = formatDecimalYearDelta(delta, effectiveSpan);
   return delta > 0 ? `${mag} ago` : `in ${mag}`;
 }
 
@@ -620,7 +622,14 @@ function drawSelectionForeground(
         ? formatDaysDuration(selStartDetail.isoDate, selEndDetail.isoDate)
         : formatPreciseDuration(selStartDetail.isoDate, selEndDetail.isoDate);
     } else {
-      const span = viewport.end - viewport.start;
+      let span = viewport.end - viewport.start;
+      // When both endpoints have month precision, ensure at least month-level detail
+      if (
+        selStartDetail && selEndDetail &&
+        hasMonthDate(selStartDetail.isoDate) && hasMonthDate(selEndDetail.isoDate)
+      ) {
+        span = Math.min(span, 2);
+      }
       duration = formatDecimalYearDelta(selection.end - selection.start, span);
     }
 
