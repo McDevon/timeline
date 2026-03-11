@@ -1416,8 +1416,12 @@ async function main() {
       infoLog.show(`Deleted ${events.length} events`);
     },
     onBulkExport: (events) => {
-      exportToFile(events, 'selected-events.json');
-      infoLog.show(`Exported ${events.length} events`);
+      // Only export root-most events to avoid duplicating nested children
+      const roots = events.filter(ev =>
+        !events.some(other => other !== ev && isDescendantOf(ev, other))
+      );
+      exportToFile(roots, 'selected-events.json');
+      infoLog.show(`Exported ${roots.length} events`);
     },
   });
 
@@ -1882,6 +1886,91 @@ async function main() {
       e.preventDefault();
       toggleCollapseAll();
       return;
+    }
+
+    // Toggle event edit menu: E
+    if (e.key === 'e' || e.key === 'E') {
+      e.preventDefault();
+      eventMenu.toggleWantOpen();
+      return;
+    }
+
+    // Toggle collapse selected events: C
+    if (e.key === 'c' || e.key === 'C') {
+      // Gather collapsible events from multi-select or single selection
+      const targets: TimelineEvent[] = [];
+      if (state.selectedEvents.size > 0) {
+        for (const ev of state.selectedEvents) {
+          if (ev.end !== undefined || ev.startApprox !== undefined) targets.push(ev);
+        }
+      } else if (state.selectedItem) {
+        const ev = state.selectedItem.event;
+        if (ev.end !== undefined || ev.startApprox !== undefined) targets.push(ev);
+      }
+      // Remove events whose ancestor is also in the set (only collapse top-most)
+      const roots = targets.filter(ev =>
+        !targets.some(other => other !== ev && isDescendantOf(ev, other))
+      );
+      if (roots.length > 0) {
+        e.preventDefault();
+        const oldPositions = new Map<TimelineEvent, number>();
+        capturePositions(state.layout, oldPositions);
+
+        const fadingOut: LayoutItem[] = [];
+        const fadingIn = new Set<TimelineEvent>();
+
+        // If any root is expanded, collapse all; otherwise expand all
+        const shouldCollapse = roots.some(ev => !state.collapsedEvents.has(ev));
+        for (const ev of roots) {
+          state.collapseAllSaved?.delete(ev);
+          if (shouldCollapse && !state.collapsedEvents.has(ev)) {
+            const container = findLayoutItem(ev, state.layout);
+            if (container) {
+              for (const child of container.children) fadingOut.push(child);
+            }
+            state.collapsedEvents.add(ev);
+          } else if (!shouldCollapse && state.collapsedEvents.has(ev)) {
+            state.collapsedEvents.delete(ev);
+          }
+        }
+
+        relayout();
+
+        const yOffsets = new Map<TimelineEvent, number>();
+        computeOffsets(state.layout, oldPositions, yOffsets);
+
+        if (!shouldCollapse) {
+          for (const ev of roots) {
+            const container = findLayoutItem(ev, state.layout);
+            if (container) {
+              for (const child of container.children) fadingIn.add(child.event);
+            }
+          }
+        }
+
+        anim.layoutTransition = (fadingOut.length > 0 || yOffsets.size > 0 || fadingIn.size > 0)
+          ? { startTime: performance.now(), fadingOut, yOffsets, fadingIn }
+          : null;
+
+        // Clear hovered/selected if now hidden inside a collapsed parent
+        if (shouldCollapse) {
+          for (const ev of roots) {
+            if (state.hoveredItem && state.hoveredItem.event !== ev && isDescendantOf(state.hoveredItem.event, ev)) {
+              setHoveredItem(null);
+            }
+            if (state.selectedItem && state.selectedItem.event !== ev && isDescendantOf(state.selectedItem.event, ev)) {
+              state.selectedItem = null;
+              eventListPanel?.selectEvent(null);
+              eventMenu.deselect();
+            }
+          }
+        }
+
+        undoManager.push(snapshot());
+        infoLog.show(shouldCollapse ? 'Collapsed selected' : 'Expanded selected');
+        requestRedraw();
+        return;
+      }
     }
 
     // Escape: clear multi-select

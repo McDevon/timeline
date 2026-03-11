@@ -513,6 +513,20 @@ export class EventMenu {
     this.el.classList.remove("collapsed");
   }
 
+  toggleWantOpen(): void {
+    if (this.el.classList.contains("disabled")) return;
+    this.wantOpen = !this.wantOpen;
+    if (!this.wantOpen && this.retained) {
+      this.hide();
+      return;
+    }
+    this.el.classList.toggle("collapsed", !this.wantOpen);
+    if (!this.wantOpen) {
+      this.hideColorFlyout();
+      this.hideParentFlyout();
+    }
+  }
+
   /** Right edge of the menu in viewport pixels (for occlusion checks). */
   getRightEdge(): number {
     return this.el.getBoundingClientRect().right;
