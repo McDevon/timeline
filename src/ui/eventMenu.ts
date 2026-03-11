@@ -1068,7 +1068,7 @@ export class EventMenu {
     // Default swatch (first position)
     const defaultSwatch = document.createElement("div");
     defaultSwatch.className = "color-swatch default-swatch" + (currentColor === undefined ? " active" : "");
-    defaultSwatch.title = "Default";
+    defaultSwatch.dataset.tooltip = "Default";
     defaultSwatch.addEventListener("click", () => {
       if (this.multiMode) {
         this.callbacks.onBulkChangeColor?.(this.multiEvents, undefined);
@@ -1088,7 +1088,7 @@ export class EventMenu {
       const swatch = document.createElement("div");
       swatch.className = "color-swatch" + (currentColor === ec.id ? " active" : "");
       swatch.style.background = ec.hex;
-      swatch.title = ec.label;
+      swatch.dataset.tooltip = ec.label;
       swatch.addEventListener("click", () => {
         if (this.multiMode) {
           this.callbacks.onBulkChangeColor?.(this.multiEvents, ec.id);
