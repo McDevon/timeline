@@ -550,6 +550,9 @@
 .color-swatch[data-tooltip] {
   position: relative;
 }
+.color-swatch[data-tooltip]:hover {
+  z-index: 71;
+}
 .color-swatch[data-tooltip]:hover::before {
   content: attr(data-tooltip);
   position: absolute;
@@ -560,6 +563,7 @@
   border: 1px solid var(--tl-border);
   border-radius: 4px;
   padding: 4px 8px;
+  font-family: sans-serif;
   font-size: 11px;
   color: var(--tl-text-muted);
   white-space: nowrap;
