@@ -46,7 +46,7 @@ export function zoomViewport(
 ): Viewport {
   const anchorYear = xToYear(cursorX, viewport, canvasWidth);
 
-  let factor = 1 + deltaY * 0.001;
+  let factor = 1 + deltaY * 0.003;
 
   // Clamp factor to respect span limits
   const currentSpan = viewport.end - viewport.start;
