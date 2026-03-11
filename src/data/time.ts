@@ -400,6 +400,26 @@ export function todayDecimalYear(): number {
   return y + dayOfYear / daysInYear(y);
 }
 
+/**
+ * Count the number of whole days between two full ISO date strings.
+ * Uses actual calendar day counting via absolute day offsets.
+ */
+export function daysBetween(startIso: string, endIso: string): number {
+  const s = dateToDecimalYear(startIso);
+  const e = dateToDecimalYear(endIso);
+  const startDay = decYearToAbsDay(s);
+  const endDay = decYearToAbsDay(e);
+  return Math.round(endDay - startDay);
+}
+
+/**
+ * Format the duration between two full ISO dates as total days, e.g. "854 d".
+ */
+export function formatDaysDuration(startIso: string, endIso: string): string {
+  const days = Math.abs(daysBetween(startIso, endIso));
+  return `${days} d`;
+}
+
 export function todayIsoDate(): string {
   const now = new Date();
   const y = now.getFullYear();

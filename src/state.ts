@@ -15,6 +15,7 @@ interface SerializedState {
   sketchMode?: boolean;
   editMode?: boolean;
   eventListOnLeft?: boolean;
+  showRangesAsDays?: boolean;
 }
 
 const STORAGE_BASE = 'timeline-state';
@@ -62,6 +63,7 @@ export interface PersistableState {
   sketchMode: boolean;
   editMode: boolean;
   eventListOnLeft?: boolean;
+  showRangesAsDays: boolean;
 }
 
 export function saveState(slug: string, s: PersistableState): void {
@@ -94,6 +96,7 @@ export function saveState(slug: string, s: PersistableState): void {
     sketchMode: s.sketchMode,
     editMode: s.editMode,
     eventListOnLeft: s.eventListOnLeft,
+    showRangesAsDays: s.showRangesAsDays,
   };
 
   try {
@@ -117,6 +120,7 @@ export function loadState(
   sketchMode: boolean;
   editMode: boolean;
   eventListOnLeft?: boolean;
+  showRangesAsDays: boolean;
 } | null {
   try {
     const raw = localStorage.getItem(storageKey(slug));
@@ -155,6 +159,7 @@ export function loadState(
       sketchMode: state.sketchMode ?? false,
       editMode: state.editMode ?? true,
       eventListOnLeft: state.eventListOnLeft,
+      showRangesAsDays: state.showRangesAsDays ?? false,
     };
   } catch {
     return null;

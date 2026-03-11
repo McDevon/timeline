@@ -9,6 +9,7 @@ export interface TimelineMenuCallbacks {
   onToggleWeekendBands: (show: boolean) => void;
   onToggleSketchMode: (enabled: boolean) => void;
   onToggleEditMode: (enabled: boolean) => void;
+  onToggleShowRangesAsDays: (enabled: boolean) => void;
   onDeleteAll: () => void;
   onReloadDefaults: () => void;
   onThemeChange: () => void;
@@ -26,6 +27,7 @@ export class TimelineMenu {
   private weekendBands: boolean;
   private sketchMode: boolean;
   private editMode: boolean;
+  private showRangesAsDays: boolean;
 
   // Edit-only buttons to hide in observer mode
   private importBtn: HTMLDivElement;
@@ -34,13 +36,14 @@ export class TimelineMenu {
   private deleteAllBtn: HTMLDivElement;
   private reloadDefaultsBtn: HTMLDivElement;
 
-  constructor(callbacks: TimelineMenuCallbacks, initialShowTodayLine: boolean, initialWeekendBands: boolean, initialSketchMode: boolean, initialEditMode: boolean, slug = '') {
+  constructor(callbacks: TimelineMenuCallbacks, initialShowTodayLine: boolean, initialWeekendBands: boolean, initialSketchMode: boolean, initialEditMode: boolean, initialShowRangesAsDays: boolean, slug = '') {
     this.slug = slug;
     this.currentThemeId = loadSavedTheme(slug).id;
     this.showTodayLine = initialShowTodayLine;
     this.weekendBands = initialWeekendBands;
     this.sketchMode = initialSketchMode;
     this.editMode = initialEditMode;
+    this.showRangesAsDays = initialShowRangesAsDays;
 
     this.el = document.createElement('div');
     this.el.className = 'timeline-menu collapsed';
@@ -135,6 +138,13 @@ export class TimelineMenu {
     });
     weekendRow.dataset.tooltip = 'Shade weekends when zoomed in to day level';
     flyout.appendChild(weekendRow);
+
+    const daysRow = this.createFlyoutCheckbox('Show ranges as days', this.showRangesAsDays, (checked) => {
+      this.showRangesAsDays = checked;
+      callbacks.onToggleShowRangesAsDays(checked);
+    });
+    daysRow.dataset.tooltip = 'Show precise durations in total days';
+    flyout.appendChild(daysRow);
 
     const editRow = this.createFlyoutCheckbox('Enable editing', this.editMode, (checked) => {
       this.editMode = checked;
@@ -260,8 +270,8 @@ export class TimelineMenu {
     }
     const rows = flyout.querySelectorAll('.theme-flyout-row');
     const idx = themes.indexOf(theme);
-    // Offset by 4 checkbox rows + 1 separator
-    const rowIdx = idx + 4;
+    // Offset by 5 checkbox rows + 1 separator
+    const rowIdx = idx + 5;
     if (rowIdx >= 0 && rows[rowIdx]) {
       rows[rowIdx].classList.add('active');
     }
@@ -287,6 +297,10 @@ export class TimelineMenu {
   setSketchMode(enabled: boolean) {
     this.sketchMode = enabled;
     if (this.sketchCheckbox) this.sketchCheckbox.checked = enabled;
+  }
+
+  setShowRangesAsDays(enabled: boolean) {
+    this.showRangesAsDays = enabled;
   }
 
   setEditMode(enabled: boolean) {

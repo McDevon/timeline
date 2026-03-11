@@ -14,6 +14,8 @@ import {
   daysFromEpochToYear,
   decYearToAbsDay,
   absDayToDecYear,
+  daysBetween,
+  formatDaysDuration,
 } from './time';
 
 describe('isLeapYear', () => {
@@ -460,5 +462,50 @@ describe('decYearToAbsDay / absDayToDecYear round-trip', () => {
     const dy = 1900.5;
     const day = decYearToAbsDay(dy);
     expect(absDayToDecYear(day)).toBeCloseTo(dy, 5);
+  });
+});
+
+describe('daysBetween', () => {
+  it('returns 0 for same date', () => {
+    expect(daysBetween('2024-01-01', '2024-01-01')).toBe(0);
+  });
+
+  it('counts days within a month', () => {
+    expect(daysBetween('2024-01-01', '2024-01-15')).toBe(14);
+  });
+
+  it('counts days across months', () => {
+    expect(daysBetween('2024-01-15', '2024-03-01')).toBe(46);
+  });
+
+  it('counts days across a non-leap year', () => {
+    expect(daysBetween('2023-01-01', '2024-01-01')).toBe(365);
+  });
+
+  it('counts days across a leap year', () => {
+    expect(daysBetween('2024-01-01', '2025-01-01')).toBe(366);
+  });
+
+  it('handles multi-year spans', () => {
+    // 2020-01-01 to 2024-01-01: 2020(leap 366) + 2021(365) + 2022(365) + 2023(365) = 1461
+    expect(daysBetween('2020-01-01', '2024-01-01')).toBe(1461);
+  });
+});
+
+describe('formatDaysDuration', () => {
+  it('formats single day', () => {
+    expect(formatDaysDuration('2024-01-01', '2024-01-02')).toBe('1 d');
+  });
+
+  it('formats multi-day span', () => {
+    expect(formatDaysDuration('2024-01-01', '2024-01-15')).toBe('14 d');
+  });
+
+  it('formats zero days', () => {
+    expect(formatDaysDuration('2024-06-15', '2024-06-15')).toBe('0 d');
+  });
+
+  it('handles reversed order (absolute value)', () => {
+    expect(formatDaysDuration('2024-01-15', '2024-01-01')).toBe('14 d');
   });
 });

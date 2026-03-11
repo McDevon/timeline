@@ -8,6 +8,7 @@ import {
   formatDecimalYearDelta,
   hasFullDate,
   formatPreciseDuration,
+  formatDaysDuration,
   todayDecimalYear,
   todayIsoDate,
   MONTH_NAMES,
@@ -390,14 +391,18 @@ function drawTodayLine(
 }
 
 /** Format a "X ago" / "in X" string, using day-precise calendar math when the detail has a full date. */
-function formatRelativeToNow(year: number, detail: SnapDetail | null, span: number): string {
+function formatRelativeToNow(year: number, detail: SnapDetail | null, span: number, showRangesAsDays?: boolean): string {
   const today = todayDecimalYear();
   const delta = today - year;
   if (detail && hasFullDate(detail.isoDate)) {
     const todayIso = todayIsoDate();
-    const dur = delta >= 0
-      ? formatPreciseDuration(detail.isoDate, todayIso)
-      : formatPreciseDuration(todayIso, detail.isoDate);
+    const dur = showRangesAsDays
+      ? (delta >= 0
+          ? formatDaysDuration(detail.isoDate, todayIso)
+          : formatDaysDuration(todayIso, detail.isoDate))
+      : (delta >= 0
+          ? formatPreciseDuration(detail.isoDate, todayIso)
+          : formatPreciseDuration(todayIso, detail.isoDate));
     return delta > 0 ? `${dur} ago` : delta < 0 ? `in ${dur}` : 'today';
   }
   const mag = formatDecimalYearDelta(delta, span);
@@ -413,6 +418,7 @@ function drawCursorLine(
   canvasWidth: number,
   canvasHeight: number,
   showTodayLine: boolean,
+  showRangesAsDays?: boolean,
 ) {
   if (cursorX < 0) return;
 
@@ -443,7 +449,7 @@ function drawCursorLine(
   if (!isRange) {
     const span = viewport.end - viewport.start;
     if (showTodayLine) {
-      const nowLabel = formatRelativeToNow(year, cursorDetail, span);
+      const nowLabel = formatRelativeToNow(year, cursorDetail, span, showRangesAsDays);
       lines.push({ text: nowLabel, color: colors.cursorText });
     }
 
@@ -525,6 +531,7 @@ function drawSelectionForeground(
   canvasWidth: number,
   canvasHeight: number,
   showTodayLine: boolean,
+  showRangesAsDays?: boolean,
 ) {
   if (selection === null) return;
 
@@ -551,7 +558,7 @@ function drawSelectionForeground(
         ? selStartDetail.date
         : formatDate(decimalYearToIso(selection.start));
       const span = viewport.end - viewport.start;
-      const agoLabel = formatRelativeToNow(selection.start, selStartDetail, span);
+      const agoLabel = formatRelativeToNow(selection.start, selStartDetail, span, showRangesAsDays);
 
       const selLines: string[] = [];
       if (selStartDetail && selStartDetail.label !== selStartDetail.date) {
@@ -609,10 +616,9 @@ function drawSelectionForeground(
       hasFullDate(selStartDetail.isoDate) &&
       hasFullDate(selEndDetail.isoDate)
     ) {
-      duration = formatPreciseDuration(
-        selStartDetail.isoDate,
-        selEndDetail.isoDate,
-      );
+      duration = showRangesAsDays
+        ? formatDaysDuration(selStartDetail.isoDate, selEndDetail.isoDate)
+        : formatPreciseDuration(selStartDetail.isoDate, selEndDetail.isoDate);
     } else {
       const span = viewport.end - viewport.start;
       duration = formatDecimalYearDelta(selection.end - selection.start, span);
@@ -1202,6 +1208,7 @@ export function render(
   reorderState?: ReorderState,
   selectedEvents?: Set<TimelineEvent>,
   boxSelectRect?: BoxSelectRect | null,
+  showRangesAsDays?: boolean,
 ) {
   // Set module-level multi-select for nested draw functions
   currentSelectedEvents = selectedEvents && selectedEvents.size > 0 ? selectedEvents : null;
@@ -1275,6 +1282,7 @@ export function render(
     canvasWidth,
     canvasHeight,
     todayVisible,
+    showRangesAsDays,
   );
   drawCursorLine(
     ctx,
@@ -1285,6 +1293,7 @@ export function render(
     canvasWidth,
     canvasHeight,
     todayVisible,
+    showRangesAsDays,
   );
 
   // Box select overlay — drawn on top of everything

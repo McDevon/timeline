@@ -94,6 +94,7 @@ async function main() {
     sketchMode: saved?.sketchMode ?? config.sketchMode ?? false,
     sketchModeUnlocked: !!(saved?.sketchMode ?? config.sketchMode),
     editMode: saved?.editMode ?? config.editMode ?? true,
+    showRangesAsDays: saved?.showRangesAsDays ?? false,
     eventListOnLeft: saved?.eventListOnLeft ?? true,
 
     // Transient interaction
@@ -240,7 +241,7 @@ async function main() {
 
     const ctx = setupCanvas(canvas);
     const rect = canvas.getBoundingClientRect();
-    render(ctx, rect.width, rect.height, state.layout, state.viewport, state.hoveredItem, state.selectedItem, state.cursorX, state.selection, state.snapState, state.scrollY, state.showTodayLine, state.weekendBands, transition, state.reorderState ?? undefined, state.selectedEvents, state.boxSelectRect);
+    render(ctx, rect.width, rect.height, state.layout, state.viewport, state.hoveredItem, state.selectedItem, state.cursorX, state.selection, state.snapState, state.scrollY, state.showTodayLine, state.weekendBands, transition, state.reorderState ?? undefined, state.selectedEvents, state.boxSelectRect, state.showRangesAsDays);
   }
 
   let saveTimer = 0;
@@ -911,6 +912,7 @@ async function main() {
     getShowTodayLine: () => state.showTodayLine,
     onContextMenu,
     getSketchMode: () => state.sketchMode && state.editMode,
+    getShowRangesAsDays: () => state.showRangesAsDays,
     onSketchMove,
     onSketchEnd,
     onSketchCancel,
@@ -1793,8 +1795,12 @@ async function main() {
       contextMenu.setEditMode(enabled);
       requestRedraw();
     },
+    onToggleShowRangesAsDays: (enabled) => {
+      state.showRangesAsDays = enabled;
+      requestRedraw();
+    },
     onThemeChange: () => requestRedraw(),
-  }, state.showTodayLine, state.weekendBands, state.sketchMode, state.editMode, slug);
+  }, state.showTodayLine, state.weekendBands, state.sketchMode, state.editMode, state.showRangesAsDays, slug);
 
   // --- Undo/redo ---
   undoManager.init(snapshot());
@@ -2019,6 +2025,16 @@ async function main() {
       e.preventDefault();
       const event = state.selectedItem.event;
       showConfirmDialog(`Delete "${event.name}"?`, () => deleteEvent(event));
+      return;
+    }
+
+    // D: toggle show ranges as days
+    if ((e.key === 'd' || e.key === 'D') && !e.metaKey && !e.ctrlKey) {
+      e.preventDefault();
+      state.showRangesAsDays = !state.showRangesAsDays;
+      timelineMenu.setShowRangesAsDays(state.showRangesAsDays);
+      infoLog.show(state.showRangesAsDays ? 'Showing ranges as days' : 'Showing ranges as yr/mo/d');
+      requestRedraw();
       return;
     }
 

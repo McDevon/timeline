@@ -44,6 +44,7 @@ export interface InputConfig {
   onBoxSelectEnd?: () => void;
   onBoxSelectCancel?: () => void;
   onToggleSelect?: (event: import('../types').TimelineEvent) => void;
+  getShowRangesAsDays?: () => boolean;
 }
 
 const CLICK_THRESHOLD = 3; // pixels — movement under this is a click, not a drag
@@ -84,6 +85,7 @@ export function setupInput(config: InputConfig): InputHandlers {
     onBoxSelectEnd,
     onBoxSelectCancel,
     onToggleSelect,
+    getShowRangesAsDays,
   } = config;
   const tooltip = new Tooltip();
 
@@ -320,7 +322,7 @@ export function setupInput(config: InputConfig): InputHandlers {
       setHovered(hit);
       if (hit) {
         const rect = canvas.getBoundingClientRect();
-        tooltip.show(hit.event, rect.left + cursorCanvasX, rect.top + cursorCanvasY);
+        tooltip.show(hit.event, rect.left + cursorCanvasX, rect.top + cursorCanvasY, getShowRangesAsDays?.());
       } else {
         tooltip.hide();
       }

@@ -25,6 +25,7 @@ const SHORTCUTS: [string, string][] = [
   ["Undo", "Ctrl/\u2318 + Z"],
   ["Redo", "Ctrl + Y or \u2318 + Shift + Z"],
   ["Delete event", "Delete or backspace"],
+  ["Toggle ranges as days", "D"],
 ];
 
 export function showHelpDialog(): void {
